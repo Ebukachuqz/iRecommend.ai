@@ -12,7 +12,7 @@ from src.constants import PERSONA_TRAIN_SPLIT
 from src.db.supabase_client import get_supabase_client
 from src.llm.groq_client import get_groq_chat
 from src.llm.logging import log_llm_response
-from src.llm.parsers import get_json_parser
+from src.llm.parsers import parse_json_from_llm_text
 from src.personas.prompts import PERSONA_PROMPT, PERSONA_SCHEMA_EXAMPLE, PERSONA_SYSTEM_INSTRUCTIONS
 from src.personas.validator import persona_to_storage_dict, validate_persona
 
@@ -130,12 +130,11 @@ class PersonaGenerator:
             "review_context": review_context,
             "schema_example": json.dumps(PERSONA_SCHEMA_EXAMPLE, indent=2),
         }
-        parser = get_json_parser()
         llm = get_groq_chat(self.settings.groq_model)
         chain = PERSONA_PROMPT | llm
         raw_message = chain.invoke(prompt_input)
         raw_text = getattr(raw_message, "content", str(raw_message))
-        raw_payload = parser.parse(raw_text)
+        raw_payload, cleaned_json_text = parse_json_from_llm_text(raw_text)
         log_llm_response(
             "persona_generation",
             {
@@ -144,6 +143,7 @@ class PersonaGenerator:
                 "model_name": self.settings.groq_model,
                 "prompt_version": self.settings.persona_prompt_version,
                 "raw_text": raw_text,
+                "cleaned_json_text": cleaned_json_text,
                 "parsed_payload": raw_payload,
             },
         )

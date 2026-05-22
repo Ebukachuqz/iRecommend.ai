@@ -6,7 +6,7 @@ from typing import Any
 from src.config import get_settings
 from src.llm.groq_client import get_groq_chat
 from src.llm.logging import log_llm_response
-from src.llm.parsers import get_json_parser
+from src.llm.parsers import parse_json_from_llm_text
 from src.task_a_simulation.prompts import (
     NIGERIAN_CONTEXT_SECTION,
     NO_NIGERIAN_CONTEXT_SECTION,
@@ -41,12 +41,11 @@ def generate_llm_review_and_rating(
         "nigerian_context": NIGERIAN_CONTEXT_SECTION if nigerian_mode else NO_NIGERIAN_CONTEXT_SECTION,
     }
     llm = get_groq_chat(settings.groq_model)
-    parser = get_json_parser()
     chain = TASK_A_REVIEW_PROMPT | llm
     raw_message = chain.invoke(prompt_input)
     raw_text = getattr(raw_message, "content", str(raw_message))
     try:
-        parsed = parser.parse(raw_text)
+        parsed, cleaned_json_text = parse_json_from_llm_text(raw_text)
         output = LLMReviewSimulationOutput.model_validate(parsed)
     except Exception as exc:
         log_llm_response(
@@ -66,6 +65,7 @@ def generate_llm_review_and_rating(
             "model_name": settings.groq_model,
             "prompt_version": TASK_A_PROMPT_VERSION,
             "raw_text": raw_text,
+            "cleaned_json_text": cleaned_json_text,
             "parsed_payload": output.model_dump(mode="json"),
         },
     )
