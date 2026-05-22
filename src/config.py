@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from src.constants import (
@@ -18,8 +18,14 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     supabase_url: str | None = Field(default=None, alias="SUPABASE_URL")
-    supabase_public_key: str | None = Field(default=None, alias="SUPABASE_PUBLIC_KEY")
-    supabase_secret_key: str | None = Field(default=None, alias="SUPABASE_SECRET_KEY")
+    supabase_public_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("SUPABASE_PUBLIC_KEY", "SUPABASE_ANON_KEY"),
+    )
+    supabase_secret_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY"),
+    )
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
 
     default_category: str = Field(default=DEFAULT_CATEGORY, alias="DEFAULT_CATEGORY")

@@ -2,13 +2,14 @@
 
 Behaviour-aware LLM agents for review simulation and personalised recommendation.
 
-This repository is being built incrementally from the implementation guide. The current implementation covers the repository scaffold, Supabase configuration, Amazon review ingestion modules, persona generation modules, Pydantic persona validation, and database hardening migrations.
+This repository is being built incrementally from the implementation guide. The current implementation covers the repository scaffold, Supabase configuration, Amazon review ingestion modules, persona generation modules, Pydantic persona validation, database hardening migrations, and Task A review simulation.
 
 ## Current Phase
 
-- Phase 1: repository setup and notebook migration
-- Phase 2: database schema hardening
-- Holdout-aware persona regeneration foundation from the immediate execution order
+- Repository setup and notebook migration
+- Database schema hardening
+- Holdout-aware persona regeneration
+- Task A review and rating simulation
 
 ## Setup
 
@@ -18,3 +19,36 @@ This repository is being built incrementally from the implementation guide. The 
 4. Run SQL migrations in `src/db/sql/` in Supabase SQL editor.
 
 Do not commit `.env`.
+
+## Environment
+
+Required variables:
+
+```text
+SUPABASE_URL=
+SUPABASE_PUBLIC_KEY=
+SUPABASE_SECRET_KEY=
+GROQ_API_KEY=
+```
+
+`SUPABASE_SECRET_KEY` is for backend scripts and services only. Do not expose it in frontend code.
+
+## Task A
+
+Run the simulation results migration before Task A:
+
+```powershell
+# Supabase SQL editor
+src/db/sql/005_simulation_results.sql
+```
+
+CLI examples:
+
+```powershell
+python scripts/run_task_a_simulation.py --user-id <USER_ID> --parent-asin <PARENT_ASIN>
+python scripts/run_task_a_simulation.py --user-id <USER_ID> --use-holdout
+python scripts/run_task_a_simulation.py --user-id <USER_ID> --parent-asin <PARENT_ASIN> --nigerian-mode
+python scripts/run_task_a_simulation.py --user-id <USER_ID> --list-unseen --limit 10
+```
+
+Every successful simulation is inserted into `simulation_results`.
