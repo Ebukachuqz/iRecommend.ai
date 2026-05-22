@@ -15,3 +15,15 @@ CREATE TABLE IF NOT EXISTS recommendation_runs (
 
 CREATE INDEX IF NOT EXISTS recommendation_runs_user_category_idx
 ON recommendation_runs (user_id, category);
+
+CREATE TABLE IF NOT EXISTS recommendation_sessions (
+    session_id TEXT PRIMARY KEY,
+    user_id TEXT,
+    category TEXT,
+    state JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS recommendation_sessions_user_category_idx
+ON recommendation_sessions (user_id, category);

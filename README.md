@@ -52,3 +52,30 @@ python scripts/run_task_a_simulation.py --user-id <USER_ID> --list-unseen --limi
 ```
 
 Every successful simulation is inserted into `simulation_results`.
+
+## Task B
+
+Run the recommendation migrations before Task B:
+
+```powershell
+# Supabase SQL editor
+src/db/sql/004_pgvector_setup.sql
+src/db/sql/006_recommendation_tables.sql
+```
+
+Embed products and build taste vectors:
+
+```powershell
+python scripts/embed_products.py --limit 100
+python scripts/build_user_taste_vectors.py --user-id <USER_ID> --category All_Beauty
+```
+
+Run recommendations:
+
+```powershell
+python scripts/run_task_b_recommendation.py --user-id <USER_ID> --request "I want something affordable and gentle"
+python scripts/run_task_b_recommendation.py --user-id <USER_ID>
+python scripts/run_task_b_recommendation.py --cold-start --request "I need affordable skincare for oily skin"
+```
+
+Every successful recommendation call inserts a row into `recommendation_runs`.
