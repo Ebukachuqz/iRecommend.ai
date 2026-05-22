@@ -50,22 +50,24 @@ def build_holdout_updates(reviews: list[dict[str, Any]]) -> list[dict[str, Any]]
     updates: list[dict[str, Any]] = []
     for user_reviews in by_user.values():
         ordered = sorted(user_reviews, key=lambda item: parse_timestamp(item.get("timestamp")), reverse=True)
+        task_b_review_id = next(
+            (
+                review["review_id"]
+                for review in ordered[1:]
+                if float(review.get("rating") or 0) >= 4
+            ),
+            None,
+        )
         for index, review in enumerate(ordered):
             split = PERSONA_TRAIN_SPLIT
-            used_for_persona = True
             if index == 0:
                 split = TASK_A_HOLDOUT_SPLIT
-                used_for_persona = False
-            elif index == 1 and float(review.get("rating") or 0) >= 4:
+            elif review["review_id"] == task_b_review_id:
                 split = TASK_B_HOLDOUT_SPLIT
-                used_for_persona = False
-            elif index == 1:
-                used_for_persona = False
             updates.append(
                 {
                     "review_id": review["review_id"],
                     "task_split": split,
-                    "used_for_persona": used_for_persona,
                 }
             )
     return updates
@@ -73,16 +75,16 @@ def build_holdout_updates(reviews: list[dict[str, Any]]) -> list[dict[str, Any]]
 
 def apply_updates(updates: list[dict[str, Any]], batch_size: int = 500) -> None:
     client = get_supabase_client()
-    grouped: dict[tuple[str, bool], list[str]] = defaultdict(list)
+    grouped: dict[str, list[str]] = defaultdict(list)
     for update in updates:
-        grouped[(update["task_split"], update["used_for_persona"])].append(update["review_id"])
+        grouped[update["task_split"]].append(update["review_id"])
 
-    for (task_split, used_for_persona), review_ids in grouped.items():
+    for task_split, review_ids in grouped.items():
         for start in range(0, len(review_ids), batch_size):
             batch_ids = review_ids[start : start + batch_size]
             (
                 client.table("amazon_reviews")
-                .update({"task_split": task_split, "used_for_persona": used_for_persona})
+                .update({"task_split": task_split})
                 .in_("review_id", batch_ids)
                 .execute()
             )

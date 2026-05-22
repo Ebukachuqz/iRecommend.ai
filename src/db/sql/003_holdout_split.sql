@@ -1,6 +1,5 @@
 ALTER TABLE amazon_reviews
-ADD COLUMN IF NOT EXISTS task_split TEXT DEFAULT 'persona_train',
-ADD COLUMN IF NOT EXISTS used_for_persona BOOLEAN DEFAULT true;
+ADD COLUMN IF NOT EXISTS task_split TEXT DEFAULT 'persona_train';
 
 CREATE INDEX IF NOT EXISTS amazon_reviews_user_split_idx
 ON amazon_reviews (user_id, task_split);

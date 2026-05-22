@@ -45,7 +45,6 @@ def test_fetch_user_reviews_does_not_filter_by_category() -> None:
     filters = client.queries["amazon_reviews"].filters
     assert ("user_id", "user-1") in filters
     assert ("task_split", "persona_train") in filters
-    assert not any(column == "used_for_persona" for column, _value in filters)
     assert not any(column == "category" for column, _value in filters)
 
 

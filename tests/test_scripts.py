@@ -1,5 +1,7 @@
-from scripts.create_holdout_split import build_holdout_updates
+from scripts import create_holdout_split
 from scripts import regenerate_personas
+
+build_holdout_updates = create_holdout_split.build_holdout_updates
 
 
 def test_holdout_split_does_not_require_review_category() -> None:
@@ -15,6 +17,32 @@ def test_holdout_split_does_not_require_review_category() -> None:
     assert by_id["new"]["task_split"] == "task_a_holdout"
     assert by_id["mid"]["task_split"] == "task_b_holdout"
     assert by_id["old"]["task_split"] == "persona_train"
+
+
+def test_holdout_split_uses_most_recent_high_rated_review_for_task_b() -> None:
+    updates = build_holdout_updates(
+        [
+            {"review_id": "old-liked", "user_id": "u1", "rating": 5, "timestamp": "2024-01-01T00:00:00Z"},
+            {"review_id": "mid-low", "user_id": "u1", "rating": 2, "timestamp": "2024-02-01T00:00:00Z"},
+            {"review_id": "new-low", "user_id": "u1", "rating": 3, "timestamp": "2024-03-01T00:00:00Z"},
+        ]
+    )
+
+    by_id = {update["review_id"]: update for update in updates}
+    assert by_id["new-low"] == {"review_id": "new-low", "task_split": "task_a_holdout"}
+    assert by_id["old-liked"] == {"review_id": "old-liked", "task_split": "task_b_holdout"}
+    assert by_id["mid-low"] == {"review_id": "mid-low", "task_split": "persona_train"}
+
+
+def test_holdout_split_leaves_no_task_b_when_no_high_rated_candidate() -> None:
+    updates = build_holdout_updates(
+        [
+            {"review_id": "old-low", "user_id": "u1", "rating": 2, "timestamp": "2024-01-01T00:00:00Z"},
+            {"review_id": "new-low", "user_id": "u1", "rating": 3, "timestamp": "2024-02-01T00:00:00Z"},
+        ]
+    )
+
+    assert {update["task_split"] for update in updates} == {"task_a_holdout", "persona_train"}
 
 
 class QueryRecorder:
@@ -52,4 +80,43 @@ def test_regenerate_user_lookup_does_not_filter_by_category(monkeypatch) -> None
 
     assert regenerate_personas.fetch_user_ids() == ["u1"]
     assert not any(column == "category" for column, _value in client.query.filters)
-    assert not any(column == "used_for_persona" for column, _value in client.query.filters)
+
+
+class UpdateQueryRecorder:
+    def __init__(self) -> None:
+        self.updates = []
+        self.review_ids = []
+
+    def update(self, payload):
+        self.updates.append(payload)
+        return self
+
+    def in_(self, _column, values):
+        self.review_ids.append(values)
+        return self
+
+    def execute(self):
+        return type("Response", (), {"data": []})()
+
+
+class UpdateClientRecorder:
+    def __init__(self) -> None:
+        self.query = UpdateQueryRecorder()
+
+    def table(self, _name):
+        return self.query
+
+
+def test_apply_updates_updates_only_task_split(monkeypatch) -> None:
+    client = UpdateClientRecorder()
+    monkeypatch.setattr(create_holdout_split, "get_supabase_client", lambda: client)
+
+    create_holdout_split.apply_updates(
+        [
+            {"review_id": "r1", "task_split": "task_a_holdout"},
+            {"review_id": "r2", "task_split": "persona_train"},
+        ],
+        batch_size=10,
+    )
+
+    assert all(set(payload) == {"task_split"} for payload in client.query.updates)

@@ -12,7 +12,6 @@ CREATE TABLE IF NOT EXISTS amazon_reviews (
     helpful_vote INTEGER,
     raw_review JSONB DEFAULT '{}'::jsonb,
     task_split TEXT DEFAULT 'persona_train',
-    used_for_persona BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
