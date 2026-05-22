@@ -3,7 +3,7 @@ ADD COLUMN IF NOT EXISTS task_split TEXT DEFAULT 'persona_train',
 ADD COLUMN IF NOT EXISTS used_for_persona BOOLEAN DEFAULT true;
 
 CREATE INDEX IF NOT EXISTS amazon_reviews_user_split_idx
-ON amazon_reviews (user_id, task_split, used_for_persona);
+ON amazon_reviews (user_id, task_split);
 
 CREATE INDEX IF NOT EXISTS amazon_reviews_parent_asin_idx
 ON amazon_reviews (parent_asin);

@@ -23,7 +23,10 @@ CREATE INDEX IF NOT EXISTS amazon_reviews_parent_asin_idx
 ON amazon_reviews (parent_asin);
 
 CREATE INDEX IF NOT EXISTS amazon_reviews_task_split_idx
-ON amazon_reviews (task_split, used_for_persona);
+ON amazon_reviews (task_split);
+
+CREATE INDEX IF NOT EXISTS amazon_reviews_user_split_idx
+ON amazon_reviews (user_id, task_split);
 
 CREATE TABLE IF NOT EXISTS amazon_product_metadata (
     parent_asin TEXT PRIMARY KEY,

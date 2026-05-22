@@ -16,7 +16,6 @@ def fetch_user_ids() -> list[str]:
             client.table("amazon_reviews")
             .select("user_id")
             .eq("task_split", "persona_train")
-            .eq("used_for_persona", True)
             .range(start, end)
             .execute()
         )

@@ -45,7 +45,7 @@ def test_fetch_user_reviews_does_not_filter_by_category() -> None:
     filters = client.queries["amazon_reviews"].filters
     assert ("user_id", "user-1") in filters
     assert ("task_split", "persona_train") in filters
-    assert ("used_for_persona", True) in filters
+    assert not any(column == "used_for_persona" for column, _value in filters)
     assert not any(column == "category" for column, _value in filters)
 
 
@@ -65,3 +65,23 @@ def test_store_persona_payload_includes_review_stats() -> None:
     assert query.payload["review_count"] == 8
     assert query.payload["average_rating"] == 4.25
     assert query.payload["source_review_ids"] == ["r1", "r2"]
+
+
+def test_prompt_stats_source_review_ids_match_selected_prompt_reviews() -> None:
+    generator = PersonaGenerator(client=ClientRecorder())
+    reviews = [
+        {
+            "review_id": f"r{index}",
+            "parent_asin": f"asin-{index}",
+            "rating": 5,
+            "verified_purchase": True,
+        }
+        for index in range(30)
+    ]
+
+    _context, stats = generator.build_prompt_stats(reviews, reviews, max_reviews=12)
+
+    assert stats["review_count"] == 30
+    assert stats["eligible_review_count"] == 30
+    assert stats["prompt_review_count"] == 12
+    assert stats["source_review_ids"] == [f"r{index}" for index in range(18, 30)]

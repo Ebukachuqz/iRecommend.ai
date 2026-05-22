@@ -20,6 +20,7 @@ def test_holdout_split_does_not_require_review_category() -> None:
 class QueryRecorder:
     def __init__(self) -> None:
         self.filters = []
+        self.execute_count = 0
 
     def select(self, _columns):
         return self
@@ -32,7 +33,9 @@ class QueryRecorder:
         return self
 
     def execute(self):
-        return type("Response", (), {"data": [{"user_id": "u1"}]})()
+        self.execute_count += 1
+        data = [{"user_id": "u1"}] if self.execute_count == 1 else []
+        return type("Response", (), {"data": data})()
 
 
 class ClientRecorder:
@@ -49,3 +52,4 @@ def test_regenerate_user_lookup_does_not_filter_by_category(monkeypatch) -> None
 
     assert regenerate_personas.fetch_user_ids() == ["u1"]
     assert not any(column == "category" for column, _value in client.query.filters)
+    assert not any(column == "used_for_persona" for column, _value in client.query.filters)

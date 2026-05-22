@@ -28,7 +28,6 @@ class PersonaGenerator:
             .select("*")
             .eq("user_id", user_id)
             .eq("task_split", PERSONA_TRAIN_SPLIT)
-            .eq("used_for_persona", True)
             .order("timestamp", desc=False)
             .execute()
         )
@@ -64,16 +63,17 @@ class PersonaGenerator:
         ]
         return {
             "review_count": len(reviews),
+            "eligible_review_count": len(reviews),
             "average_rating": round(mean(ratings), 3) if ratings else 0.0,
             "rating_distribution": {str(key): distribution.get(str(key), 0) for key in range(1, 6)},
             "verified_purchase_ratio": round(sum(verified_values) / len(verified_values), 3)
             if verified_values
             else 0.0,
-            "source_review_ids": [review["review_id"] for review in reviews],
         }
 
-    def format_review_context(self, reviews: list[dict[str, Any]], max_reviews: int = 20) -> str:
+    def format_review_context(self, reviews: list[dict[str, Any]], max_reviews: int = 20) -> tuple[str, list[str]]:
         selected = reviews[-max_reviews:]
+        selected_review_ids = [review["review_id"] for review in selected]
         blocks = []
         for review in selected:
             product = review.get("product") or {}
@@ -92,7 +92,22 @@ class PersonaGenerator:
                     ]
                 )
             )
-        return "\n\n---\n\n".join(blocks)
+        return "\n\n---\n\n".join(blocks), selected_review_ids
+
+    def build_prompt_stats(
+        self,
+        reviews: list[dict[str, Any]],
+        enriched_reviews: list[dict[str, Any]],
+        max_reviews: int,
+    ) -> tuple[str, dict[str, Any]]:
+        review_context, selected_review_ids = self.format_review_context(
+            enriched_reviews,
+            max_reviews=max_reviews,
+        )
+        stats = self.compute_user_stats(reviews)
+        stats["prompt_review_count"] = len(selected_review_ids)
+        stats["source_review_ids"] = selected_review_ids
+        return review_context, stats
 
     def generate_persona_payload(
         self,
@@ -107,12 +122,12 @@ class PersonaGenerator:
             raise ValueError(f"No persona_train reviews found for user_id={user_id!r}, category={category!r}.")
 
         enriched_reviews = self.enrich_reviews(reviews)
-        stats = self.compute_user_stats(reviews)
+        review_context, stats = self.build_prompt_stats(reviews, enriched_reviews, max_reviews)
         prompt_input = {
             "instructions": PERSONA_SYSTEM_INSTRUCTIONS,
             "category": category,
             "user_stats": json.dumps(stats, indent=2),
-            "review_context": self.format_review_context(enriched_reviews, max_reviews=max_reviews),
+            "review_context": review_context,
             "schema_example": json.dumps(PERSONA_SCHEMA_EXAMPLE, indent=2),
         }
         parser = get_json_parser()

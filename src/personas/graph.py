@@ -13,6 +13,7 @@ class PersonaGraphState(TypedDict, total=False):
     enriched_reviews: list[dict[str, Any]]
     stats: dict[str, Any]
     review_context: str
+    selected_review_ids: list[str]
     raw_persona: dict[str, Any]
     persona: dict[str, Any]
     stored: bool
@@ -33,7 +34,16 @@ def build_persona_graph(generator: PersonaGenerator | None = None):
         return {**state, "stats": generator.compute_user_stats(state["reviews"])}
 
     def format_review_context(state: PersonaGraphState) -> PersonaGraphState:
-        return {**state, "review_context": generator.format_review_context(state["enriched_reviews"])}
+        review_context, selected_review_ids = generator.format_review_context(state["enriched_reviews"])
+        stats = dict(state["stats"])
+        stats["prompt_review_count"] = len(selected_review_ids)
+        stats["source_review_ids"] = selected_review_ids
+        return {
+            **state,
+            "review_context": review_context,
+            "selected_review_ids": selected_review_ids,
+            "stats": stats,
+        }
 
     def generate_persona_llm(state: PersonaGraphState) -> PersonaGraphState:
         raw_persona, stats = generator.generate_persona_payload(state["user_id"], state["category"])

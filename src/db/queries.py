@@ -34,7 +34,6 @@ def fetch_persona_train_reviews(client: Client, user_id: str) -> list[dict[str, 
         .select("*")
         .eq("user_id", user_id)
         .eq("task_split", PERSONA_TRAIN_SPLIT)
-        .eq("used_for_persona", True)
         .order("timestamp", desc=False)
         .execute()
     )
