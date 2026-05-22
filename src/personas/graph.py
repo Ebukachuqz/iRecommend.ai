@@ -24,7 +24,7 @@ def build_persona_graph(generator: PersonaGenerator | None = None):
     graph = StateGraph(PersonaGraphState)
 
     def fetch_user_reviews(state: PersonaGraphState) -> PersonaGraphState:
-        return {**state, "reviews": generator.fetch_user_reviews(state["user_id"], state["category"])}
+        return {**state, "reviews": generator.fetch_user_reviews(state["user_id"])}
 
     def enrich_with_product_metadata(state: PersonaGraphState) -> PersonaGraphState:
         return {**state, "enriched_reviews": generator.enrich_reviews(state["reviews"])}
@@ -48,7 +48,7 @@ def build_persona_graph(generator: PersonaGenerator | None = None):
             state["user_id"],
             state["category"],
             state["persona"],
-            state["stats"]["source_review_ids"],
+            state["stats"],
         )
         return {**state, "stored": True}
 

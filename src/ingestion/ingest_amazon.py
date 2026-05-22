@@ -79,13 +79,12 @@ def count_users(reviews: Iterable[dict[str, Any]], max_reviews: int | None = Non
     return counts
 
 
-def normalize_review(review: dict[str, Any], category: str) -> dict[str, Any]:
+def normalize_review(review: dict[str, Any]) -> dict[str, Any]:
     parent_asin = review.get("parent_asin") or review.get("asin")
     normalized = AmazonReview(
         review_id=stable_review_id(review),
         user_id=str(review["user_id"]),
         parent_asin=str(parent_asin),
-        category=category,
         rating=review.get("rating"),
         title=review.get("title"),
         text=review.get("text"),
@@ -153,7 +152,7 @@ def ingest_category(
 
     parent_asins: set[str] = set()
     normalized_reviews: Iterator[dict[str, Any]] = (
-        normalize_review(review, category)
+        normalize_review(review)
         for review in stream_reviews(category)
         if review.get("user_id") in eligible_users and (review.get("parent_asin") or review.get("asin"))
     )

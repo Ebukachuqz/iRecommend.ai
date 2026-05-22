@@ -22,7 +22,7 @@ def parse_timestamp(value: Any) -> datetime:
         return datetime.min.replace(tzinfo=timezone.utc)
 
 
-def fetch_reviews(category: str, page_size: int = 1000) -> list[dict[str, Any]]:
+def fetch_reviews(page_size: int = 1000) -> list[dict[str, Any]]:
     client = get_supabase_client()
     rows: list[dict[str, Any]] = []
     start = 0
@@ -30,8 +30,7 @@ def fetch_reviews(category: str, page_size: int = 1000) -> list[dict[str, Any]]:
         end = start + page_size - 1
         response = (
             client.table("amazon_reviews")
-            .select("review_id,user_id,rating,timestamp,category")
-            .eq("category", category)
+            .select("review_id,user_id,rating,timestamp")
             .range(start, end)
             .execute()
         )
@@ -97,7 +96,7 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    reviews = fetch_reviews(args.category)
+    reviews = fetch_reviews()
     updates = build_holdout_updates(reviews)
     counts: dict[str, int] = defaultdict(int)
     for update in updates:

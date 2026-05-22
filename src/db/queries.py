@@ -28,12 +28,11 @@ def fetch_product(client: Client, parent_asin: str) -> dict[str, Any] | None:
     return response.data[0] if response.data else None
 
 
-def fetch_persona_train_reviews(client: Client, user_id: str, category: str) -> list[dict[str, Any]]:
+def fetch_persona_train_reviews(client: Client, user_id: str) -> list[dict[str, Any]]:
     response = (
         client.table("amazon_reviews")
         .select("*")
         .eq("user_id", user_id)
-        .eq("category", category)
         .eq("task_split", PERSONA_TRAIN_SPLIT)
         .eq("used_for_persona", True)
         .order("timestamp", desc=False)

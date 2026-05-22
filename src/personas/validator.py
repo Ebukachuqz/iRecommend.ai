@@ -29,12 +29,21 @@ DEFAULT_SECTIONS = {
     "extra_persona_signals": {},
 }
 
+KNOWN_SCHEMA_KEYS = set(DEFAULT_SECTIONS)
+
 
 def repair_persona_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    repaired = dict(payload)
+    repaired = {key: value for key, value in payload.items() if key in KNOWN_SCHEMA_KEYS}
+    extra_signals = dict(payload.get("extra_persona_signals") or {})
+    unknown_top_level = {key: value for key, value in payload.items() if key not in KNOWN_SCHEMA_KEYS}
+    if unknown_top_level:
+        extra_signals["llm_extra_fields"] = unknown_top_level
+
     for key, default in DEFAULT_SECTIONS.items():
         if key not in repaired or repaired[key] is None:
             repaired[key] = default
+    if extra_signals:
+        repaired["extra_persona_signals"] = extra_signals
     return repaired
 
 

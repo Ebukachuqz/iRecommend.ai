@@ -4,7 +4,6 @@ CREATE TABLE IF NOT EXISTS amazon_reviews (
     review_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
     parent_asin TEXT NOT NULL,
-    category TEXT NOT NULL DEFAULT 'All_Beauty',
     rating FLOAT,
     title TEXT,
     text TEXT,
@@ -17,8 +16,8 @@ CREATE TABLE IF NOT EXISTS amazon_reviews (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS amazon_reviews_user_category_idx
-ON amazon_reviews (user_id, category);
+CREATE INDEX IF NOT EXISTS amazon_reviews_user_idx
+ON amazon_reviews (user_id);
 
 CREATE INDEX IF NOT EXISTS amazon_reviews_parent_asin_idx
 ON amazon_reviews (parent_asin);
@@ -50,6 +49,8 @@ CREATE TABLE IF NOT EXISTS user_personas (
     persona_version TEXT DEFAULT 'v1',
     model_name TEXT,
     prompt_version TEXT,
+    review_count INTEGER DEFAULT 0,
+    average_rating FLOAT,
     source_review_ids JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now(),

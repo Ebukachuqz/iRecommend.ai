@@ -5,7 +5,7 @@ from src.db.supabase_client import get_supabase_client
 from src.personas.generator import PersonaGenerator
 
 
-def fetch_user_ids(category: str) -> list[str]:
+def fetch_user_ids() -> list[str]:
     client = get_supabase_client()
     user_ids: set[str] = set()
     start = 0
@@ -15,7 +15,6 @@ def fetch_user_ids(category: str) -> list[str]:
         response = (
             client.table("amazon_reviews")
             .select("user_id")
-            .eq("category", category)
             .eq("task_split", "persona_train")
             .eq("used_for_persona", True)
             .range(start, end)
@@ -37,7 +36,7 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=None)
     args = parser.parse_args()
 
-    user_ids = args.user_ids or fetch_user_ids(args.category)
+    user_ids = args.user_ids or fetch_user_ids()
     if args.limit:
         user_ids = user_ids[: args.limit]
 

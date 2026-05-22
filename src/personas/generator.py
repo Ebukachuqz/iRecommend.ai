@@ -22,13 +22,11 @@ class PersonaGenerator:
         self.settings = get_settings()
         self.client = client or get_supabase_client()
 
-    def fetch_user_reviews(self, user_id: str, category: str | None = None) -> list[dict[str, Any]]:
-        category = category or self.settings.default_category
+    def fetch_user_reviews(self, user_id: str) -> list[dict[str, Any]]:
         response = (
             self.client.table("amazon_reviews")
             .select("*")
             .eq("user_id", user_id)
-            .eq("category", category)
             .eq("task_split", PERSONA_TRAIN_SPLIT)
             .eq("used_for_persona", True)
             .order("timestamp", desc=False)
@@ -104,7 +102,7 @@ class PersonaGenerator:
         max_reviews: int = 20,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         category = category or self.settings.default_category
-        reviews = self.fetch_user_reviews(user_id, category)
+        reviews = self.fetch_user_reviews(user_id)
         if not reviews:
             raise ValueError(f"No persona_train reviews found for user_id={user_id!r}, category={category!r}.")
 
@@ -152,7 +150,7 @@ class PersonaGenerator:
         user_id: str,
         category: str,
         persona: dict[str, Any],
-        source_review_ids: list[str],
+        stats: dict[str, Any],
     ) -> None:
         payload = {
             "user_id": user_id,
@@ -161,7 +159,9 @@ class PersonaGenerator:
             "persona_version": self.settings.persona_version,
             "model_name": self.settings.groq_model,
             "prompt_version": self.settings.persona_prompt_version,
-            "source_review_ids": source_review_ids,
+            "review_count": stats["review_count"],
+            "average_rating": stats["average_rating"],
+            "source_review_ids": stats["source_review_ids"],
         }
         self.client.table("user_personas").upsert(payload, on_conflict="user_id,category").execute()
 
@@ -176,7 +176,7 @@ class PersonaGenerator:
         category = category or self.settings.default_category
         persona, stats = self.generate_and_validate(user_id, category, max_reviews=max_reviews)
         if store:
-            self.store_persona(user_id, category, persona, stats["source_review_ids"])
+            self.store_persona(user_id, category, persona, stats)
         return {
             "user_id": user_id,
             "category": category,

@@ -10,7 +10,6 @@ class AmazonReview(BaseModel):
     review_id: str
     user_id: str
     parent_asin: str
-    category: str
     rating: float | None = None
     title: str | None = None
     text: str | None = None
