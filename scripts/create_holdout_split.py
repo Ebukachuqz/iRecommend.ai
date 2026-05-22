@@ -3,7 +3,13 @@ from __future__ import annotations
 import argparse
 from collections import defaultdict
 from datetime import datetime, timezone
+from pathlib import Path
+import sys
 from typing import Any
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config import get_settings
 from src.constants import PERSONA_TRAIN_SPLIT, TASK_A_HOLDOUT_SPLIT, TASK_B_HOLDOUT_SPLIT
