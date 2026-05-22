@@ -18,8 +18,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     supabase_url: str | None = Field(default=None, alias="SUPABASE_URL")
-    supabase_anon_key: str | None = Field(default=None, alias="SUPABASE_ANON_KEY")
-    supabase_service_role_key: str | None = Field(default=None, alias="SUPABASE_SERVICE_ROLE_KEY")
+    supabase_public_key: str | None = Field(default=None, alias="SUPABASE_PUBLIC_KEY")
+    supabase_secret_key: str | None = Field(default=None, alias="SUPABASE_SECRET_KEY")
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
 
     default_category: str = Field(default=DEFAULT_CATEGORY, alias="DEFAULT_CATEGORY")
@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     def require_supabase(self) -> tuple[str, str]:
         """Return URL and backend key, preferring the service role key."""
 
-        key = self.supabase_service_role_key or self.supabase_anon_key
+        key = self.supabase_secret_key or self.supabase_public_key
         if not self.supabase_url or not key:
             raise RuntimeError("SUPABASE_URL and a Supabase key must be configured.")
         return self.supabase_url, key
