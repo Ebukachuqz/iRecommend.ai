@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import re
+import string
 from typing import Any
 
 from src.config import get_settings
@@ -52,53 +54,151 @@ Output:
 """
 
 
+def normalize_product_title(title: str | None) -> str:
+    text = (title or "").lower()
+    text = re.sub(r"\b\d+(\.\d+)?\s*(fl\s*)?oz\b", " ", text)
+    text = re.sub(r"\b\d+(\.\d+)?\s*(ounce|ounces|ml|g|gram|grams)\b", " ", text)
+    text = re.sub(r"\b(pack of|pack|set of)\s*\d+\b", " ", text)
+    text = re.sub(r"\b(single|one count|1 count)\b", " ", text)
+    text = text.translate(str.maketrans("", "", string.punctuation))
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def dedupe_terms(terms: list[str], limit: int = 4) -> list[str]:
+    seen: set[str] = set()
+    output: list[str] = []
+    for term in terms:
+        clean = str(term).strip()
+        key = clean.lower()
+        if not clean or key in seen:
+            continue
+        output.append(clean)
+        seen.add(key)
+        if len(output) >= limit:
+            break
+    return output
+
+
+def concrete_product_matches(candidate: ScoredRecommendationCandidate, intent: RecommendationIntent | None) -> list[str]:
+    if not intent:
+        return []
+    product_text = build_product_text(candidate.product).lower()
+    return dedupe_terms([term for term in intent.required_attributes if term and term.lower() in product_text], limit=4)
+
+
+def build_fallback_reason(
+    candidate: ScoredRecommendationCandidate,
+    intent: RecommendationIntent | None,
+    evidence: list[str],
+) -> str:
+    title = candidate.title or candidate.product.get("title") or "This product"
+    request_terms = intent.required_attributes if intent else []
+    has_affordable_signal = any(term.lower() in {"affordable", "value for money"} for term in request_terms)
+    concrete = concrete_product_matches(candidate, intent)
+    if concrete:
+        value_clause = " and fits the affordable skincare intent" if has_affordable_signal else ""
+        return (
+            f"This matches the request because {title} includes "
+            f"{', '.join(concrete[:3])}{value_clause}."
+        )
+    if evidence:
+        return f"This product connects to concrete persona/request signals: {', '.join(evidence[:3])}."
+    return (
+        "This product is selected from the score breakdown because its quality, reliability, "
+        "and preference-fit signals are the strongest available evidence."
+    )
+
+
+def build_fallback_recommendation(
+    candidate: ScoredRecommendationCandidate,
+    rank: int,
+    intent: RecommendationIntent | None = None,
+) -> RerankedRecommendation:
+    concrete = concrete_product_matches(candidate, intent)
+    matched = candidate.score_breakdown.matched_persona_signals
+    evidence = dedupe_terms(concrete + matched[:4])
+    if not evidence:
+        evidence = dedupe_terms(
+            [
+                f"Product quality score {candidate.score_breakdown.product_quality:.2f}",
+                f"Preference match score {candidate.score_breakdown.preference_match:.2f}",
+            ],
+            limit=2,
+        )
+    return RerankedRecommendation(
+        parent_asin=candidate.parent_asin,
+        rank=rank,
+        title=candidate.title,
+        reason=build_fallback_reason(candidate, intent, evidence),
+        confidence=candidate.score_breakdown.final_score,
+        evidence=evidence,
+        score_breakdown=candidate.score_breakdown.model_dump(mode="json"),
+    )
+
+
+def dedupe_and_backfill_recommendations(
+    recommendations: list[RerankedRecommendation],
+    candidates: list[ScoredRecommendationCandidate],
+    limit: int,
+    intent: RecommendationIntent | None = None,
+) -> list[RerankedRecommendation]:
+    candidate_by_asin = {candidate.parent_asin: candidate for candidate in candidates}
+    seen_titles: set[str] = set()
+    seen_asins: set[str] = set()
+    final: list[RerankedRecommendation] = []
+
+    def add_recommendation(recommendation: RerankedRecommendation) -> None:
+        candidate = candidate_by_asin.get(recommendation.parent_asin)
+        title = recommendation.title or (candidate.title if candidate else None)
+        normalized_title = normalize_product_title(title)
+        if recommendation.parent_asin in seen_asins or (normalized_title and normalized_title in seen_titles):
+            return
+        if candidate:
+            evidence = dedupe_terms(
+                concrete_product_matches(candidate, intent)
+                + candidate.score_breakdown.matched_persona_signals
+                + recommendation.evidence
+            )
+        else:
+            evidence = dedupe_terms(recommendation.evidence)
+        if not evidence and candidate:
+            evidence = build_fallback_recommendation(candidate, len(final) + 1, intent).evidence
+        final.append(
+            recommendation.model_copy(
+                update={
+                    "rank": len(final) + 1,
+                    "title": title,
+                    "evidence": evidence,
+                    "score_breakdown": recommendation.score_breakdown
+                    or (candidate.score_breakdown.model_dump(mode="json") if candidate else {}),
+                }
+            )
+        )
+        seen_asins.add(recommendation.parent_asin)
+        if normalized_title:
+            seen_titles.add(normalized_title)
+
+    for recommendation in recommendations:
+        add_recommendation(recommendation)
+        if len(final) >= limit:
+            return final
+
+    for candidate in candidates:
+        add_recommendation(build_fallback_recommendation(candidate, len(final) + 1, intent))
+        if len(final) >= limit:
+            break
+    return final
+
+
 def fallback_rerank(
     candidates: list[ScoredRecommendationCandidate],
     limit: int,
     intent: RecommendationIntent | None = None,
 ) -> RerankerOutput:
-    recommendations = []
-    for rank, candidate in enumerate(candidates[:limit], start=1):
-        matched = candidate.score_breakdown.matched_persona_signals
-        request_terms = intent.required_attributes if intent else []
-        product_text = build_product_text(candidate.product).lower()
-        concrete_matches = [
-            term
-            for term in request_terms
-            if term and term.lower() in product_text
-        ][:3]
-        evidence = (concrete_matches + matched[:3])[:4]
-        if not evidence:
-            evidence = [
-                f"Product quality score {candidate.score_breakdown.product_quality:.2f}",
-                f"Preference match score {candidate.score_breakdown.preference_match:.2f}",
-            ]
-        if concrete_matches:
-            reason = (
-                f"This product is a stronger fit because its metadata mentions "
-                f"{', '.join(concrete_matches)}, matching the request."
-            )
-        elif matched:
-            reason = f"This product connects to persona/request signals: {', '.join(matched[:3])}."
-        else:
-            reason = (
-                "This product is selected from the transparent score breakdown, led by "
-                f"quality {candidate.score_breakdown.product_quality:.2f}, reliability "
-                f"{candidate.score_breakdown.popularity_reliability:.2f}, and preference fit "
-                f"{candidate.score_breakdown.preference_match:.2f}."
-            )
-        recommendations.append(
-            RerankedRecommendation(
-                parent_asin=candidate.parent_asin,
-                rank=rank,
-                title=candidate.title,
-                reason=reason,
-                confidence=candidate.score_breakdown.final_score,
-                evidence=evidence,
-                score_breakdown=candidate.score_breakdown.model_dump(mode="json"),
-            )
-        )
-    return RerankerOutput(recommendations=recommendations)
+    recommendations = [build_fallback_recommendation(candidate, rank, intent) for rank, candidate in enumerate(candidates, start=1)]
+    return RerankerOutput(
+        recommendations=dedupe_and_backfill_recommendations(recommendations, candidates, limit, intent)
+    )
 
 
 def rerank_recommendations(
@@ -159,7 +259,12 @@ def rerank_recommendations(
             )
             if len(filtered) >= limit:
                 break
-        reranked = RerankerOutput(recommendations=filtered) if filtered else fallback_rerank(candidates, limit, intent)
+        final_recommendations = (
+            dedupe_and_backfill_recommendations(filtered, candidates, limit, intent)
+            if filtered
+            else fallback_rerank(candidates, limit, intent).recommendations
+        )
+        reranked = RerankerOutput(recommendations=final_recommendations)
         log_llm_response(
             "task_b_reranking",
             {

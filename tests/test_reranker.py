@@ -1,4 +1,4 @@
-from src.task_b_recommendation.reranker import fallback_rerank
+from src.task_b_recommendation.reranker import fallback_rerank, normalize_product_title
 from src.task_b_recommendation.schema import (
     RecommendationCandidate,
     RecommendationIntent,
@@ -7,15 +7,22 @@ from src.task_b_recommendation.schema import (
 )
 
 
-def test_fallback_reason_mentions_concrete_request_and_product_evidence() -> None:
-    candidate = ScoredRecommendationCandidate(
+def make_scored_candidate(
+    parent_asin: str,
+    title: str,
+    features: list[str] | None = None,
+    description: str | None = None,
+    matched_signals: list[str] | None = None,
+    final_score: float = 0.84,
+) -> ScoredRecommendationCandidate:
+    return ScoredRecommendationCandidate(
         **RecommendationCandidate(
-            parent_asin="skin-1",
-            title="Oil-Free Facial Toner for Oily Skin",
+            parent_asin=parent_asin,
+            title=title,
             product={
-                "title": "Oil-Free Facial Toner for Oily Skin",
-                "features": ["gentle toner", "non-comedogenic"],
-                "description": "Facial skincare for oily skin.",
+                "title": title,
+                "features": features or [],
+                "description": description,
             },
             semantic_similarity=0.82,
             retrieval_source="request_query",
@@ -26,10 +33,20 @@ def test_fallback_reason_mentions_concrete_request_and_product_evidence() -> Non
             product_quality=0.88,
             price_fit=0.8,
             popularity_reliability=0.5,
-            final_score=0.84,
-            matched_persona_signals=["oily skin", "oil-free"],
+            final_score=final_score,
+            matched_persona_signals=matched_signals or [],
             warnings=[],
         ),
+    )
+
+
+def test_fallback_reason_mentions_concrete_request_and_product_evidence() -> None:
+    candidate = make_scored_candidate(
+        "skin-1",
+        "Oil-Free Facial Toner for Oily Skin",
+        features=["gentle toner", "non-comedogenic"],
+        description="Facial skincare for oily skin.",
+        matched_signals=["oily skin", "oil-free"],
     )
 
     output = fallback_rerank(
@@ -40,5 +57,83 @@ def test_fallback_reason_mentions_concrete_request_and_product_evidence() -> Non
 
     reason = output.recommendations[0].reason.lower()
     assert "oily skin" in reason
-    assert "matching the request" in reason
+    assert "matches the request" in reason
     assert "ranks well" not in reason
+
+
+def test_normalize_product_title_removes_common_size_tokens() -> None:
+    assert normalize_product_title("Zia Natural Skincare Ultimate Body Butter, 6 oz") == normalize_product_title(
+        "Zia Natural Skincare Ultimate Body Butter"
+    )
+
+
+def test_duplicate_titles_are_not_repeated_and_backfill_is_used() -> None:
+    candidates = [
+        make_scored_candidate(
+            "asin-1",
+            "Zia Natural Skincare Ultimate Body Butter, 6 oz",
+            features=["body butter for dry skin"],
+            matched_signals=["dry skin"],
+            final_score=0.91,
+        ),
+        make_scored_candidate(
+            "asin-2",
+            "Zia Natural Skincare Ultimate Body Butter",
+            features=["moisturizer for dry skin"],
+            matched_signals=["dry skin"],
+            final_score=0.89,
+        ),
+        make_scored_candidate(
+            "asin-3",
+            "Gentle Dry Skin Facial Moisturizer",
+            features=["facial moisturizer", "dry skin"],
+            matched_signals=["dry skin", "moisturizer"],
+            final_score=0.82,
+        ),
+    ]
+
+    output = fallback_rerank(
+        candidates,
+        limit=2,
+        intent=RecommendationIntent(required_attributes=["skincare", "dry skin", "moisturizer"]),
+    )
+
+    assert [item.parent_asin for item in output.recommendations] == ["asin-1", "asin-3"]
+    assert len(output.recommendations) == 2
+
+
+def test_evidence_terms_are_deduplicated() -> None:
+    candidate = make_scored_candidate(
+        "asin-1",
+        "Dry Skin Skincare Moisturizer",
+        features=["dry skin moisturizer"],
+        matched_signals=["skincare", "skincare", "dry skin"],
+    )
+
+    output = fallback_rerank(
+        [candidate],
+        limit=1,
+        intent=RecommendationIntent(required_attributes=["skincare", "dry skin", "skincare"]),
+    )
+
+    assert output.recommendations[0].evidence == ["skincare", "dry skin"]
+
+
+def test_cold_start_fallback_reason_prefers_concrete_request_evidence() -> None:
+    candidate = make_scored_candidate(
+        "asin-1",
+        "Affordable Moisturizer for Dry Skin",
+        features=["dry skin skincare", "gentle moisturizer"],
+        matched_signals=[],
+    )
+
+    output = fallback_rerank(
+        [candidate],
+        limit=1,
+        intent=RecommendationIntent(required_attributes=["affordable", "skincare", "dry skin", "moisturizer"]),
+    )
+
+    reason = output.recommendations[0].reason.lower()
+    assert "dry skin" in reason
+    assert "moisturizer" in reason
+    assert "transparent score breakdown" not in reason
