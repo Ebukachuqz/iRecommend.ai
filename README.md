@@ -107,3 +107,33 @@ POST /recommendations/generate
 POST /recommendations/cold-start
 POST /sessions/{session_id}/message
 ```
+
+## Streamlit Client
+
+The Streamlit frontend lives in `client/streamlit` so it can be moved or deployed separately from the backend later.
+
+Run the backend:
+
+```powershell
+uvicorn app.api.main:app --reload
+```
+
+Run the Streamlit client:
+
+```powershell
+streamlit run client/streamlit/streamlit_app.py
+```
+
+Open:
+
+```text
+http://localhost:8501
+```
+
+Client API configuration:
+
+```text
+STREAMLIT_API_BASE_URL=http://127.0.0.1:8000
+```
+
+The Streamlit client only needs the API base URL. It does not need Supabase or Groq secrets.
