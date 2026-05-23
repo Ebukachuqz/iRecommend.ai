@@ -23,6 +23,28 @@ def fetch_persona(user_id: str, category: str, client: Client | None = None) -> 
     return response.data[0] if response.data else None
 
 
+def fetch_user_persona_summaries(
+    category: str,
+    limit: int = 20,
+    client: Client | None = None,
+) -> list[dict[str, Any]]:
+    client = resolve_client(client)
+    response = (
+        client.table("user_personas")
+        .select("user_id, category, review_count, average_rating, persona_version")
+        .eq("category", category)
+        .limit(limit)
+        .execute()
+    )
+    return list(response.data or [])
+
+
+def check_table_reachable(table_name: str, client: Client | None = None) -> bool:
+    client = resolve_client(client)
+    client.table(table_name).select("*").limit(1).execute()
+    return True
+
+
 def fetch_product(parent_asin: str, client: Client | None = None) -> dict[str, Any] | None:
     client = resolve_client(client)
     response = (

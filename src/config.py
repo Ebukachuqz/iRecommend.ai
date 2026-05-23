@@ -27,6 +27,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY"),
     )
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
+    hf_token: str | None = Field(default=None, alias="HF_TOKEN")
 
     default_category: str = Field(default=DEFAULT_CATEGORY, alias="DEFAULT_CATEGORY")
     groq_model: str = Field(default=DEFAULT_GROQ_MODEL, alias="GROQ_MODEL")

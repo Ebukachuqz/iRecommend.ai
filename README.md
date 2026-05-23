@@ -79,3 +79,31 @@ python scripts/run_task_b_recommendation.py --cold-start --request "I need affor
 ```
 
 Every successful recommendation call inserts a row into `recommendation_runs`.
+
+## FastAPI Backend
+
+Run the API locally:
+
+```powershell
+uvicorn app.api.main:app --reload
+```
+
+Open API docs at:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+Core endpoints:
+
+```text
+GET  /health
+GET  /ready
+GET  /users
+GET  /users/{user_id}/persona
+GET  /users/{user_id}/unseen-products
+POST /reviews/simulate
+POST /recommendations/generate
+POST /recommendations/cold-start
+POST /sessions/{session_id}/message
+```
