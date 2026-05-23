@@ -8,6 +8,7 @@ from src.llm.groq_client import get_groq_chat
 from src.llm.logging import log_llm_response
 from src.llm.parsers import parse_json_from_llm_text
 from src.task_b_recommendation.schema import RecommendationIntent, RecommendationSessionState
+from src.task_b_recommendation.scoring import normalize_intent_term, unique_terms
 
 
 INTENT_PROMPT_VERSION = "task_b_intent_v1"
@@ -42,9 +43,10 @@ Output:
 REQUEST_ATTRIBUTE_KEYWORDS = [
     ("skincare", ["skincare"]),
     ("skin care", ["skincare"]),
-    ("oily skin", ["oily skin", "oil-free"]),
-    ("oil free", ["oil-free"]),
-    ("oil-free", ["oil-free"]),
+    ("dry skin", ["dry skin", "moisturizer", "hydrating"]),
+    ("oily skin", ["oily skin", "oil free", "oil control"]),
+    ("oil free", ["oil free"]),
+    ("oil-free", ["oil free"]),
     ("gentle", ["gentle"]),
     ("cleanser", ["cleanser"]),
     ("face wash", ["face wash", "cleanser"]),
@@ -57,13 +59,13 @@ REQUEST_ATTRIBUTE_KEYWORDS = [
 
 
 def append_unique(values: list[str], additions: list[str]) -> list[str]:
-    seen = {value.lower() for value in values}
-    output = list(values)
+    output = unique_terms(values)
+    seen = set(output)
     for addition in additions:
-        normalized = addition.strip()
-        if normalized and normalized.lower() not in seen:
+        normalized = normalize_intent_term(addition)
+        if normalized and normalized not in seen:
             output.append(normalized)
-            seen.add(normalized.lower())
+            seen.add(normalized)
     return output
 
 
@@ -83,6 +85,7 @@ def enrich_intent_from_request(intent: RecommendationIntent, request: str | None
         explicit_constraints.setdefault("value_conscious", True)
         required_attributes = append_unique(required_attributes, ["affordable", "value for money"])
 
+    required_attributes = unique_terms(required_attributes)
     retrieval_query = intent.retrieval_query.strip() or request or ""
     return intent.model_copy(
         update={

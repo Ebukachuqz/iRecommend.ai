@@ -33,6 +33,8 @@ Scoring is transparent:
 
 Each candidate returns matched persona signals, warnings, and component scores before LLM reranking.
 
+The scoring layer also includes a small transparent rule layer for request quality. It normalizes intent attributes such as `suitable_for_dry_skin` into readable phrases like `dry skin`, rewards direct request/product evidence such as dry-skin moisturizers or oil-control cleansers, and applies soft penalties to off-type results such as haircare, nail tools, travel kits, or narrow eye-area products for broad skincare requests. This is intentionally lightweight and inspectable so later solution-paper analysis can explain ranking trade-offs without treating the recommender as a black box.
+
 ## Reranking
 
 The LLM reranker receives only scored candidates and must not invent product facts or recommend products outside the candidate set. If the LLM call or parser fails, a deterministic score-based fallback is used and the fallback event is logged.

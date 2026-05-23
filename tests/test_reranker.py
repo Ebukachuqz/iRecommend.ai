@@ -116,7 +116,11 @@ def test_evidence_terms_are_deduplicated() -> None:
         intent=RecommendationIntent(required_attributes=["skincare", "dry skin", "skincare"]),
     )
 
-    assert output.recommendations[0].evidence == ["skincare", "dry skin"]
+    evidence = output.recommendations[0].evidence
+    assert len(evidence) == len(set(evidence))
+    assert "skincare" in evidence
+    assert "dry skin" in evidence
+    assert all("_" not in term for term in evidence)
 
 
 def test_cold_start_fallback_reason_prefers_concrete_request_evidence() -> None:
@@ -137,3 +141,45 @@ def test_cold_start_fallback_reason_prefers_concrete_request_evidence() -> None:
     assert "dry skin" in reason
     assert "moisturizer" in reason
     assert "transparent score breakdown" not in reason
+
+
+def test_fallback_reason_does_not_include_extremely_long_full_title() -> None:
+    long_title = (
+        "AZURE Hyaluronic & Retinol Anti Aging Under Eye Pads for Wrinkles "
+        "Dark Circles Puffy Eyes Fine Lines 24K Gold Skincare Treatment"
+    )
+    candidate = make_scored_candidate(
+        "asin-1",
+        long_title,
+        features=["hydrating skincare"],
+        matched_signals=[],
+    )
+
+    output = fallback_rerank(
+        [candidate],
+        limit=1,
+        intent=RecommendationIntent(required_attributes=["skincare", "hydrating"]),
+    )
+
+    reason = output.recommendations[0].reason
+    assert long_title not in reason
+    assert len(reason) < 150
+
+
+def test_evidence_normalizes_underscored_terms_to_readable_phrases() -> None:
+    candidate = make_scored_candidate(
+        "asin-1",
+        "Oil Free Non Comedogenic Cleanser",
+        features=["oil free", "non comedogenic"],
+        matched_signals=["oil_free", "non_comedogenic", "oil free"],
+    )
+
+    output = fallback_rerank(
+        [candidate],
+        limit=1,
+        intent=RecommendationIntent(required_attributes=["oil_free", "non_comedogenic"]),
+    )
+
+    assert "oil free" in output.recommendations[0].evidence
+    assert "non comedogenic" in output.recommendations[0].evidence
+    assert all("_" not in term for term in output.recommendations[0].evidence)

@@ -10,6 +10,13 @@ from src.llm.groq_client import get_groq_chat
 from src.llm.logging import log_llm_response
 from src.llm.parsers import parse_json_from_llm_text
 from src.task_b_recommendation.product_text import build_product_text
+from src.task_b_recommendation.scoring import (
+    matched_terms,
+    normalize_intent_term,
+    normalized_required_attributes,
+    related_terms_for_intent,
+    unique_terms,
+)
 from src.task_b_recommendation.schema import (
     RecommendationIntent,
     RerankedRecommendation,
@@ -65,25 +72,16 @@ def normalize_product_title(title: str | None) -> str:
 
 
 def dedupe_terms(terms: list[str], limit: int = 4) -> list[str]:
-    seen: set[str] = set()
-    output: list[str] = []
-    for term in terms:
-        clean = str(term).strip()
-        key = clean.lower()
-        if not clean or key in seen:
-            continue
-        output.append(clean)
-        seen.add(key)
-        if len(output) >= limit:
-            break
-    return output
+    return unique_terms([normalize_intent_term(term) for term in terms], limit=limit)
 
 
 def concrete_product_matches(candidate: ScoredRecommendationCandidate, intent: RecommendationIntent | None) -> list[str]:
     if not intent:
         return []
     product_text = build_product_text(candidate.product).lower()
-    return dedupe_terms([term for term in intent.required_attributes if term and term.lower() in product_text], limit=4)
+    direct_matches = matched_terms(product_text, normalized_required_attributes(intent))
+    related_matches = [term for term in matched_terms(product_text, related_terms_for_intent(intent)) if term not in direct_matches]
+    return dedupe_terms(direct_matches + related_matches, limit=4)
 
 
 def build_fallback_reason(
@@ -91,21 +89,17 @@ def build_fallback_reason(
     intent: RecommendationIntent | None,
     evidence: list[str],
 ) -> str:
-    title = candidate.title or candidate.product.get("title") or "This product"
-    request_terms = intent.required_attributes if intent else []
-    has_affordable_signal = any(term.lower() in {"affordable", "value for money"} for term in request_terms)
+    request_terms = normalized_required_attributes(intent) if intent else []
+    has_affordable_signal = any(term in {"affordable", "value for money"} for term in request_terms)
     concrete = concrete_product_matches(candidate, intent)
     if concrete:
-        value_clause = " and fits the affordable skincare intent" if has_affordable_signal else ""
-        return (
-            f"This matches the request because {title} includes "
-            f"{', '.join(concrete[:3])}{value_clause}."
-        )
+        display_terms = [term for term in concrete if term not in {"affordable", "value for money"}] or concrete
+        value_clause = " and has strong price-fit evidence" if has_affordable_signal and candidate.score_breakdown.price_fit >= 0.75 else ""
+        return f"This matches the request because it mentions {', '.join(display_terms[:3])}{value_clause}."
     if evidence:
-        return f"This product connects to concrete persona/request signals: {', '.join(evidence[:3])}."
+        return f"This fits the request through {', '.join(evidence[:3])}."
     return (
-        "This product is selected from the score breakdown because its quality, reliability, "
-        "and preference-fit signals are the strongest available evidence."
+        "This is the best available fallback from product quality, reliability, and preference-fit scores."
     )
 
 
@@ -117,6 +111,10 @@ def build_fallback_recommendation(
     concrete = concrete_product_matches(candidate, intent)
     matched = candidate.score_breakdown.matched_persona_signals
     evidence = dedupe_terms(concrete + matched[:4])
+    if intent:
+        required = set(normalized_required_attributes(intent))
+        if ("affordable" in required or "value for money" in required) and candidate.score_breakdown.price_fit >= 0.75:
+            evidence = dedupe_terms(evidence + ["price fit"])
     if not evidence:
         evidence = dedupe_terms(
             [
@@ -159,6 +157,10 @@ def dedupe_and_backfill_recommendations(
                 + candidate.score_breakdown.matched_persona_signals
                 + recommendation.evidence
             )
+            if intent:
+                required = set(normalized_required_attributes(intent))
+                if ("affordable" in required or "value for money" in required) and candidate.score_breakdown.price_fit >= 0.75:
+                    evidence = dedupe_terms(evidence + ["price fit"])
         else:
             evidence = dedupe_terms(recommendation.evidence)
         if not evidence and candidate:

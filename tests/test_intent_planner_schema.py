@@ -17,5 +17,16 @@ def test_intent_enrichment_adds_skincare_and_oily_skin_terms() -> None:
 
     assert "skincare" in intent.required_attributes
     assert "oily skin" in intent.required_attributes
-    assert "oil-free" in intent.required_attributes
+    assert "oil free" in intent.required_attributes
+    assert "oil control" in intent.required_attributes
     assert intent.explicit_constraints["price_preference"] == "affordable"
+
+
+def test_intent_enrichment_adds_dry_skin_terms_as_natural_phrases() -> None:
+    intent = fallback_intent("I need affordable skincare for dry skin")
+
+    assert "dry skin" in intent.required_attributes
+    assert "moisturizer" in intent.required_attributes
+    assert "hydrating" in intent.required_attributes
+    assert "value for money" in intent.required_attributes
+    assert all("_" not in term for term in intent.required_attributes)
