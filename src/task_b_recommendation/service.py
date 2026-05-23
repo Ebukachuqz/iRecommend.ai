@@ -92,7 +92,7 @@ def store_recommendation_run(
 ) -> dict[str, Any]:
     recommendations = [item.model_dump(mode="json") for item in output.recommendations]
     retrieval_sources: dict[str, int] = {}
-    for candidate in context.get("scored_candidates") or []:
+    for candidate in context.get("retrieved_candidates") or context.get("scored_candidates") or []:
         source = candidate.get("retrieval_source") or "unknown"
         retrieval_sources[source] = retrieval_sources.get(source, 0) + 1
 
@@ -176,7 +176,8 @@ def recommend(request: RecommendationRequest, client: Client | None = None, vect
         context={
             **request.context,
             "intent": intent.model_dump(mode="json"),
-            "scored_candidates": [candidate.model_dump(mode="json") for candidate in scored[: request.limit]],
+            "retrieved_candidates": [candidate.model_dump(mode="json") for candidate in candidates],
+            "scored_candidates": [candidate.model_dump(mode="json") for candidate in scored],
         },
         client=client,
     )

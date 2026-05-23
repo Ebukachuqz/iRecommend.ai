@@ -31,6 +31,39 @@ def weighted_average(vectors: list[list[float]], weights: list[float]) -> list[f
     ]
 
 
+def normalize_category(value: Any) -> str:
+    return " ".join(str(value or "").replace("_", " ").lower().split())
+
+
+def flatten_category_values(value: Any) -> list[str]:
+    if value in (None, "", [], {}):
+        return []
+    if isinstance(value, list):
+        flattened: list[str] = []
+        for item in value:
+            flattened.extend(flatten_category_values(item))
+        return flattened
+    if isinstance(value, dict):
+        flattened = []
+        for item in value.values():
+            flattened.extend(flatten_category_values(item))
+        return flattened
+    return [str(value)]
+
+
+def product_matches_category(product: dict[str, Any] | None, category: str) -> bool:
+    if not product:
+        return False
+    expected = normalize_category(category)
+    if not expected:
+        return True
+    category_values: list[str] = []
+    category_values.extend(flatten_category_values(product.get("category")))
+    category_values.extend(flatten_category_values(product.get("main_category")))
+    category_values.extend(flatten_category_values(product.get("categories")))
+    return any(normalize_category(value) == expected for value in category_values)
+
+
 def fetch_liked_training_reviews(user_id: str, client: Client | None = None) -> list[dict[str, Any]]:
     client = client or get_supabase_client()
     response = (
@@ -42,6 +75,19 @@ def fetch_liked_training_reviews(user_id: str, client: Client | None = None) -> 
         .execute()
     )
     return list(response.data or [])
+
+
+def fetch_product_metadata(parent_asins: list[str], client: Client | None = None) -> dict[str, dict[str, Any]]:
+    client = client or get_supabase_client()
+    if not parent_asins:
+        return {}
+    response = (
+        client.table("amazon_product_metadata")
+        .select("parent_asin,category,main_category,categories")
+        .in_("parent_asin", list(dict.fromkeys(parent_asins)))
+        .execute()
+    )
+    return {row["parent_asin"]: row for row in response.data or [] if row.get("parent_asin")}
 
 
 def fetch_product_embeddings(parent_asins: list[str], client: Client | None = None) -> dict[str, list[float]]:
@@ -61,8 +107,24 @@ def fetch_product_embeddings(parent_asins: list[str], client: Client | None = No
     }
 
 
-def build_user_taste_vector(user_id: str, client: Client | None = None) -> tuple[list[float], list[str]]:
+def filter_reviews_by_product_category(
+    reviews: list[dict[str, Any]],
+    category: str,
+    client: Client | None = None,
+) -> list[dict[str, Any]]:
+    parent_asins = [review["parent_asin"] for review in reviews if review.get("parent_asin")]
+    metadata_by_asin = fetch_product_metadata(parent_asins, client=client)
+    return [
+        review
+        for review in reviews
+        if product_matches_category(metadata_by_asin.get(review.get("parent_asin")), category)
+    ]
+
+
+def build_user_taste_vector(user_id: str, category: str | None = None, client: Client | None = None) -> tuple[list[float], list[str]]:
     reviews = fetch_liked_training_reviews(user_id, client=client)
+    if category:
+        reviews = filter_reviews_by_product_category(reviews, category, client=client)
     parent_asins = [review["parent_asin"] for review in reviews if review.get("parent_asin")]
     embeddings_by_asin = fetch_product_embeddings(parent_asins, client=client)
     vectors: list[list[float]] = []
@@ -107,7 +169,7 @@ def build_and_store_user_taste_vector(
     embedding_model: str = DEFAULT_EMBEDDING_MODEL,
     client: Client | None = None,
 ) -> tuple[list[float], list[str]]:
-    embedding, sources = build_user_taste_vector(user_id, client=client)
+    embedding, sources = build_user_taste_vector(user_id, category, client=client)
     if embedding:
         store_user_taste_vector(user_id, category, embedding, sources, embedding_model=embedding_model, client=client)
     return embedding, sources
