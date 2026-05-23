@@ -7,10 +7,10 @@ from supabase import Client
 from src.config import get_settings
 from src.db import queries
 from src.db.supabase_client import get_supabase_client
-from src.personas.normalizer import normalize_custom_persona
+from src.personas.custom_persona_processor import process_custom_persona
 from src.personas.validator import validate_persona
 from src.task_a_simulation.calibration import calibrate_rating
-from src.task_a_simulation.product_normalizer import normalize_custom_product
+from src.task_a_simulation.custom_product_processor import process_custom_product
 from src.task_a_simulation.prompts import TASK_A_PROMPT_VERSION
 from src.task_a_simulation.rating_predictor import predict_statistical_rating
 from src.task_a_simulation.schema import (
@@ -36,13 +36,11 @@ def is_custom_simulation_request(request: ReviewSimulationRequest) -> bool:
 def resolve_persona(
     user_id: str | None,
     category: str,
-    persona: dict[str, Any] | None,
+    persona: dict[str, Any] | str | None,
     client: Client | None,
 ) -> tuple[dict[str, Any], str | None]:
-    if persona:
-        normalized = normalize_custom_persona(persona)
-        validated = validate_persona(normalized, repair=True)
-        return validated.model_dump(mode="json"), None
+    if persona is not None:
+        return process_custom_persona(persona), None
 
     if not user_id:
         raise TaskAServiceError("Task A requires either user_id with parent_asin/use_holdout or custom persona and product.")
@@ -54,12 +52,12 @@ def resolve_persona(
     return validated.model_dump(mode="json"), row.get("persona_version")
 
 
-def resolve_product(parent_asin: str, product: dict[str, Any] | ProductSnapshot | None, client: Client | None) -> ProductSnapshot:
-    if product:
+def resolve_product(parent_asin: str, product: dict[str, Any] | str | ProductSnapshot | None, client: Client | None) -> ProductSnapshot:
+    if product is not None:
         if isinstance(product, ProductSnapshot):
             normalized = product.model_dump(mode="json")
         else:
-            normalized = normalize_custom_product(product)
+            normalized = process_custom_product(product)
         if parent_asin and normalized.get("parent_asin") == "custom_product":
             normalized["parent_asin"] = parent_asin
         return ProductSnapshot.model_validate(normalized)

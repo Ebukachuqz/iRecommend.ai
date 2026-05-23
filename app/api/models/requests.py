@@ -11,8 +11,8 @@ class ReviewSimulationAPIRequest(BaseModel):
     user_id: str | None = None
     category: str = DEFAULT_CATEGORY
     parent_asin: str | None = None
-    persona: dict[str, Any] | None = None
-    product: dict[str, Any] | None = None
+    persona: dict[str, Any] | str | None = None
+    product: dict[str, Any] | str | None = None
     use_holdout: bool = False
     nigerian_mode: bool = False
     context: dict[str, Any] = Field(default_factory=dict)
@@ -21,7 +21,7 @@ class ReviewSimulationAPIRequest(BaseModel):
 class RecommendationAPIRequest(BaseModel):
     user_id: str | None = None
     category: str = DEFAULT_CATEGORY
-    persona: dict[str, Any] | None = None
+    persona: dict[str, Any] | str | None = None
     request: str | None = None
     limit: int = Field(default=5, ge=1, le=50)
     session_id: str | None = None

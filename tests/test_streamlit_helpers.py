@@ -74,3 +74,29 @@ def test_parse_json_text_rejects_non_object_json() -> None:
         assert "Persona must be a JSON object" in str(exc)
     else:
         raise AssertionError("Expected ValueError")
+
+
+def test_parse_json_or_text_input_returns_object_for_valid_json() -> None:
+    assert ui_helpers.parse_json_or_text_input("Persona", '{"likes": ["hydrating"]}') == {"likes": ["hydrating"]}
+
+
+def test_parse_json_or_text_input_returns_plain_text() -> None:
+    assert ui_helpers.parse_json_or_text_input("Persona", "I like gentle skincare") == "I like gentle skincare"
+
+
+def test_parse_json_or_text_input_rejects_malformed_json_like_text() -> None:
+    try:
+        ui_helpers.parse_json_or_text_input("Persona", "{not json}")
+    except ValueError as exc:
+        assert "Persona looks like JSON but is malformed" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError")
+
+
+def test_parse_json_or_text_input_rejects_json_arrays() -> None:
+    try:
+        ui_helpers.parse_json_or_text_input("Persona", '["hydrating"]')
+    except ValueError as exc:
+        assert "Persona JSON must be an object" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError")

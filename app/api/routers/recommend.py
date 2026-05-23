@@ -17,7 +17,7 @@ def generate_recommendations(
     payload: RecommendationAPIRequest,
     client: Client = Depends(get_db_client),
 ) -> RecommendationOutput:
-    if not payload.user_id and not payload.persona and not payload.cold_start:
+    if not payload.user_id and payload.persona is None and not payload.cold_start:
         raise HTTPException(status_code=400, detail="Provide user_id, persona, or cold_start=true.")
     try:
         request = RecommendationRequest(**payload.model_dump())

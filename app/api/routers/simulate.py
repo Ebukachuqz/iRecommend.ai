@@ -27,7 +27,7 @@ def simulate_review(
     client: Client = Depends(get_db_client),
 ) -> ReviewSimulationOutput:
     has_custom_input = payload.persona is not None or payload.product is not None
-    if has_custom_input and not (payload.persona and payload.product):
+    if has_custom_input and (payload.persona is None or payload.product is None):
         raise HTTPException(status_code=400, detail="Custom Task A simulation requires both persona and product.")
     if not has_custom_input and not payload.user_id:
         raise HTTPException(

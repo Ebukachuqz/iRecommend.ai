@@ -7,7 +7,7 @@ from supabase import Client
 from src.config import get_settings
 from src.db.queries import fetch_persona
 from src.db.supabase_client import get_supabase_client
-from src.personas.normalizer import normalize_custom_persona
+from src.personas.custom_persona_processor import process_custom_persona
 from src.personas.validator import validate_persona
 from src.task_b_recommendation.candidate_retriever import retrieve_candidates
 from src.task_b_recommendation.cold_start import build_cold_start_persona
@@ -40,9 +40,8 @@ def resolve_persona_for_recommendation(
     request: RecommendationRequest,
     client: Client,
 ) -> tuple[dict[str, Any], bool]:
-    if request.persona:
-        normalized = normalize_custom_persona(request.persona)
-        return validate_persona(normalized, repair=True).model_dump(mode="json"), request.cold_start or request.user_id is None
+    if request.persona is not None:
+        return process_custom_persona(request.persona), request.cold_start or request.user_id is None
     if request.user_id and not request.cold_start:
         row = fetch_persona(request.user_id, request.category, client=client)
         if row and row.get("persona"):
@@ -198,7 +197,7 @@ def recommend_for_user(
 
 
 def recommend_from_persona(
-    persona: dict[str, Any],
+    persona: dict[str, Any] | str,
     request: str | None = None,
     limit: int = 5,
     client: Client | None = None,

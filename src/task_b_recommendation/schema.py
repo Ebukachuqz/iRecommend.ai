@@ -34,7 +34,7 @@ class RecommendationRequest(BaseModel):
     user_id: str | None = None
     category: str = DEFAULT_CATEGORY
     request: str | None = None
-    persona: dict[str, Any] | None = None
+    persona: dict[str, Any] | str | None = None
     limit: int = Field(default=5, ge=1, le=50)
     session_id: str | None = None
     cold_start: bool = False

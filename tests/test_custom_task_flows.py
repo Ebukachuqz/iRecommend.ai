@@ -17,7 +17,61 @@ class DummyClient:
         return DummyInsert()
 
 
+CUSTOM_PERSONA = {
+    "writing_style": {"tone": "casual", "length": "medium", "detail_level": "medium", "formality": "mixed"},
+    "preferences": {
+        "liked_product_types": ["moisturizers"],
+        "disliked_product_types": [],
+        "liked_attributes": ["hydrating"],
+        "disliked_attributes": ["strong fragrance"],
+        "what_they_value": ["gentle skincare"],
+        "common_complaints": ["dry skin"],
+    },
+    "rating_behavior": {
+        "average_rating": 4.2,
+        "rating_distribution": {"1": 0, "2": 0, "3": 0, "4": 2, "5": 3},
+        "strictness": "moderate",
+        "rating_patterns": "likes useful detail",
+    },
+    "purchase_behavior": {
+        "preferred_categories": ["skincare"],
+        "price_sensitivity": "medium",
+        "quality_sensitivity": "medium",
+        "verified_purchase_ratio": 0.0,
+    },
+    "cultural_signals": "none detected",
+    "evidence": {"positive_examples": [], "negative_examples": []},
+    "extra_persona_signals": {},
+}
+
+CUSTOM_PRODUCT = {
+    "parent_asin": "custom_product",
+    "title": "Gentle Hydrating Face Cream",
+    "main_category": "Skincare",
+    "categories": ["Skincare"],
+    "price": 18.99,
+    "features": ["for dry skin"],
+    "description": ["A gentle hydrating cream."],
+    "average_rating": 4.5,
+    "rating_number": 120,
+    "store": "Example",
+    "details": {},
+}
+
+
 def test_task_a_custom_request_works_without_user_id(monkeypatch) -> None:
+    persona_calls = []
+    product_calls = []
+    monkeypatch.setattr(
+        task_a_service,
+        "process_custom_persona",
+        lambda raw: persona_calls.append(raw) or CUSTOM_PERSONA,
+    )
+    monkeypatch.setattr(
+        task_a_service,
+        "process_custom_product",
+        lambda raw: product_calls.append(raw) or CUSTOM_PRODUCT,
+    )
     monkeypatch.setattr(
         task_a_service,
         "generate_llm_review_and_rating",
@@ -43,6 +97,8 @@ def test_task_a_custom_request_works_without_user_id(monkeypatch) -> None:
     assert output.user_id is None
     assert output.parent_asin == "custom_product"
     assert output.product_title == "Gentle Hydrating Face Cream"
+    assert persona_calls
+    assert product_calls
 
 
 def test_task_a_rejects_missing_user_id_and_missing_custom_payload() -> None:
@@ -55,6 +111,12 @@ def test_task_a_rejects_missing_user_id_and_missing_custom_payload() -> None:
 
 
 def test_task_b_persona_only_request_uses_custom_persona(monkeypatch) -> None:
+    persona_calls = []
+    monkeypatch.setattr(
+        task_b_service,
+        "process_custom_persona",
+        lambda raw: persona_calls.append(raw) or CUSTOM_PERSONA,
+    )
     monkeypatch.setattr(
         task_b_service,
         "plan_intent",
@@ -72,3 +134,4 @@ def test_task_b_persona_only_request_uses_custom_persona(monkeypatch) -> None:
 
     assert output.user_id is None
     assert output.cold_start is True
+    assert persona_calls

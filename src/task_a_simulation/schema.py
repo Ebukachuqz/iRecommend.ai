@@ -42,8 +42,8 @@ class ReviewSimulationRequest(BaseModel):
     user_id: str | None = None
     category: str = DEFAULT_CATEGORY
     parent_asin: str | None = None
-    persona: dict[str, Any] | None = None
-    product: dict[str, Any] | ProductSnapshot | None = None
+    persona: dict[str, Any] | str | None = None
+    product: dict[str, Any] | str | ProductSnapshot | None = None
     use_holdout: bool = False
     nigerian_mode: bool = False
     context: dict[str, Any] = Field(default_factory=dict)

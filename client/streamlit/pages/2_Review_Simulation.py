@@ -11,7 +11,7 @@ if str(STREAMLIT_ROOT) not in sys.path:
     sys.path.insert(0, str(STREAMLIT_ROOT))
 
 import api_client
-from ui_helpers import parse_json_text, render_error, render_rating_breakdown, safe_json_view
+from ui_helpers import parse_json_or_text_input, render_error, render_rating_breakdown, safe_json_view
 
 
 PERSONA_SAMPLE = {
@@ -37,7 +37,7 @@ PRODUCT_SAMPLE = {
 st.set_page_config(page_title="Review Simulation", page_icon="iR", layout="wide")
 st.title("Review Simulation")
 
-mode = st.radio("Mode", ["Existing user", "Custom JSON"], horizontal=True)
+mode = st.radio("Mode", ["Existing user", "Custom input"], horizontal=True)
 nigerian_mode = st.toggle("Nigerian shopping context", value=False)
 
 if mode == "Existing user":
@@ -81,20 +81,24 @@ if mode == "Existing user":
             except Exception as exc:
                 render_error(exc)
 else:
-    st.caption("Custom JSON can use common field names. It does not need to match the internal schema exactly.")
-    persona_text = st.text_area("Persona JSON", value=json.dumps(PERSONA_SAMPLE, indent=2), height=220)
-    product_text = st.text_area("Product JSON", value=json.dumps(PRODUCT_SAMPLE, indent=2), height=240)
+    st.caption(
+        "Custom persona/product input can be JSON or plain text. It will be validated by an LLM before use. "
+        "Inputs like 'nothing', 'unknown', or 'hello world' will be rejected."
+    )
+    persona_text = st.text_area("Persona JSON or text", value=json.dumps(PERSONA_SAMPLE, indent=2), height=220)
+    product_text = st.text_area("Product JSON or text", value=json.dumps(PRODUCT_SAMPLE, indent=2), height=240)
 
     if st.button("Run custom simulation", type="primary"):
         try:
-            persona = parse_json_text("Persona JSON", persona_text)
-            product = parse_json_text("Product JSON", product_text)
+            persona = parse_json_or_text_input("Persona input", persona_text)
+            product = parse_json_or_text_input("Product input", product_text)
+            parent_asin = product.get("parent_asin") if isinstance(product, dict) else None
             payload = {
                 "user_id": None,
                 "category": "Custom",
                 "persona": persona,
                 "product": product,
-                "parent_asin": product.get("parent_asin") or "custom_product",
+                "parent_asin": parent_asin or "custom_product",
                 "nigerian_mode": nigerian_mode,
                 "context": {},
             }

@@ -41,6 +41,21 @@ def parse_json_text(label: str, text: str) -> dict[str, Any]:
     return parsed
 
 
+def parse_json_or_text_input(label: str, text: str) -> dict[str, Any] | str:
+    stripped = text.strip()
+    if not stripped:
+        raise ValueError(f"{label} cannot be empty.")
+    if stripped.startswith(("{", "[")):
+        try:
+            parsed = json.loads(stripped)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"{label} looks like JSON but is malformed: {exc.msg}") from exc
+        if not isinstance(parsed, dict):
+            raise ValueError(f"{label} JSON must be an object.")
+        return parsed
+    return stripped
+
+
 def render_status_badge(label: str, ok: bool | None) -> None:
     if st is None:
         return

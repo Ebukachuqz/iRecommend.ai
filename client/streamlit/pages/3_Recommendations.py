@@ -11,7 +11,7 @@ if str(STREAMLIT_ROOT) not in sys.path:
     sys.path.insert(0, str(STREAMLIT_ROOT))
 
 import api_client
-from ui_helpers import parse_json_text, render_error, render_recommendation_card, safe_json_view
+from ui_helpers import parse_json_or_text_input, render_error, render_recommendation_card, safe_json_view
 
 
 PERSONA_SAMPLE = {
@@ -53,12 +53,15 @@ if mode == "Existing user":
             except Exception as exc:
                 render_error(exc)
 else:
-    st.caption("Custom persona JSON can use common field names such as likes, dislikes, budget, tone, concerns, and average_rating.")
-    persona_text = st.text_area("Persona JSON", value=json.dumps(PERSONA_SAMPLE, indent=2), height=240)
+    st.caption(
+        "Custom persona input can be JSON or plain text. It will be validated by an LLM before use. "
+        "Inputs like 'nothing', 'unknown', or 'hello world' will be rejected."
+    )
+    persona_text = st.text_area("Persona JSON or text", value=json.dumps(PERSONA_SAMPLE, indent=2), height=240)
 
     if st.button("Generate recommendations from persona", type="primary"):
         try:
-            persona = parse_json_text("Persona JSON", persona_text)
+            persona = parse_json_or_text_input("Persona input", persona_text)
             payload = {
                 "category": category,
                 "persona": persona,
