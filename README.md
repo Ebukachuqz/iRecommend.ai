@@ -137,3 +137,5 @@ STREAMLIT_API_BASE_URL=http://127.0.0.1:8000
 ```
 
 The Streamlit client only needs the API base URL. It does not need Supabase or Groq secrets.
+
+For independent Streamlit deployment, use `client/streamlit/requirements.txt` instead of the root `requirements.txt`.

@@ -2,10 +2,12 @@
 
 Client applications live here so they can be detached from the backend and deployed independently.
 
+Clients communicate with the backend through HTTP APIs only. They should not import backend services, connect to Supabase directly, or require backend secrets.
+
 Current client:
 
-- `streamlit/` - research/demo UI that talks to the FastAPI backend over HTTP.
+- `streamlit/` - current research/demo frontend for persona exploration, review simulation, and recommendations.
 
 Reserved for later:
 
-- `nextjs/` - placeholder for a future frontend. It is not implemented yet.
+- `nextjs/` - reserved for a later polished frontend. It is not implemented yet.
