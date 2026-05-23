@@ -37,13 +37,57 @@ def preference_match_score(
 ) -> tuple[float, list[str], list[str]]:
     text = build_product_text(product).lower()
     positive_terms = terms_from_persona(persona, "liked_attributes", "what_they_value", "liked_product_types")
-    positive_terms.extend(intent.required_attributes)
+    request_terms = list(intent.required_attributes)
     negative_terms = terms_from_persona(persona, "disliked_attributes", "common_complaints", "disliked_product_types")
     negative_terms.extend(intent.excluded_attributes)
     matched = [term for term in positive_terms if contains_term(text, term)]
+    matched_request_terms = [term for term in request_terms if contains_term(text, term)]
+    matched.extend(matched_request_terms)
     warnings = [f"Matched avoided signal: {term}" for term in negative_terms if contains_term(text, term)]
-    score = 0.35 + min(0.55, len(matched) * 0.12) - min(0.35, len(warnings) * 0.12)
+    score = (
+        0.30
+        + min(0.30, len(matched) * 0.08)
+        + min(0.45, len(matched_request_terms) * 0.16)
+        - min(0.35, len(warnings) * 0.12)
+    )
     return clamp_score(score), matched, warnings
+
+
+def request_fit_adjustment(product: dict[str, Any], intent: RecommendationIntent) -> tuple[float, list[str], list[str]]:
+    text = build_product_text(product).lower()
+    required = {term.lower() for term in intent.required_attributes}
+    warnings: list[str] = []
+    matched: list[str] = []
+    adjustment = 0.0
+
+    wants_skincare = "skincare" in required or "oily skin" in required
+    wants_oily_skin = "oily skin" in required
+    off_type_terms = [
+        "shampoo",
+        "conditioner",
+        "hair",
+        "nail",
+        "travel",
+        "luggage",
+        "brush",
+        "hand cream",
+        "body lotion",
+        "foot cream",
+    ]
+    if wants_skincare:
+        off_type_matches = [term for term in off_type_terms if contains_term(text, term)]
+        if off_type_matches:
+            warnings.append(f"Possible off-type match for skincare request: {', '.join(off_type_matches[:3])}")
+            adjustment -= 0.18
+
+    if wants_oily_skin:
+        oily_skin_terms = ["oily skin", "oil-free", "oil free", "non-comedogenic", "toner", "cleanser", "face", "facial", "acne"]
+        matched_oily_terms = [term for term in oily_skin_terms if contains_term(text, term)]
+        if matched_oily_terms:
+            matched.extend(matched_oily_terms[:4])
+            adjustment += min(0.16, 0.04 * len(matched_oily_terms))
+
+    return adjustment, matched, warnings
 
 
 def product_quality_score(product: dict[str, Any]) -> float:
@@ -85,6 +129,9 @@ def score_candidate(
 ) -> ScoredRecommendationCandidate:
     product = candidate.product
     preference_score, matched, warnings = preference_match_score(persona, product, intent)
+    request_adjustment, request_matches, request_warnings = request_fit_adjustment(product, intent)
+    matched.extend(term for term in request_matches if term not in matched)
+    warnings.extend(request_warnings)
     quality_score = product_quality_score(product)
     price_score = price_fit_score(persona, product, intent)
     reliability_score = popularity_reliability_score(product)
@@ -95,6 +142,7 @@ def score_candidate(
         + 0.20 * quality_score
         + 0.15 * price_score
         + 0.10 * reliability_score
+        + request_adjustment
     )
     breakdown = RecommendationScoreBreakdown(
         semantic_similarity=semantic_similarity,

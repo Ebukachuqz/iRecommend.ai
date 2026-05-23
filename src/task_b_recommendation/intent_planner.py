@@ -39,15 +39,70 @@ Output:
 """
 
 
+REQUEST_ATTRIBUTE_KEYWORDS = [
+    ("skincare", ["skincare"]),
+    ("skin care", ["skincare"]),
+    ("oily skin", ["oily skin", "oil-free"]),
+    ("oil free", ["oil-free"]),
+    ("oil-free", ["oil-free"]),
+    ("gentle", ["gentle"]),
+    ("cleanser", ["cleanser"]),
+    ("face wash", ["face wash", "cleanser"]),
+    ("toner", ["toner"]),
+    ("serum", ["serum"]),
+    ("moisturizer", ["moisturizer"]),
+    ("moisturiser", ["moisturizer"]),
+    ("sunscreen", ["sunscreen"]),
+]
+
+
+def append_unique(values: list[str], additions: list[str]) -> list[str]:
+    seen = {value.lower() for value in values}
+    output = list(values)
+    for addition in additions:
+        normalized = addition.strip()
+        if normalized and normalized.lower() not in seen:
+            output.append(normalized)
+            seen.add(normalized.lower())
+    return output
+
+
+def enrich_intent_from_request(intent: RecommendationIntent, request: str | None) -> RecommendationIntent:
+    request_text = (request or "").lower()
+    if not request_text:
+        return intent
+
+    required_attributes = list(intent.required_attributes)
+    for keyword, additions in REQUEST_ATTRIBUTE_KEYWORDS:
+        if keyword in request_text:
+            required_attributes = append_unique(required_attributes, additions)
+
+    explicit_constraints = dict(intent.explicit_constraints)
+    if "affordable" in request_text or "budget" in request_text or "cheap" in request_text:
+        explicit_constraints.setdefault("price_preference", "affordable")
+        explicit_constraints.setdefault("value_conscious", True)
+        required_attributes = append_unique(required_attributes, ["affordable", "value for money"])
+
+    retrieval_query = intent.retrieval_query.strip() or request or ""
+    return intent.model_copy(
+        update={
+            "retrieval_query": retrieval_query,
+            "required_attributes": required_attributes,
+            "explicit_constraints": explicit_constraints,
+        }
+    )
+
+
 def fallback_intent(request: str | None, persona: dict[str, Any] | None = None) -> RecommendationIntent:
     request = request or ""
     preferences = persona.get("preferences", {}) if isinstance(persona, dict) else {}
-    return RecommendationIntent(
+    intent = RecommendationIntent(
         interpreted_need=request or "Recommend products that fit the user's persona.",
         retrieval_query=request,
         required_attributes=list(preferences.get("liked_attributes", []) or [])[:5],
         excluded_attributes=list(preferences.get("disliked_attributes", []) or [])[:5],
     )
+    return enrich_intent_from_request(intent, request)
 
 
 def plan_intent(
@@ -78,7 +133,7 @@ def plan_intent(
                 "parsed_payload": intent.model_dump(mode="json"),
             },
         )
-        return intent
+        return enrich_intent_from_request(intent, request)
     except Exception as exc:
         log_llm_response(
             "task_b_intent_planning_fallback",

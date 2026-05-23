@@ -7,6 +7,7 @@ from src.config import get_settings
 from src.llm.groq_client import get_groq_chat
 from src.llm.logging import log_llm_response
 from src.llm.parsers import parse_json_from_llm_text
+from src.task_b_recommendation.product_text import build_product_text
 from src.task_b_recommendation.schema import (
     RecommendationIntent,
     RerankedRecommendation,
@@ -54,16 +55,38 @@ Output:
 def fallback_rerank(
     candidates: list[ScoredRecommendationCandidate],
     limit: int,
+    intent: RecommendationIntent | None = None,
 ) -> RerankerOutput:
     recommendations = []
     for rank, candidate in enumerate(candidates[:limit], start=1):
         matched = candidate.score_breakdown.matched_persona_signals
-        evidence = matched[:3] or ["High transparent score from metadata and persona matching."]
-        reason = (
-            f"Matches persona signals: {', '.join(matched[:3])}."
-            if matched
-            else "Ranks well from product quality, reliability, and available preference signals."
-        )
+        request_terms = intent.required_attributes if intent else []
+        product_text = build_product_text(candidate.product).lower()
+        concrete_matches = [
+            term
+            for term in request_terms
+            if term and term.lower() in product_text
+        ][:3]
+        evidence = (concrete_matches + matched[:3])[:4]
+        if not evidence:
+            evidence = [
+                f"Product quality score {candidate.score_breakdown.product_quality:.2f}",
+                f"Preference match score {candidate.score_breakdown.preference_match:.2f}",
+            ]
+        if concrete_matches:
+            reason = (
+                f"This product is a stronger fit because its metadata mentions "
+                f"{', '.join(concrete_matches)}, matching the request."
+            )
+        elif matched:
+            reason = f"This product connects to persona/request signals: {', '.join(matched[:3])}."
+        else:
+            reason = (
+                "This product is selected from the transparent score breakdown, led by "
+                f"quality {candidate.score_breakdown.product_quality:.2f}, reliability "
+                f"{candidate.score_breakdown.popularity_reliability:.2f}, and preference fit "
+                f"{candidate.score_breakdown.preference_match:.2f}."
+            )
         recommendations.append(
             RerankedRecommendation(
                 parent_asin=candidate.parent_asin,
@@ -136,7 +159,7 @@ def rerank_recommendations(
             )
             if len(filtered) >= limit:
                 break
-        reranked = RerankerOutput(recommendations=filtered) if filtered else fallback_rerank(candidates, limit)
+        reranked = RerankerOutput(recommendations=filtered) if filtered else fallback_rerank(candidates, limit, intent)
         log_llm_response(
             "task_b_reranking",
             {
@@ -157,4 +180,4 @@ def rerank_recommendations(
                 "error": str(exc),
             },
         )
-        return fallback_rerank(candidates, limit)
+        return fallback_rerank(candidates, limit, intent)
