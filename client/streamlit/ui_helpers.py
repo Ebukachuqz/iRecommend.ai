@@ -54,12 +54,21 @@ def safe_json_view(label: str, payload: Any, expanded: bool = False) -> None:
         st.json(payload)
 
 
+def is_json_renderable(value: Any) -> bool:
+    return isinstance(value, dict | list)
+
+
 def render_persona_section(title: str, persona: dict[str, Any], key: str) -> None:
     if st is None:
         return
     value = persona.get(key)
     with st.expander(title, expanded=key in {"writing_style", "preferences", "rating_behavior"}):
-        st.json(value if value is not None else {})
+        if value is None:
+            st.info("No data available.")
+        elif is_json_renderable(value):
+            st.json(value)
+        else:
+            st.write(str(value))
 
 
 def render_rating_breakdown(breakdown: dict[str, Any] | None) -> None:

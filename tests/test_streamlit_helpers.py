@@ -43,3 +43,12 @@ def test_persona_average_rating_falls_back_to_persona_json() -> None:
 
 def test_persona_average_rating_returns_na_when_missing() -> None:
     assert ui_helpers.get_persona_average_rating({"persona": {}}) == "n/a"
+
+
+def test_persona_section_detects_json_renderable_values() -> None:
+    assert ui_helpers.is_json_renderable({"tone": "direct"}) is True
+    assert ui_helpers.is_json_renderable(["concise", "specific"]) is True
+
+
+def test_persona_section_treats_plain_strings_as_non_json_renderable() -> None:
+    assert ui_helpers.is_json_renderable("none detected") is False
