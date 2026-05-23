@@ -17,6 +17,19 @@ def format_score(value: Any) -> str:
         return str(value)
 
 
+def get_persona_average_rating(persona_row: dict[str, Any] | None) -> float | str:
+    if not persona_row:
+        return "n/a"
+    db_average = persona_row.get("average_rating")
+    if db_average is not None:
+        return db_average
+    persona = persona_row.get("persona") or {}
+    rating_behavior = persona.get("rating_behavior") if isinstance(persona, dict) else {}
+    if isinstance(rating_behavior, dict) and rating_behavior.get("average_rating") is not None:
+        return rating_behavior["average_rating"]
+    return "n/a"
+
+
 def render_status_badge(label: str, ok: bool | None) -> None:
     if st is None:
         return

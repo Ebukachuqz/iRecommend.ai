@@ -13,6 +13,17 @@ from src.task_a_simulation.service import list_unseen_products
 router = APIRouter(tags=["personas"])
 
 
+def persona_average_rating(row: dict) -> float | None:
+    average_rating = row.get("average_rating")
+    if average_rating is not None:
+        return average_rating
+    persona = row.get("persona") or {}
+    rating_behavior = persona.get("rating_behavior") if isinstance(persona, dict) else {}
+    if isinstance(rating_behavior, dict):
+        return rating_behavior.get("average_rating")
+    return None
+
+
 @router.get("/users", response_model=list[UserPersonaSummary])
 def list_users(
     category: str = DEFAULT_CATEGORY,
@@ -20,7 +31,10 @@ def list_users(
     client: Client = Depends(get_db_client),
 ) -> list[UserPersonaSummary]:
     try:
-        return [UserPersonaSummary.model_validate(row) for row in fetch_user_persona_summaries(category, limit, client=client)]
+        rows = fetch_user_persona_summaries(category, limit, client=client)
+        for row in rows:
+            row["average_rating"] = persona_average_rating(row)
+        return [UserPersonaSummary.model_validate(row) for row in rows]
     except Exception as exc:
         raise HTTPException(status_code=500, detail="Failed to fetch persona users.") from exc
 
@@ -42,7 +56,7 @@ def get_user_persona(
         "category": row.get("category"),
         "persona": row.get("persona"),
         "review_count": row.get("review_count"),
-        "average_rating": row.get("average_rating"),
+        "average_rating": persona_average_rating(row),
         "source_review_ids": row.get("source_review_ids") or [],
         "persona_version": row.get("persona_version"),
         "model_name": row.get("model_name"),

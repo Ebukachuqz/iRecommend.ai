@@ -21,3 +21,25 @@ def test_format_score_formats_numbers() -> None:
 
 def test_format_score_handles_text() -> None:
     assert ui_helpers.format_score("not-a-number") == "not-a-number"
+
+
+def test_persona_average_rating_prefers_db_column() -> None:
+    row = {
+        "average_rating": 4.25,
+        "persona": {"rating_behavior": {"average_rating": 3.5}},
+    }
+
+    assert ui_helpers.get_persona_average_rating(row) == 4.25
+
+
+def test_persona_average_rating_falls_back_to_persona_json() -> None:
+    row = {
+        "average_rating": None,
+        "persona": {"rating_behavior": {"average_rating": 3.75}},
+    }
+
+    assert ui_helpers.get_persona_average_rating(row) == 3.75
+
+
+def test_persona_average_rating_returns_na_when_missing() -> None:
+    assert ui_helpers.get_persona_average_rating({"persona": {}}) == "n/a"

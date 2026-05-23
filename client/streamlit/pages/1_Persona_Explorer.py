@@ -10,7 +10,7 @@ if str(STREAMLIT_ROOT) not in sys.path:
     sys.path.insert(0, str(STREAMLIT_ROOT))
 
 import api_client
-from ui_helpers import render_error, render_persona_section, safe_json_view
+from ui_helpers import format_score, get_persona_average_rating, render_error, render_persona_section, safe_json_view
 
 
 st.set_page_config(page_title="Persona Explorer", page_icon="iR", layout="wide")
@@ -38,7 +38,7 @@ if users:
     selected_summary = next((row for row in users if row["user_id"] == selected_user), {})
     summary_cols = st.columns(3)
     summary_cols[0].metric("Review count", selected_summary.get("review_count") or 0)
-    summary_cols[1].metric("Average rating", selected_summary.get("average_rating") or "n/a")
+    summary_cols[1].metric("Average rating", format_score(get_persona_average_rating(selected_summary)))
     summary_cols[2].metric("Persona version", selected_summary.get("persona_version") or "n/a")
 
     if st.button("Load persona"):
@@ -54,7 +54,7 @@ if persona_row:
     st.subheader("Persona Summary")
     cols = st.columns(4)
     cols[0].metric("Review count", persona_row.get("review_count") or 0)
-    cols[1].metric("Average rating", persona_row.get("average_rating") or "n/a")
+    cols[1].metric("Average rating", format_score(get_persona_average_rating(persona_row)))
     cols[2].metric("Source reviews", len(persona_row.get("source_review_ids") or []))
     cols[3].metric("Version", persona_row.get("persona_version") or "n/a")
 

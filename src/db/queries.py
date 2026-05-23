@@ -31,7 +31,7 @@ def fetch_user_persona_summaries(
     client = resolve_client(client)
     response = (
         client.table("user_personas")
-        .select("user_id, category, review_count, average_rating, persona_version")
+        .select("user_id, category, review_count, average_rating, persona_version, persona")
         .eq("category", category)
         .limit(limit)
         .execute()
