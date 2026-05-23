@@ -22,6 +22,8 @@ def generate_recommendations(
     try:
         request = RecommendationRequest(**payload.model_dump())
         return recommendation_service.recommend(request, client=client)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except recommendation_service.TaskBServiceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
@@ -41,6 +43,8 @@ def cold_start_recommendations(
             context=payload.context,
         )
         return recommendation_service.recommend(request, client=client)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except recommendation_service.TaskBServiceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:

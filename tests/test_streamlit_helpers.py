@@ -52,3 +52,25 @@ def test_persona_section_detects_json_renderable_values() -> None:
 
 def test_persona_section_treats_plain_strings_as_non_json_renderable() -> None:
     assert ui_helpers.is_json_renderable("none detected") is False
+
+
+def test_parse_json_text_returns_object() -> None:
+    assert ui_helpers.parse_json_text("Persona", '{"likes": ["hydrating"]}') == {"likes": ["hydrating"]}
+
+
+def test_parse_json_text_rejects_invalid_json() -> None:
+    try:
+        ui_helpers.parse_json_text("Persona", "{not json}")
+    except ValueError as exc:
+        assert "Persona must be valid JSON" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError")
+
+
+def test_parse_json_text_rejects_non_object_json() -> None:
+    try:
+        ui_helpers.parse_json_text("Persona", '["hydrating"]')
+    except ValueError as exc:
+        assert "Persona must be a JSON object" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError")

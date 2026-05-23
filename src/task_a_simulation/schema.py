@@ -39,7 +39,7 @@ ProductDetails = ProductSnapshot
 
 
 class ReviewSimulationRequest(BaseModel):
-    user_id: str
+    user_id: str | None = None
     category: str = DEFAULT_CATEGORY
     parent_asin: str | None = None
     persona: dict[str, Any] | None = None
@@ -75,7 +75,7 @@ RatingPredictionResult = RatingPredictionBreakdown
 
 
 class ReviewSimulationOutput(BaseModel):
-    user_id: str
+    user_id: str | None = None
     category: str
     parent_asin: str
     product_title: str | None = None

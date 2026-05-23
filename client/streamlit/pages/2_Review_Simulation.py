@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -10,51 +11,94 @@ if str(STREAMLIT_ROOT) not in sys.path:
     sys.path.insert(0, str(STREAMLIT_ROOT))
 
 import api_client
-from ui_helpers import render_error, render_rating_breakdown, safe_json_view
+from ui_helpers import parse_json_text, render_error, render_rating_breakdown, safe_json_view
+
+
+PERSONA_SAMPLE = {
+    "likes": ["hydrating skincare", "gentle products"],
+    "dislikes": ["strong fragrance", "greasy texture"],
+    "budget": "medium",
+    "tone": "casual",
+    "average_rating": 4.2,
+    "concerns": ["dry skin", "sensitivity"],
+}
+
+PRODUCT_SAMPLE = {
+    "name": "Gentle Hydrating Face Cream",
+    "category": "Skincare",
+    "price": 18.99,
+    "rating": 4.5,
+    "reviews_count": 120,
+    "features": ["fragrance-free", "hydrating", "for dry sensitive skin"],
+    "description": "A lightweight moisturizing cream for dry and sensitive skin.",
+}
 
 
 st.set_page_config(page_title="Review Simulation", page_icon="iR", layout="wide")
 st.title("Review Simulation")
 
-user_id = st.text_input("User ID", value=st.session_state.get("selected_user_id", ""))
-category = st.text_input("Category", value=st.session_state.get("category", "All_Beauty"))
-product_limit = st.number_input("Unseen product limit", min_value=1, max_value=100, value=20)
-
-if st.button("Load unseen products"):
-    if not user_id:
-        st.warning("Enter or select a user first.")
-    else:
-        try:
-            products = api_client.get_unseen_products(user_id, limit=int(product_limit))
-            st.session_state["unseen_products"] = products
-        except Exception as exc:
-            render_error(exc)
-
-products = st.session_state.get("unseen_products", [])
-product_map = {
-    f"{product.get('title') or 'Untitled'} ({product.get('parent_asin')})": product
-    for product in products
-}
-selected_label = st.selectbox("Product", list(product_map.keys())) if product_map else None
+mode = st.radio("Mode", ["Existing user", "Custom JSON"], horizontal=True)
 nigerian_mode = st.toggle("Nigerian shopping context", value=False)
 
-if st.button("Run simulation", type="primary"):
-    if not user_id:
-        st.warning("User ID is required.")
-    elif not selected_label:
-        st.warning("Load and select an unseen product first.")
-    else:
-        product = product_map[selected_label]
-        payload = {
-            "user_id": user_id,
-            "category": category,
-            "parent_asin": product["parent_asin"],
-            "nigerian_mode": nigerian_mode,
-            "context": {},
-        }
+if mode == "Existing user":
+    user_id = st.text_input("User ID", value=st.session_state.get("selected_user_id", ""))
+    category = st.text_input("Category", value=st.session_state.get("category", "All_Beauty"))
+    product_limit = st.number_input("Unseen product limit", min_value=1, max_value=100, value=20)
+
+    if st.button("Load unseen products"):
+        if not user_id:
+            st.warning("Enter or select a user first.")
+        else:
+            try:
+                products = api_client.get_unseen_products(user_id, limit=int(product_limit))
+                st.session_state["unseen_products"] = products
+            except Exception as exc:
+                render_error(exc)
+
+    products = st.session_state.get("unseen_products", [])
+    product_map = {
+        f"{product.get('title') or 'Untitled'} ({product.get('parent_asin')})": product
+        for product in products
+    }
+    selected_label = st.selectbox("Product", list(product_map.keys())) if product_map else None
+
+    if st.button("Run simulation", type="primary"):
+        if not user_id:
+            st.warning("User ID is required.")
+        elif not selected_label:
+            st.warning("Load and select an unseen product first.")
+        else:
+            product = product_map[selected_label]
+            payload = {
+                "user_id": user_id,
+                "category": category,
+                "parent_asin": product["parent_asin"],
+                "nigerian_mode": nigerian_mode,
+                "context": {},
+            }
+            try:
+                st.session_state["latest_simulation"] = api_client.simulate_review(payload)
+            except Exception as exc:
+                render_error(exc)
+else:
+    st.caption("Custom JSON can use common field names. It does not need to match the internal schema exactly.")
+    persona_text = st.text_area("Persona JSON", value=json.dumps(PERSONA_SAMPLE, indent=2), height=220)
+    product_text = st.text_area("Product JSON", value=json.dumps(PRODUCT_SAMPLE, indent=2), height=240)
+
+    if st.button("Run custom simulation", type="primary"):
         try:
-            result = api_client.simulate_review(payload)
-            st.session_state["latest_simulation"] = result
+            persona = parse_json_text("Persona JSON", persona_text)
+            product = parse_json_text("Product JSON", product_text)
+            payload = {
+                "user_id": None,
+                "category": "Custom",
+                "persona": persona,
+                "product": product,
+                "parent_asin": product.get("parent_asin") or "custom_product",
+                "nigerian_mode": nigerian_mode,
+                "context": {},
+            }
+            st.session_state["latest_simulation"] = api_client.simulate_review(payload)
         except Exception as exc:
             render_error(exc)
 

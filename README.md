@@ -99,6 +99,8 @@ python scripts/run_task_a_simulation.py --user-id <USER_ID> --parent-asin <PAREN
 
 Successful simulations are stored in `simulation_results`.
 
+Task A also accepts custom persona and product JSON through `POST /reviews/simulate`. This satisfies the direct persona + product -> review/rating flow. The backend normalizes common field variants, preserves unknown persona fields under `extra_persona_signals.unmapped_fields`, preserves unknown product fields under `details.custom_fields`, and rejects only inputs that are too empty to support the task.
+
 ## Task B
 
 Embed products:
@@ -121,6 +123,8 @@ python scripts/run_task_b_recommendation.py --cold-start --request "I need affor
 ```
 
 Successful recommendation calls are stored in `recommendation_runs`.
+
+Task B also accepts a custom persona JSON through `POST /recommendations/generate`. This supports the direct persona -> recommendations flow. The normalizer supports common fields such as `likes`, `interests`, `preferred_products`, `dislikes`, `avoid`, `concerns`, `values`, `priorities`, `budget`, `tone`, `average_rating`, and category signals. It does not attempt to map every possible arbitrary schema.
 
 ## FastAPI Backend
 
@@ -234,6 +238,8 @@ On Windows without `make`, run the equivalent commands shown in the sections abo
 4. Simulate a review for an unseen product.
 5. Generate personalised recommendations.
 6. Try cold-start recommendations.
+7. Try custom JSON mode in Review Simulation with a persona and product.
+8. Try custom persona mode in Recommendations.
 
 ## Known Limitations
 

@@ -1,6 +1,3 @@
-import pytest
-from pydantic import ValidationError
-
 from app.api.models.requests import (
     ColdStartRecommendationAPIRequest,
     RecommendationAPIRequest,
@@ -9,9 +6,11 @@ from app.api.models.requests import (
 )
 
 
-def test_review_simulation_request_requires_user_id() -> None:
-    with pytest.raises(ValidationError):
-        ReviewSimulationAPIRequest(parent_asin="asin-1")
+def test_review_simulation_request_accepts_custom_mode_without_user_id() -> None:
+    request = ReviewSimulationAPIRequest(persona={"likes": ["hydrating"]}, product={"name": "Cream"})
+
+    assert request.user_id is None
+    assert request.persona == {"likes": ["hydrating"]}
 
 
 def test_recommendation_request_accepts_user_id() -> None:

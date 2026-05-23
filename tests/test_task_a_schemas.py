@@ -39,7 +39,7 @@ def test_invalid_llm_rating_fails_validation() -> None:
 
 def test_review_output_carries_nigerian_mode_flag(sample_rating_breakdown) -> None:
     output = ReviewSimulationOutput(
-        user_id="u1",
+        user_id=None,
         category="All_Beauty",
         parent_asin="asin-1",
         llm_predicted_rating=4,
@@ -53,3 +53,4 @@ def test_review_output_carries_nigerian_mode_flag(sample_rating_breakdown) -> No
     )
 
     assert output.nigerian_mode is True
+    assert output.user_id is None

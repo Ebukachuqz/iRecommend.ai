@@ -7,8 +7,10 @@ from supabase import Client
 from src.config import get_settings
 from src.db import queries
 from src.db.supabase_client import get_supabase_client
+from src.personas.normalizer import normalize_custom_persona
 from src.personas.validator import validate_persona
 from src.task_a_simulation.calibration import calibrate_rating
+from src.task_a_simulation.product_normalizer import normalize_custom_product
 from src.task_a_simulation.prompts import TASK_A_PROMPT_VERSION
 from src.task_a_simulation.rating_predictor import predict_statistical_rating
 from src.task_a_simulation.schema import (
@@ -27,16 +29,23 @@ def coerce_product(product: dict[str, Any] | ProductSnapshot) -> ProductSnapshot
     return product if isinstance(product, ProductSnapshot) else ProductSnapshot.model_validate(product)
 
 
+def is_custom_simulation_request(request: ReviewSimulationRequest) -> bool:
+    return request.persona is not None and request.product is not None
+
+
 def resolve_persona(
-    user_id: str,
+    user_id: str | None,
     category: str,
     persona: dict[str, Any] | None,
-    client: Client,
+    client: Client | None,
 ) -> tuple[dict[str, Any], str | None]:
     if persona:
-        validated = validate_persona(persona, repair=True)
+        normalized = normalize_custom_persona(persona)
+        validated = validate_persona(normalized, repair=True)
         return validated.model_dump(mode="json"), None
 
+    if not user_id:
+        raise TaskAServiceError("Task A requires either user_id with parent_asin/use_holdout or custom persona and product.")
     row = queries.fetch_persona(user_id, category, client=client)
     if not row:
         raise TaskAServiceError(f"No persona found for user_id={user_id!r}, category={category!r}.")
@@ -45,9 +54,15 @@ def resolve_persona(
     return validated.model_dump(mode="json"), row.get("persona_version")
 
 
-def resolve_product(parent_asin: str, product: dict[str, Any] | ProductSnapshot | None, client: Client) -> ProductSnapshot:
+def resolve_product(parent_asin: str, product: dict[str, Any] | ProductSnapshot | None, client: Client | None) -> ProductSnapshot:
     if product:
-        return coerce_product(product)
+        if isinstance(product, ProductSnapshot):
+            normalized = product.model_dump(mode="json")
+        else:
+            normalized = normalize_custom_product(product)
+        if parent_asin and normalized.get("parent_asin") == "custom_product":
+            normalized["parent_asin"] = parent_asin
+        return ProductSnapshot.model_validate(normalized)
 
     row = queries.fetch_product(parent_asin, client=client)
     if not row:
@@ -90,17 +105,24 @@ def build_simulation_payload(
 
 def simulate_review(request: ReviewSimulationRequest, client: Client | None = None) -> ReviewSimulationOutput:
     settings = get_settings()
-    client = client or get_supabase_client()
+    custom_mode = is_custom_simulation_request(request)
+    client = None if custom_mode else (client or get_supabase_client())
     holdout_review = None
 
-    if request.use_holdout:
+    if custom_mode:
+        parent_asin = request.parent_asin or "custom_product"
+    elif request.use_holdout:
+        if not request.user_id:
+            raise TaskAServiceError("user_id is required when use_holdout is true.")
         holdout_review = queries.fetch_task_a_holdout_review(request.user_id, client=client)
         if not holdout_review:
             raise TaskAServiceError(f"No task_a_holdout review found for user_id={request.user_id!r}.")
         parent_asin = holdout_review["parent_asin"]
     else:
         if not request.parent_asin:
-            raise TaskAServiceError("parent_asin is required when use_holdout is false.")
+            raise TaskAServiceError("Task A requires either user_id with parent_asin/use_holdout or custom persona and product.")
+        if not request.user_id:
+            raise TaskAServiceError("Task A requires either user_id with parent_asin/use_holdout or custom persona and product.")
         parent_asin = request.parent_asin
 
     persona, persona_version = resolve_persona(request.user_id, request.category, request.persona, client)
@@ -136,10 +158,11 @@ def simulate_review(request: ReviewSimulationRequest, client: Client | None = No
         model_name=settings.groq_model,
         prompt_version=TASK_A_PROMPT_VERSION,
     )
-    queries.store_simulation_result(
-        build_simulation_payload(request, persona, product, output, persona_version, holdout_review),
-        client=client,
-    )
+    if not custom_mode and client is not None:
+        queries.store_simulation_result(
+            build_simulation_payload(request, persona, product, output, persona_version, holdout_review),
+            client=client,
+        )
     return output
 
 

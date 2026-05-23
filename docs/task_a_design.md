@@ -20,6 +20,10 @@ fetch_persona_and_product
 
 `amazon_reviews` is never filtered by category. Holdout evaluation uses `task_split='task_a_holdout'`; persona generation and Task A both treat `task_split` as the review split source of truth.
 
+Task A also supports the hackathon contract directly: a caller can provide a custom persona JSON object and a custom product JSON object without a Supabase user/product row. The backend normalizes common persona fields such as `likes`, `dislikes`, `budget`, `tone`, and `average_rating`, and common product fields such as `name`, `category`, `rating`, and `reviews_count`. Unknown persona fields are preserved under `extra_persona_signals.unmapped_fields`; unknown product fields are preserved under `details.custom_fields`.
+
+This custom path is intentionally bounded. It accepts flexible-but-reasonable JSON, fills safe defaults, and rejects inputs that contain no usable user or product signal. It does not claim to understand every arbitrary schema.
+
 ## Rating
 
 The statistical predictor starts from the user's historical average, blends in product average rating when available, rewards liked attribute matches, penalizes disliked attributes and complaint matches, applies price/quality sensitivity, and adjusts for strictness.

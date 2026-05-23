@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 try:
@@ -28,6 +29,16 @@ def get_persona_average_rating(persona_row: dict[str, Any] | None) -> float | st
     if isinstance(rating_behavior, dict) and rating_behavior.get("average_rating") is not None:
         return rating_behavior["average_rating"]
     return "n/a"
+
+
+def parse_json_text(label: str, text: str) -> dict[str, Any]:
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{label} must be valid JSON: {exc.msg}") from exc
+    if not isinstance(parsed, dict):
+        raise ValueError(f"{label} must be a JSON object.")
+    return parsed
 
 
 def render_status_badge(label: str, ok: bool | None) -> None:

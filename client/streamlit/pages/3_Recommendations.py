@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -10,33 +11,62 @@ if str(STREAMLIT_ROOT) not in sys.path:
     sys.path.insert(0, str(STREAMLIT_ROOT))
 
 import api_client
-from ui_helpers import render_error, render_recommendation_card, safe_json_view
+from ui_helpers import parse_json_text, render_error, render_recommendation_card, safe_json_view
+
+
+PERSONA_SAMPLE = {
+    "likes": ["hydrating skincare", "gentle products"],
+    "dislikes": ["strong fragrance", "greasy texture"],
+    "budget": "medium",
+    "tone": "casual",
+    "average_rating": 4.2,
+    "concerns": ["dry skin", "sensitivity"],
+}
 
 
 st.set_page_config(page_title="Recommendations", page_icon="iR", layout="wide")
 st.title("Recommendations")
 
-user_id = st.text_input("User ID", value=st.session_state.get("selected_user_id", ""))
+mode = st.radio("Mode", ["Existing user", "Custom persona"], horizontal=True)
 category = st.text_input("Category", value=st.session_state.get("category", "All_Beauty"))
 request_text = st.text_area("Request", value="I want something affordable and gentle")
 limit = st.slider("Limit", min_value=1, max_value=10, value=5)
-session_id = st.text_input("Session ID (optional)", value="")
 
-if st.button("Generate recommendations", type="primary"):
-    if not user_id:
-        st.warning("User ID is required for personalised recommendations. Use Cold Start for request-only demos.")
-    else:
-        payload = {
-            "user_id": user_id,
-            "category": category,
-            "request": request_text,
-            "limit": limit,
-            "session_id": session_id or None,
-            "context": {},
-        }
+if mode == "Existing user":
+    user_id = st.text_input("User ID", value=st.session_state.get("selected_user_id", ""))
+    session_id = st.text_input("Session ID (optional)", value="")
+
+    if st.button("Generate recommendations", type="primary"):
+        if not user_id:
+            st.warning("User ID is required for personalised recommendations. Switch to Custom persona or Cold Start for request-only demos.")
+        else:
+            payload = {
+                "user_id": user_id,
+                "category": category,
+                "request": request_text,
+                "limit": limit,
+                "session_id": session_id or None,
+                "context": {},
+            }
+            try:
+                st.session_state["latest_recommendations"] = api_client.generate_recommendations(payload)
+            except Exception as exc:
+                render_error(exc)
+else:
+    st.caption("Custom persona JSON can use common field names such as likes, dislikes, budget, tone, concerns, and average_rating.")
+    persona_text = st.text_area("Persona JSON", value=json.dumps(PERSONA_SAMPLE, indent=2), height=240)
+
+    if st.button("Generate recommendations from persona", type="primary"):
         try:
-            result = api_client.generate_recommendations(payload)
-            st.session_state["latest_recommendations"] = result
+            persona = parse_json_text("Persona JSON", persona_text)
+            payload = {
+                "category": category,
+                "persona": persona,
+                "request": request_text,
+                "limit": limit,
+                "context": {},
+            }
+            st.session_state["latest_recommendations"] = api_client.generate_recommendations(payload)
         except Exception as exc:
             render_error(exc)
 

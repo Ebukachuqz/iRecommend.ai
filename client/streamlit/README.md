@@ -53,6 +53,22 @@ STREAMLIT_API_BASE_URL=http://127.0.0.1:8000
 
 The Streamlit client does not need Supabase, Groq, or Hugging Face secrets.
 
+## Demo Modes
+
+Persona Explorer, Review Simulation, Recommendations, and Cold Start use the FastAPI backend over HTTP.
+
+Review Simulation supports:
+
+- existing user mode: select a Supabase-backed user and unseen product
+- custom JSON mode: paste a persona-like JSON object and product-like JSON object
+
+Recommendations supports:
+
+- existing user mode: generate recommendations for a stored persona
+- custom persona mode: paste a persona-like JSON object and request
+
+Custom JSON support is bounded. The backend normalizes common field variants such as `likes`, `dislikes`, `budget`, `tone`, `average_rating`, `name`, `category`, and `reviews_count`, but it does not claim to understand every arbitrary schema.
+
 ## Docker
 
 From the repository root, run both API and Streamlit:
