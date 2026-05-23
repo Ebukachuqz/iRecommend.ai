@@ -52,3 +52,19 @@ STREAMLIT_API_BASE_URL=http://127.0.0.1:8000
 ```
 
 The Streamlit client does not need Supabase, Groq, or Hugging Face secrets.
+
+## Docker
+
+From the repository root, run both API and Streamlit:
+
+```powershell
+docker compose up
+```
+
+The Streamlit container receives:
+
+```text
+STREAMLIT_API_BASE_URL=http://api:8000
+```
+
+It does not receive backend secrets.

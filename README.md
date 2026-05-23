@@ -2,71 +2,114 @@
 
 Behaviour-aware LLM agents for review simulation and personalised recommendation.
 
-This repository is being built incrementally from the implementation guide. The current implementation covers the repository scaffold, Supabase configuration, Amazon review ingestion modules, persona generation modules, Pydantic persona validation, database hardening migrations, and Task A review simulation.
+iRecommend learns structured personas from Amazon review history, uses those personas to simulate future reviews, and generates personalised recommendations with transparent scoring and evidence.
 
-## Current Phase
+## Architecture
 
-- Repository setup and notebook migration
-- Database schema hardening
-- Holdout-aware persona regeneration
-- Task A review and rating simulation
+```text
+Amazon Reviews 2023
+-> Supabase reviews + product metadata
+-> holdout split
+-> persona generation
+-> Task A review simulation
+-> Task B recommendation
+-> FastAPI backend
+-> Streamlit client
+```
 
-## Setup
-
-1. Create a virtual environment.
-2. Install dependencies with `pip install -r requirements.txt`.
-3. Copy `.env.example` to `.env` and fill in your own keys.
-4. Run SQL migrations in `src/db/sql/` in Supabase SQL editor.
-
-Do not commit `.env`.
+Supabase is the hosted system of record. Product embeddings use pgvector in Supabase. The Streamlit client talks to FastAPI over HTTP only.
 
 ## Environment
 
-Required variables:
+Backend variables:
 
 ```text
 SUPABASE_URL=
 SUPABASE_PUBLIC_KEY=
 SUPABASE_SECRET_KEY=
 GROQ_API_KEY=
+HF_TOKEN=
 ```
 
-`SUPABASE_SECRET_KEY` is for backend scripts and services only. Do not expose it in frontend code.
+Client variable:
+
+```text
+STREAMLIT_API_BASE_URL=http://127.0.0.1:8000
+```
+
+`SUPABASE_SECRET_KEY` is for backend scripts, services, and the API only. Do not expose it in frontend/client deployments.
+
+## Local Setup
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+Copy-Item .env.example .env
+```
+
+Edit `.env` with your own keys. Do not commit `.env`.
+
+Root backend dependencies live in `requirements.txt`. The detachable Streamlit client has its own minimal dependencies in `client/streamlit/requirements.txt`.
+
+## Supabase SQL Migrations
+
+Run these in the Supabase SQL editor:
+
+```text
+src/db/sql/001_initial_schema.sql
+src/db/sql/002_persona_schema_update.sql
+src/db/sql/003_holdout_split.sql
+src/db/sql/004_pgvector_setup.sql
+src/db/sql/005_simulation_results.sql
+src/db/sql/006_recommendation_tables.sql
+```
+
+Supabase remains hosted externally; Docker Compose does not start a local database.
+
+## Data Ingestion
+
+```powershell
+python scripts/ingest_amazon.py --category All_Beauty
+```
+
+Create holdout splits:
+
+```powershell
+python scripts/create_holdout_split.py --category All_Beauty
+```
+
+## Persona Generation
+
+```powershell
+python scripts/regenerate_personas.py --category All_Beauty --limit 10
+```
+
+Persona generation uses only `task_split='persona_train'` reviews. `amazon_reviews` does not have or require a `category` column.
 
 ## Task A
 
-Run the simulation results migration before Task A:
-
-```powershell
-# Supabase SQL editor
-src/db/sql/005_simulation_results.sql
-```
-
-CLI examples:
+Run review simulation:
 
 ```powershell
 python scripts/run_task_a_simulation.py --user-id <USER_ID> --parent-asin <PARENT_ASIN>
 python scripts/run_task_a_simulation.py --user-id <USER_ID> --use-holdout
 python scripts/run_task_a_simulation.py --user-id <USER_ID> --parent-asin <PARENT_ASIN> --nigerian-mode
-python scripts/run_task_a_simulation.py --user-id <USER_ID> --list-unseen --limit 10
 ```
 
-Every successful simulation is inserted into `simulation_results`.
+Successful simulations are stored in `simulation_results`.
 
 ## Task B
 
-Run the recommendation migrations before Task B:
-
-```powershell
-# Supabase SQL editor
-src/db/sql/004_pgvector_setup.sql
-src/db/sql/006_recommendation_tables.sql
-```
-
-Embed products and build taste vectors:
+Embed products:
 
 ```powershell
 python scripts/embed_products.py --limit 100
+```
+
+Build a user taste vector:
+
+```powershell
 python scripts/build_user_taste_vectors.py --user-id <USER_ID> --category All_Beauty
 ```
 
@@ -74,21 +117,18 @@ Run recommendations:
 
 ```powershell
 python scripts/run_task_b_recommendation.py --user-id <USER_ID> --request "I want something affordable and gentle"
-python scripts/run_task_b_recommendation.py --user-id <USER_ID>
 python scripts/run_task_b_recommendation.py --cold-start --request "I need affordable skincare for oily skin"
 ```
 
-Every successful recommendation call inserts a row into `recommendation_runs`.
+Successful recommendation calls are stored in `recommendation_runs`.
 
 ## FastAPI Backend
-
-Run the API locally:
 
 ```powershell
 uvicorn app.api.main:app --reload
 ```
 
-Open API docs at:
+API docs:
 
 ```text
 http://127.0.0.1:8000/docs
@@ -110,18 +150,21 @@ POST /sessions/{session_id}/message
 
 ## Streamlit Client
 
-The Streamlit frontend lives in `client/streamlit` so it can be moved or deployed separately from the backend later.
-
-Run the backend:
-
-```powershell
-uvicorn app.api.main:app --reload
-```
-
-Run the Streamlit client:
+Run from the root environment:
 
 ```powershell
 streamlit run client/streamlit/streamlit_app.py
+```
+
+Run independently:
+
+```powershell
+cd client/streamlit
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+Copy-Item .env.example .env
+streamlit run streamlit_app.py
 ```
 
 Open:
@@ -130,12 +173,79 @@ Open:
 http://localhost:8501
 ```
 
-Client API configuration:
+The Streamlit client only needs `STREAMLIT_API_BASE_URL`. It does not need Supabase, Groq, or Hugging Face secrets.
 
-```text
-STREAMLIT_API_BASE_URL=http://127.0.0.1:8000
+`client/nextjs` is reserved for a later polished frontend. It is not implemented yet.
+
+## Docker
+
+Build images:
+
+```powershell
+docker compose build
 ```
 
-The Streamlit client only needs the API base URL. It does not need Supabase or Groq secrets.
+Run API and Streamlit:
 
-For independent Streamlit deployment, use `client/streamlit/requirements.txt` instead of the root `requirements.txt`.
+```powershell
+docker compose up
+```
+
+Open:
+
+```text
+FastAPI:   http://127.0.0.1:8000/docs
+Streamlit: http://127.0.0.1:8501
+```
+
+Stop:
+
+```powershell
+docker compose down
+```
+
+Docker uses `.env` for the API service. The Streamlit service receives only:
+
+```text
+STREAMLIT_API_BASE_URL=http://api:8000
+```
+
+## Makefile
+
+```powershell
+make install
+make test
+make run-api
+make run-streamlit
+make docker-build
+make docker-up
+make docker-down
+make embed-products LIMIT=100
+make build-taste-vector USER_ID=<USER_ID> CATEGORY=All_Beauty
+```
+
+On Windows without `make`, run the equivalent commands shown in the sections above.
+
+## MVP Demo Flow
+
+1. Start the API.
+2. Start Streamlit.
+3. Load a user persona.
+4. Simulate a review for an unseen product.
+5. Generate personalised recommendations.
+6. Try cold-start recommendations.
+
+## Known Limitations
+
+- Supabase must already be configured and migrated.
+- Product embeddings must be built before semantic Task B retrieval is useful.
+- Cross-platform user history agents are postponed.
+- Baselines, ablations, and evaluation reports are planned later.
+- Docker Compose does not provide a local Supabase/Postgres instance.
+
+## Next Planned Work
+
+- Docker/reproducibility polish follow-ups if needed.
+- Research baselines and ablations.
+- Evaluation scripts and reporting.
+- Optional Next.js frontend under `client/nextjs`.
