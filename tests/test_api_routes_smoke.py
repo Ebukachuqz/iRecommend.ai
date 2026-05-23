@@ -77,7 +77,17 @@ def test_reviews_simulate_rejects_missing_user_id() -> None:
 def test_reviews_simulate_accepts_custom_persona_and_product(monkeypatch) -> None:
     from app.api.routers import simulate
 
-    monkeypatch.setattr(simulate.task_a_service, "simulate_review", lambda request, client=None: make_simulation_output())
+    calls = []
+
+    def fail_db_client():
+        raise AssertionError("Custom Task A route should not initialize Supabase")
+
+    def fake_simulate_review(request, client=None):
+        calls.append(client)
+        return make_simulation_output()
+
+    monkeypatch.setattr(simulate, "get_db_client", fail_db_client)
+    monkeypatch.setattr(simulate.task_a_service, "simulate_review", fake_simulate_review)
 
     response = client_with_overrides().post(
         "/reviews/simulate",
@@ -90,6 +100,7 @@ def test_reviews_simulate_accepts_custom_persona_and_product(monkeypatch) -> Non
     assert response.status_code == 200
     assert response.json()["user_id"] is None
     assert response.json()["parent_asin"] == "custom_product"
+    assert calls == [None]
 
 
 def test_recommendations_generate_accepts_user_id_request(monkeypatch) -> None:

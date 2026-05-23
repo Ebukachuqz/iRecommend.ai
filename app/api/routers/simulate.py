@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
-from supabase import Client
+from fastapi import APIRouter, HTTPException
 
 from app.api.dependencies import get_db_client
 from app.api.models.requests import ReviewSimulationAPIRequest
@@ -24,7 +23,6 @@ def map_task_a_error(message: str) -> int:
 @router.post("/reviews/simulate", response_model=ReviewSimulationOutput)
 def simulate_review(
     payload: ReviewSimulationAPIRequest,
-    client: Client = Depends(get_db_client),
 ) -> ReviewSimulationOutput:
     has_custom_input = payload.persona is not None or payload.product is not None
     if has_custom_input and (payload.persona is None or payload.product is None):
@@ -36,6 +34,7 @@ def simulate_review(
         )
     try:
         request = ReviewSimulationRequest(**payload.model_dump())
+        client = None if has_custom_input else get_db_client()
         return task_a_service.simulate_review(request, client=client)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
