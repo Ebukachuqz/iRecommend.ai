@@ -34,7 +34,20 @@ def load_session(session_id: str, client: Client | None = None) -> Recommendatio
     if not response.data:
         return None
     row = response.data[0]
-    return RecommendationSessionState.model_validate(row["state"])
+    state_payload = row.get("state")
+    if isinstance(state_payload, dict):
+        return RecommendationSessionState.model_validate(state_payload)
+    return RecommendationSessionState.model_validate(
+        {
+            "session_id": row.get("session_id"),
+            "user_id": row.get("user_id"),
+            "category": row.get("category"),
+            "persona": row.get("persona") or {},
+            "conversation_history": row.get("conversation_history") or [],
+            "active_constraints": row.get("active_constraints") or {},
+            "shown_products": row.get("shown_products") or [],
+        }
+    )
 
 
 def store_session(state: RecommendationSessionState, client: Client | None = None) -> None:
@@ -45,6 +58,10 @@ def store_session(state: RecommendationSessionState, client: Client | None = Non
             "user_id": state.user_id,
             "category": state.category,
             "state": state.model_dump(mode="json"),
+            "persona": state.persona,
+            "conversation_history": state.conversation_history,
+            "active_constraints": state.active_constraints,
+            "shown_products": state.shown_products,
         },
         on_conflict="session_id",
     ).execute()

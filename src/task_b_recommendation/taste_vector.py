@@ -95,6 +95,7 @@ def store_user_taste_vector(
             "embedding": embedding,
             "embedding_model": embedding_model,
             "source_parent_asins": source_parent_asins,
+            "source_review_count": len(source_parent_asins),
         },
         on_conflict="user_id,category",
     ).execute()

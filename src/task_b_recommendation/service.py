@@ -11,6 +11,7 @@ from src.personas.custom_persona_processor import process_custom_persona
 from src.personas.validator import validate_persona
 from src.task_b_recommendation.candidate_retriever import retrieve_candidates
 from src.task_b_recommendation.cold_start import build_cold_start_persona
+from src.task_b_recommendation.embeddings import DEFAULT_EMBEDDING_MODEL
 from src.task_b_recommendation.intent_planner import INTENT_PROMPT_VERSION, plan_intent
 from src.task_b_recommendation.reranker import RERANKER_PROMPT_VERSION, rerank_recommendations
 from src.task_b_recommendation.schema import (
@@ -89,17 +90,27 @@ def store_recommendation_run(
     context: dict[str, Any],
     client: Client,
 ) -> dict[str, Any]:
+    recommendations = [item.model_dump(mode="json") for item in output.recommendations]
+    retrieval_sources: dict[str, int] = {}
+    for candidate in context.get("scored_candidates") or []:
+        source = candidate.get("retrieval_source") or "unknown"
+        retrieval_sources[source] = retrieval_sources.get(source, 0) + 1
+
     payload = {
         "user_id": output.user_id,
         "category": output.category,
         "request": output.request,
         "context": context,
         "candidate_count": output.candidate_count,
-        "recommendations": [item.model_dump(mode="json") for item in output.recommendations],
+        "retrieval_sources": retrieval_sources,
+        "recommendations": recommendations,
+        "top_asin": recommendations[0]["parent_asin"] if recommendations else None,
         "cold_start": output.cold_start,
+        "cold_start_type": "new_user" if output.cold_start and not output.user_id else None,
         "session_id": output.session_id,
         "model_name": output.model_name,
         "prompt_version": output.prompt_version,
+        "embedding_model": DEFAULT_EMBEDDING_MODEL,
     }
     response = client.table("recommendation_runs").insert(payload).execute()
     return response.data[0] if response.data else payload
