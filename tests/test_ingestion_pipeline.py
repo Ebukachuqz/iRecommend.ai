@@ -218,6 +218,67 @@ def test_unrelated_metadata_is_not_stored_beyond_extra_product_limit() -> None:
     assert [item["parent_asin"] for item in plan["extra_metadata"]] == ["extra-1"]
 
 
+class StreamingOnlyReviews:
+    def __init__(self, rows):
+        self.rows = rows
+        self.iterations = 0
+        self.consumed = 0
+
+    def __iter__(self):
+        self.iterations += 1
+        for row in self.rows:
+            self.consumed += 1
+            yield row
+
+    def __len__(self):
+        raise AssertionError("review stream should not be sized")
+
+    def __getitem__(self, _index):
+        raise AssertionError("review stream should not be indexed")
+
+
+def test_review_iterable_is_consumed_as_stream_not_materialized() -> None:
+    reviews = StreamingOnlyReviews([valid_review("u1", "p1", 1), valid_review("u1", "p2", 2)])
+
+    plan = ingest_amazon.build_ingestion_plan(
+        reviews,
+        [valid_metadata("p1"), valid_metadata("p2")],
+        category="All_Beauty",
+        min_reviews=2,
+        max_users=100,
+        extra_products=0,
+    )
+
+    assert reviews.iterations == 3
+    assert reviews.consumed == 6
+    assert plan["selected_user_ids"] == ["u1"]
+    assert [review["parent_asin"] for review in plan["reviews_to_upload"]] == ["p1", "p2"]
+
+
+def test_review_limit_applies_to_each_streaming_review_pass() -> None:
+    reviews = StreamingOnlyReviews(
+        [
+            valid_review("u1", "p1", 1),
+            valid_review("u1", "p2", 2),
+            valid_review("u1", "p3", 3),
+        ]
+    )
+
+    plan = ingest_amazon.build_ingestion_plan(
+        reviews,
+        [valid_metadata("p1"), valid_metadata("p2"), valid_metadata("p3")],
+        category="All_Beauty",
+        min_reviews=3,
+        max_users=100,
+        extra_products=0,
+        review_limit=2,
+    )
+
+    assert reviews.consumed == 6
+    assert plan["valid_review_product_pairs"] == 2
+    assert plan["selected_user_ids"] == []
+
+
 class FailingClient:
     def table(self, _name):
         raise AssertionError("dry-run should not upload")

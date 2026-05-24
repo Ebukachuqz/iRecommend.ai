@@ -3,7 +3,8 @@ from __future__ import annotations
 import hashlib
 import re
 from collections import Counter
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
+from itertools import islice
 from typing import Any
 
 from datasets import load_dataset
@@ -181,14 +182,18 @@ def upsert_metadata(client: Client, metadata: list[dict[str, Any]]) -> None:
 
 
 def limited(items: Iterable[dict[str, Any]], limit: int | None) -> Iterator[dict[str, Any]]:
-    for index, item in enumerate(items, start=1):
-        if limit is not None and index > limit:
-            break
-        yield item
+    yield from items if limit is None else islice(items, limit)
 
 
-def select_eligible_users(valid_pairs: list[dict[str, Any]], min_reviews: int, max_users: int) -> list[str]:
-    counts: Counter[str] = Counter(str(review["user_id"]) for review in valid_pairs)
+ReviewSource = Iterable[dict[str, Any]] | Callable[[], Iterable[dict[str, Any]]]
+
+
+def iter_reviews(reviews: ReviewSource, limit: int | None) -> Iterator[dict[str, Any]]:
+    source = reviews() if callable(reviews) else reviews
+    yield from limited(source, limit)
+
+
+def select_eligible_users_from_counts(counts: Counter[str], min_reviews: int, max_users: int) -> list[str]:
     eligible = [(user_id, count) for user_id, count in counts.items() if count >= min_reviews]
     ordered = sorted(eligible, key=lambda item: (-item[1], item[0]))
     selected = ordered if max_users == 0 else ordered[:max_users]
@@ -196,7 +201,7 @@ def select_eligible_users(valid_pairs: list[dict[str, Any]], min_reviews: int, m
 
 
 def build_ingestion_plan(
-    reviews: Iterable[dict[str, Any]],
+    reviews: ReviewSource,
     metadata: Iterable[dict[str, Any]],
     category: str,
     min_reviews: int = 15,
@@ -204,17 +209,17 @@ def build_ingestion_plan(
     extra_products: int = 1000,
     review_limit: int | None = None,
 ) -> dict[str, Any]:
-    raw_reviews = list(limited(reviews, review_limit))
-
-    valid_reviews: list[dict[str, Any]] = []
+    candidate_parent_asins: set[str] = set()
+    valid_review_rows = 0
     skipped_invalid_reviews = 0
-    for review in raw_reviews:
+    for review in iter_reviews(reviews, review_limit):
         if is_valid_review(review):
-            valid_reviews.append(review)
+            valid_review_rows += 1
+            if parent_asin := review_parent_asin(review):
+                candidate_parent_asins.add(parent_asin)
         else:
             skipped_invalid_reviews += 1
 
-    candidate_parent_asins = {parent_asin for review in valid_reviews if (parent_asin := review_parent_asin(review))}
     reviewed_metadata_by_asin: dict[str, dict[str, Any]] = {}
     extra_metadata_by_asin: dict[str, dict[str, Any]] = {}
     seen_metadata_asins: set[str] = set()
@@ -240,14 +245,26 @@ def build_ingestion_plan(
         elif extra_products > 0 and len(extra_metadata_by_asin) < extra_products:
             extra_metadata_by_asin[parent_asin] = item
 
-    valid_pairs = [
-        review
-        for review in valid_reviews
-        if (parent_asin := review_parent_asin(review)) and parent_asin in reviewed_metadata_by_asin
-    ]
+    user_pair_counts: Counter[str] = Counter()
+    valid_review_product_pairs = 0
+    for review in iter_reviews(reviews, review_limit):
+        if not is_valid_review(review):
+            continue
+        parent_asin = review_parent_asin(review)
+        if parent_asin and parent_asin in reviewed_metadata_by_asin:
+            user_pair_counts[str(review["user_id"])] += 1
+            valid_review_product_pairs += 1
 
-    selected_user_ids = set(select_eligible_users(valid_pairs, min_reviews=min_reviews, max_users=max_users))
-    selected_reviews = [review for review in valid_pairs if str(review["user_id"]) in selected_user_ids]
+    selected_user_ids = set(
+        select_eligible_users_from_counts(user_pair_counts, min_reviews=min_reviews, max_users=max_users)
+    )
+    selected_reviews = []
+    for review in iter_reviews(reviews, review_limit):
+        if not is_valid_review(review):
+            continue
+        parent_asin = review_parent_asin(review)
+        if parent_asin and parent_asin in reviewed_metadata_by_asin and str(review["user_id"]) in selected_user_ids:
+            selected_reviews.append(review)
 
     selected_parent_asins = {review_parent_asin(review) for review in selected_reviews}
     selected_parent_asins.discard(None)
@@ -274,8 +291,8 @@ def build_ingestion_plan(
         "metadata_to_upload": metadata_to_upload + extra_metadata,
         "extra_metadata": extra_metadata,
         "valid_metadata_rows": valid_metadata_rows,
-        "valid_review_rows": len(valid_reviews),
-        "valid_review_product_pairs": len(valid_pairs),
+        "valid_review_rows": valid_review_rows,
+        "valid_review_product_pairs": valid_review_product_pairs,
         "skipped_invalid_reviews": skipped_invalid_reviews,
         "skipped_sparse_metadata": skipped_sparse_metadata,
     }
@@ -356,7 +373,7 @@ def ingest_category(
     effective_review_limit = review_limit if review_limit is not None else max_reviews
 
     plan = build_ingestion_plan(
-        stream_reviews(category),
+        lambda: stream_reviews(category),
         stream_metadata(category),
         category=category,
         min_reviews=effective_min_reviews,
