@@ -21,6 +21,14 @@ Task B can run from a stored user persona or from a caller-provided custom perso
 
 Candidate retrieval first tries the user's stored taste vector from `user_taste_vectors`. Taste vectors are built only from `amazon_reviews.task_split='persona_train'` liked reviews with rating >= 4, and products already reviewed by the user are always excluded. If no taste vector exists, retrieval falls back to high-quality/popular product metadata.
 
+Taste vectors are category-aware. Reviews are filtered through `amazon_product_metadata` by `parent_asin`, using `category` first and falling back to `main_category`/`categories`, before product embeddings are averaged. This prevents a beauty taste vector from being polluted by books, electronics, or other category histories.
+
+## Product Embeddings
+
+Product embeddings are built from rich metadata rather than title-only text. `product_embeddings.product_text` includes the title, full category path, top product features, the first description entries/sentences, brand/store, a semantic price tier, and useful details. The stored `product_text` is intentionally kept for debugging and reproducibility: it shows exactly what text was embedded for a product.
+
+The embedding text uses price tiers (`budget`, `mid-range`, `premium`, `luxury`) instead of exact prices such as `$18.99`. Exact prices change over time and add little semantic value; price tiers preserve the stable consumer meaning. When the product text strategy changes, run `scripts/embed_products.py --force-reembed` for the affected category or product set so existing vectors match the new text representation.
+
 ## Scoring
 
 Scoring is transparent:

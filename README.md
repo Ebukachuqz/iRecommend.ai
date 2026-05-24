@@ -63,6 +63,7 @@ src/db/sql/003_holdout_split.sql
 src/db/sql/004_pgvector_setup.sql
 src/db/sql/005_simulation_results.sql
 src/db/sql/006_recommendation_tables.sql
+src/db/sql/007_task_b_upgrade.sql
 ```
 
 Supabase remains hosted externally; Docker Compose does not start a local database.
@@ -107,7 +108,11 @@ Embed products:
 
 ```powershell
 python scripts/embed_products.py --limit 100
+python scripts/embed_products.py --category All_Beauty --limit 100 --dry-run
+python scripts/embed_products.py --category All_Beauty --force-reembed
 ```
+
+Product embeddings are built from rich product metadata: title, category path, features, description, brand/store, price tier, and useful details. The exact raw price is not embedded; the script uses semantic tiers such as `budget`, `mid-range`, `premium`, and `luxury` because those meanings are more stable than a changing seller price. The text used for each embedding is stored in `product_embeddings.product_text` for debugging and reproducibility. Re-run with `--force-reembed` when the product text strategy changes.
 
 Build a user taste vector:
 

@@ -1,4 +1,5 @@
 from scripts import create_holdout_split
+from scripts import embed_products
 from scripts import regenerate_personas
 
 build_holdout_updates = create_holdout_split.build_holdout_updates
@@ -120,3 +121,38 @@ def test_apply_updates_updates_only_task_split(monkeypatch) -> None:
     )
 
     assert all(set(payload) == {"task_split"} for payload in client.query.updates)
+
+
+class EmbeddingStoreRecorder:
+    def __init__(self) -> None:
+        self.upserts = []
+
+    def upsert_product_embedding(self, *args):
+        self.upserts.append(args)
+
+
+def test_embed_products_dry_run_does_not_write_or_encode(monkeypatch) -> None:
+    store = EmbeddingStoreRecorder()
+    monkeypatch.setattr(embed_products, "existing_embedding_ids", lambda parent_asins: set())
+
+    def fail_encode(*_args, **_kwargs):
+        raise AssertionError("dry-run should not encode embeddings")
+
+    monkeypatch.setattr(embed_products, "embed_texts", fail_encode)
+
+    result = embed_products.embed_product_batch(
+        [
+            {
+                "parent_asin": "asin-1",
+                "title": "Gentle Face Cream",
+                "category": "All_Beauty",
+                "features": ["hydrating"],
+            }
+        ],
+        store,
+        dry_run=True,
+    )
+
+    assert result["would_embed"] == 1
+    assert result["embedded"] == 0
+    assert store.upserts == []
