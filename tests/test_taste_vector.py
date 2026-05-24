@@ -1,3 +1,5 @@
+import math
+
 from src.task_b_recommendation import taste_vector
 from src.task_b_recommendation.taste_vector import (
     build_and_store_user_taste_vector,
@@ -12,7 +14,18 @@ from src.task_b_recommendation.taste_vector import (
 def test_weighted_average_uses_rating_weights() -> None:
     average = weighted_average([[1.0, 0.0], [0.0, 1.0]], [1.0, 2.0])
 
-    assert average == [1 / 3, 2 / 3]
+    assert average == [1 / math.sqrt(5), 2 / math.sqrt(5)]
+
+
+def test_weighted_average_output_is_unit_normalized() -> None:
+    average = weighted_average([[1.0, 0.0], [0.0, 1.0]], [1.0, 2.0])
+
+    assert math.isclose(math.sqrt(sum(value * value for value in average)), 1.0)
+
+
+def test_weighted_average_empty_or_zero_vector_returns_empty() -> None:
+    assert weighted_average([], []) == []
+    assert weighted_average([[0.0, 0.0]], [1.0]) == []
 
 
 def test_parse_pgvector_string_embedding() -> None:
@@ -92,9 +105,9 @@ def test_build_user_taste_vector_filters_positive_reviews_by_category(monkeypatc
     book_vector, book_sources = build_user_taste_vector("user-1", "Books")
 
     assert beauty_sources == ["beauty-4", "beauty-5"]
-    assert beauty_vector == [1 / 3, 2 / 3]
+    assert beauty_vector == [1 / math.sqrt(5), 2 / math.sqrt(5)]
     assert book_sources == ["book-5"]
-    assert book_vector == [10.0, 10.0]
+    assert book_vector == [1 / math.sqrt(2), 1 / math.sqrt(2)]
 
 
 def test_build_and_store_taste_vector_records_category_specific_source_count(monkeypatch) -> None:

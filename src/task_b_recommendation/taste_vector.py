@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from supabase import Client
@@ -25,10 +26,14 @@ def weighted_average(vectors: list[list[float]], weights: list[float]) -> list[f
     total_weight = sum(weights)
     if total_weight <= 0:
         return []
-    return [
+    averaged = [
         sum(vector[index] * weight for vector, weight in zip(vectors, weights)) / total_weight
         for index in range(dimension)
     ]
+    norm = math.sqrt(sum(value * value for value in averaged))
+    if norm == 0:
+        return []
+    return [value / norm for value in averaged]
 
 
 def normalize_category(value: Any) -> str:
