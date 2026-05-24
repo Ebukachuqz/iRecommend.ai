@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from collections import Counter
 from collections.abc import Callable, Iterable, Iterator
@@ -145,6 +146,18 @@ def review_parent_asin(review: dict[str, Any]) -> str | None:
     return str(parent_asin).strip() if has_value(parent_asin) else None
 
 
+def normalize_details_value(value: Any) -> dict[str, Any] | None:
+    if isinstance(value, dict):
+        return value if value else None
+    if isinstance(value, str) and value.strip():
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return None
+        return parsed if isinstance(parsed, dict) and parsed else None
+    return None
+
+
 def is_valid_review(review: dict[str, Any]) -> bool:
     parent_asin = review_parent_asin(review)
     return all(
@@ -159,6 +172,7 @@ def is_valid_review(review: dict[str, Any]) -> bool:
 
 
 def is_valid_metadata(item: dict[str, Any], category: str, require_rating_number: bool = False) -> bool:
+    details = normalize_details_value(item.get("details"))
     has_required_fields = all(
         [
             has_value(item.get("parent_asin")),
@@ -169,7 +183,7 @@ def is_valid_metadata(item: dict[str, Any], category: str, require_rating_number
             parse_price(item.get("price")) is not None,
             has_value(item.get("average_rating")),
             has_value(item.get("store")),
-            has_value(item.get("details")),
+            details is not None,
         ]
     )
     if not has_required_fields:
@@ -197,6 +211,7 @@ def normalize_review(review: dict[str, Any]) -> dict[str, Any]:
 
 
 def normalize_metadata(item: dict[str, Any], category: str) -> dict[str, Any]:
+    details = normalize_details_value(item.get("details")) or {}
     normalized = AmazonProductMetadata(
         parent_asin=str(item["parent_asin"]),
         category=category,
@@ -209,7 +224,7 @@ def normalize_metadata(item: dict[str, Any], category: str) -> dict[str, Any]:
         average_rating=item.get("average_rating"),
         rating_number=item.get("rating_number"),
         store=item.get("store"),
-        details=item.get("details") or {},
+        details=details,
         raw_metadata=item,
     )
     return normalized.model_dump(mode="json")

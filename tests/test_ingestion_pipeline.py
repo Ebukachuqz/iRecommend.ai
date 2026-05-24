@@ -233,6 +233,51 @@ def test_product_required_metadata_fields_are_enforced() -> None:
         assert ingest_amazon.is_valid_metadata(item, "All_Beauty") is False, field
 
 
+def test_product_details_dict_is_valid() -> None:
+    item = valid_metadata("p1")
+
+    assert ingest_amazon.normalize_details_value(item["details"]) == {"skin_type": "dry"}
+    assert ingest_amazon.is_valid_metadata(item, "All_Beauty") is True
+
+
+def test_product_details_json_string_dict_is_valid() -> None:
+    item = valid_metadata("p1")
+    item["details"] = '{"Color": "As Shown", "Manufacturer": "Lurrose"}'
+
+    assert ingest_amazon.normalize_details_value(item["details"]) == {
+        "Color": "As Shown",
+        "Manufacturer": "Lurrose",
+    }
+    assert ingest_amazon.is_valid_metadata(item, "All_Beauty") is True
+
+
+def test_product_details_invalid_json_string_is_invalid() -> None:
+    item = valid_metadata("p1")
+    item["details"] = '{"Color": "As Shown"'
+
+    assert ingest_amazon.normalize_details_value(item["details"]) is None
+    assert ingest_amazon.is_valid_metadata(item, "All_Beauty") is False
+
+
+def test_product_details_non_dict_json_is_invalid() -> None:
+    for raw_details in ('["Color"]', '"Color"'):
+        item = valid_metadata("p1")
+        item["details"] = raw_details
+
+        assert ingest_amazon.normalize_details_value(item["details"]) is None
+        assert ingest_amazon.is_valid_metadata(item, "All_Beauty") is False
+
+
+def test_normalize_metadata_converts_json_string_details_to_dict() -> None:
+    item = valid_metadata("p1")
+    item["details"] = '{"Color": "As Shown", "Manufacturer": "Lurrose"}'
+
+    normalized = ingest_amazon.normalize_metadata(item, "All_Beauty")
+
+    assert normalized["details"] == {"Color": "As Shown", "Manufacturer": "Lurrose"}
+    assert normalized["raw_metadata"]["details"] == '{"Color": "As Shown", "Manufacturer": "Lurrose"}'
+
+
 def test_product_missing_rating_number_is_valid_by_default() -> None:
     item = valid_metadata("p1")
     item["rating_number"] = None
