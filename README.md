@@ -152,6 +152,41 @@ python scripts/regenerate_personas.py --category All_Beauty --limit 20 --max-rev
 
 Persona generation uses only `task_split='persona_train'` reviews. It sends at most 10 reviews per user to the LLM by default to keep prompt length manageable; use `--max-reviews-per-user` to override this for experiments. The selected review IDs are stored in `user_personas.source_review_ids` and included in the persona run summary. `task_a_holdout` and `task_b_holdout` reviews are reserved for evaluation and should not be used to build personas. `amazon_reviews` does not have or require a `category` column.
 
+## Finding Test IDs
+
+Check whether a category is ready for Task A / Task B smoke tests:
+
+```powershell
+python scripts/check_category_readiness.py --category Health_and_Household
+```
+
+List evaluation-friendly users:
+
+```powershell
+python scripts/list_eval_users.py --category Health_and_Household --limit 10
+python scripts/list_eval_users.py --category Health_and_Household --task task_a --require-persona --limit 10
+python scripts/list_eval_users.py --category Health_and_Household --task task_b --require-persona --require-taste-vector --limit 10
+```
+
+Pick a user for Task A:
+
+1. Choose a row where `has_persona=true` and `task_a_holdout_count>0`.
+2. List their holdout reviews and copy a `review_id` / `parent_asin`:
+
+```powershell
+python scripts/list_user_holdouts.py --user-id <USER_ID> --category Health_and_Household
+```
+
+Pick a user for Task B:
+
+1. Choose a row where `has_persona=true`, `has_taste_vector=true`, and `task_b_holdout_count>0`.
+
+List embedded products (useful for checking whether semantic retrieval has any catalog):
+
+```powershell
+python scripts/list_embedded_products.py --category Health_and_Household --limit 10
+```
+
 ## Task A
 
 Run review simulation:
