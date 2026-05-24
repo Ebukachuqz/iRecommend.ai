@@ -219,6 +219,14 @@ Build a user taste vector:
 python scripts/build_user_taste_vectors.py --user-id <USER_ID> --category All_Beauty
 ```
 
+Build taste vectors for a batch of users in a category (from `user_personas`):
+
+```powershell
+python scripts/build_user_taste_vectors.py --category Health_and_Household --limit 20
+python scripts/build_user_taste_vectors.py --category Electronics --limit 20
+python scripts/build_user_taste_vectors.py --category Beauty_and_Personal_Care --limit 20
+```
+
 Taste vectors are category-specific and unit-normalized after averaging liked product embeddings. They are built from rating >= 4 `persona_train` reviews whose products match the requested metadata category.
 
 Run recommendations:

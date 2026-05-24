@@ -3,6 +3,7 @@ import json
 from scripts import create_holdout_split
 from scripts import embed_products
 from scripts import ingest_amazon as ingest_amazon_script
+from scripts import build_user_taste_vectors as build_user_taste_vectors_script
 from scripts import regenerate_personas as regenerate_personas_script
 from scripts import regenerate_personas
 
@@ -309,3 +310,94 @@ def test_embed_products_dry_run_does_not_write_or_encode(monkeypatch) -> None:
     assert result["would_embed"] == 1
     assert result["embedded"] == 0
     assert store.upserts == []
+
+
+class TasteVectorClientRecorder:
+    def __init__(self, persona_user_ids: list[str]) -> None:
+        self.persona_user_ids = persona_user_ids
+        self.tables = []
+
+    def table(self, name: str):
+        self.tables.append(name)
+        return self
+
+    def select(self, _columns):
+        return self
+
+    def eq(self, _column, _value):
+        return self
+
+    def range(self, _start, _end):
+        return self
+
+    def execute(self):
+        # Only used for user_personas pagination in batch mode.
+        data = [{"user_id": user_id} for user_id in self.persona_user_ids]
+        self.persona_user_ids = []
+        return type("Resp", (), {"data": data})()
+
+
+def test_build_user_taste_vectors_single_user_mode(monkeypatch, capsys) -> None:
+    calls = []
+
+    def fake_build_and_store(user_id, category, embedding_model, client=None):
+        calls.append((user_id, category, embedding_model))
+        return [0.1], ["p1"]
+
+    monkeypatch.setattr(build_user_taste_vectors_script, "get_supabase_client", lambda: object())
+    monkeypatch.setattr(build_user_taste_vectors_script, "build_and_store_user_taste_vector", fake_build_and_store)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["build_user_taste_vectors.py", "--user-id", "u1", "--category", "Electronics", "--model", "m1"],
+    )
+
+    build_user_taste_vectors_script.main()
+
+    assert calls == [("u1", "Electronics", "m1")]
+    output = capsys.readouterr().out
+    assert "u1" in output
+    assert "Electronics" in output
+
+
+def test_build_user_taste_vectors_batch_skips_existing_by_default(monkeypatch, capsys) -> None:
+    client = TasteVectorClientRecorder(["u1", "u2"])
+    monkeypatch.setattr(build_user_taste_vectors_script, "get_supabase_client", lambda: client)
+    monkeypatch.setattr(build_user_taste_vectors_script, "fetch_user_taste_vector", lambda user_id, _cat, client=None: {"user_id": user_id} if user_id == "u1" else None)
+    built = []
+
+    def fake_build_and_store(user_id, category, embedding_model, client=None):
+        built.append(user_id)
+        return [0.1], ["p1"]
+
+    monkeypatch.setattr(build_user_taste_vectors_script, "build_and_store_user_taste_vector", fake_build_and_store)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["build_user_taste_vectors.py", "--category", "Health_and_Household", "--limit", "20"],
+    )
+
+    build_user_taste_vectors_script.main()
+
+    assert built == ["u2"]
+    output = capsys.readouterr().out
+    assert "skipped_existing" in output
+
+
+def test_build_user_taste_vectors_batch_force_rebuilds_existing(monkeypatch) -> None:
+    client = TasteVectorClientRecorder(["u1"])
+    monkeypatch.setattr(build_user_taste_vectors_script, "get_supabase_client", lambda: client)
+    monkeypatch.setattr(build_user_taste_vectors_script, "fetch_user_taste_vector", lambda _user_id, _cat, client=None: {"user_id": "u1"})
+    built = []
+
+    def fake_build_and_store(user_id, category, embedding_model, client=None):
+        built.append(user_id)
+        return [0.1], ["p1"]
+
+    monkeypatch.setattr(build_user_taste_vectors_script, "build_and_store_user_taste_vector", fake_build_and_store)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["build_user_taste_vectors.py", "--category", "Health_and_Household", "--limit", "1", "--force"],
+    )
+
+    build_user_taste_vectors_script.main()
+
+    assert built == ["u1"]
