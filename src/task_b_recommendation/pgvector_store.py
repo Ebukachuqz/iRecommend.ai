@@ -1,11 +1,40 @@
 from __future__ import annotations
 
+import random
+import time
 from typing import Any
 
+import httpx
 from supabase import Client
 
 from src.db.supabase_client import get_supabase_client
 from src.task_b_recommendation.vector_store import VectorStore
+
+
+def _is_transient_network_error(exc: BaseException) -> bool:
+    if isinstance(exc, (httpx.ReadError, httpx.ConnectError, httpx.TimeoutException)):
+        return True
+    # Fallback: Windows can surface some resets as OSError with winerror 10054.
+    winerror = getattr(exc, "winerror", None)
+    if winerror == 10054:
+        return True
+    return False
+
+
+def _execute_with_retries(builder: Any, *, max_attempts: int = 5) -> Any:
+    attempt = 0
+    delay_s = 0.5
+    while True:
+        attempt += 1
+        try:
+            return builder.execute()
+        except Exception as exc:  # noqa: BLE001 - narrow by predicate
+            if attempt >= max_attempts or not _is_transient_network_error(exc):
+                raise
+            # Exponential backoff with small jitter. Keep it simple: this is for transient resets.
+            jitter = random.random() * 0.25
+            time.sleep(delay_s + jitter)
+            delay_s = min(delay_s * 2.0, 8.0)
 
 
 class SupabasePgVectorStore(VectorStore):
@@ -19,7 +48,7 @@ class SupabasePgVectorStore(VectorStore):
         embedding_model: str,
         product_text: str,
     ) -> None:
-        self.client.table("product_embeddings").upsert(
+        builder = self.client.table("product_embeddings").upsert(
             {
                 "parent_asin": parent_asin,
                 "embedding": embedding,
@@ -27,7 +56,8 @@ class SupabasePgVectorStore(VectorStore):
                 "product_text": product_text,
             },
             on_conflict="parent_asin",
-        ).execute()
+        )
+        _execute_with_retries(builder)
 
     def search_products(
         self,
@@ -35,24 +65,25 @@ class SupabasePgVectorStore(VectorStore):
         limit: int,
         exclude_parent_asins: set[str] | None = None,
     ) -> list[dict[str, Any]]:
-        response = self.client.rpc(
+        builder = self.client.rpc(
             "match_product_embeddings",
             {
                 "query_embedding": query_embedding,
                 "match_count": limit,
                 "exclude_parent_asins": list(exclude_parent_asins or []),
             },
-        ).execute()
+        )
+        response = _execute_with_retries(builder)
         return list(response.data or [])
 
     def get_product_embedding(self, parent_asin: str) -> dict[str, Any] | None:
-        response = (
+        builder = (
             self.client.table("product_embeddings")
             .select("*")
             .eq("parent_asin", parent_asin)
             .limit(1)
-            .execute()
         )
+        response = _execute_with_retries(builder)
         return response.data[0] if response.data else None
 
     def search_similar_users(
@@ -62,7 +93,7 @@ class SupabasePgVectorStore(VectorStore):
         limit: int,
         exclude_user_id: str | None = None,
     ) -> list[dict[str, Any]]:
-        response = self.client.rpc(
+        builder = self.client.rpc(
             "match_user_taste_vectors",
             {
                 "query_embedding": query_embedding,
@@ -70,5 +101,6 @@ class SupabasePgVectorStore(VectorStore):
                 "match_count": limit,
                 "exclude_user_id": exclude_user_id,
             },
-        ).execute()
+        )
+        response = _execute_with_retries(builder)
         return list(response.data or [])
