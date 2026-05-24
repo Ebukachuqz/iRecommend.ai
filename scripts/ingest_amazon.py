@@ -7,6 +7,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.ingestion.ingest_amazon import ingest_category
+from src.utils.run_summary import build_run_summary, save_run_summary
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -20,6 +21,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--require-rating-number", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--verify", action="store_true")
+    parser.add_argument("--output-dir", default="outputs/ingestion")
     return parser
 
 
@@ -38,6 +40,21 @@ def main() -> None:
         dry_run=args.dry_run,
         verify=args.verify,
     )
+    mode = "dry_run" if args.dry_run else "ingest"
+    summary = build_run_summary(
+        category=result.get("category") or args.category,
+        mode=mode,
+        args=vars(args),
+        result=result,
+    )
+    summary_path = save_run_summary(
+        args.output_dir,
+        summary["category"],
+        mode,
+        summary,
+        timestamp=summary["timestamp"],
+    )
+    print(f"[ingestion] Run summary saved: {summary_path}")
     print(result)
 
 

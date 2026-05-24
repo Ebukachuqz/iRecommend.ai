@@ -9,6 +9,7 @@ __pycache__/
 .ipynb_checkpoints/
 logs/*.jsonl
 logs/*.log
+outputs/
 data/
 dist/
 build/

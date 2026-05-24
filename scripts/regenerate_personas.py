@@ -9,6 +9,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.config import get_settings
 from src.db.supabase_client import get_supabase_client
 from src.personas.generator import PersonaGenerator, log_persona_generation
+from src.utils.run_summary import build_run_summary, save_run_summary
 
 
 def fetch_user_ids() -> list[str]:
@@ -39,6 +40,7 @@ def main() -> None:
     parser.add_argument("--category", default=settings.default_category)
     parser.add_argument("--user-id", action="append", dest="user_ids")
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--output-dir", default="outputs/personas")
     args = parser.parse_args()
 
     user_ids = args.user_ids or fetch_user_ids()
@@ -51,12 +53,14 @@ def main() -> None:
     generator = PersonaGenerator()
     success_count = 0
     failure_count = 0
+    failures: list[dict[str, str]] = []
     for index, user_id in enumerate(user_ids, start=1):
         log_persona_generation(f"Processing user {index}/{len(user_ids)}: user_id={user_id}")
         try:
             result = generator.regenerate_persona(user_id=user_id, category=args.category, store=True)
         except Exception as exc:
             failure_count += 1
+            failures.append({"user_id": user_id, "error": str(exc)})
             log_persona_generation(f"Persona generation failed: user_id={user_id}, error={exc}")
             continue
         success_count += 1
@@ -66,6 +70,33 @@ def main() -> None:
     log_persona_generation(
         f"Persona regeneration complete: succeeded={success_count}, failed={failure_count}, total={len(user_ids)}"
     )
+    result_payload = {
+        "category": args.category,
+        "limit": args.limit,
+        "model_name": generator.settings.groq_model,
+        "prompt_version": generator.settings.persona_prompt_version,
+        "users_considered": len(user_ids),
+        "personas_generated": success_count,
+        "personas_upserted": success_count,
+        "skipped_users": 0,
+        "failed_users": failure_count,
+        "failure_reasons": failures,
+        "dry_run": False,
+    }
+    summary = build_run_summary(
+        category=args.category,
+        mode="upsert",
+        args=vars(args),
+        result=result_payload,
+    )
+    summary_path = save_run_summary(
+        args.output_dir,
+        args.category,
+        "upsert",
+        summary,
+        timestamp=summary["timestamp"],
+    )
+    log_persona_generation(f"Run summary saved: {summary_path}")
 
 
 if __name__ == "__main__":

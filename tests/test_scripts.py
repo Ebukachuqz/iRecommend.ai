@@ -1,5 +1,8 @@
+import json
+
 from scripts import create_holdout_split
 from scripts import embed_products
+from scripts import ingest_amazon as ingest_amazon_script
 from scripts import regenerate_personas as regenerate_personas_script
 from scripts import regenerate_personas
 
@@ -87,6 +90,14 @@ def test_regenerate_user_lookup_does_not_filter_by_category(monkeypatch) -> None
 class PersonaGeneratorRecorder:
     def __init__(self) -> None:
         self.calls = []
+        self.settings = type(
+            "Settings",
+            (),
+            {
+                "groq_model": "test-model",
+                "persona_prompt_version": "test-prompt",
+            },
+        )()
 
     def regenerate_persona(self, user_id, category, store=True):
         self.calls.append((user_id, category, store))
@@ -95,13 +106,13 @@ class PersonaGeneratorRecorder:
         return {"source_review_ids": ["r1", "r2"]}
 
 
-def test_regenerate_personas_script_logs_progress_and_failures(monkeypatch, capsys) -> None:
+def test_regenerate_personas_script_logs_progress_and_failures(monkeypatch, capsys, tmp_path) -> None:
     recorder = PersonaGeneratorRecorder()
     monkeypatch.setattr(regenerate_personas_script, "fetch_user_ids", lambda: ["good", "bad"])
     monkeypatch.setattr(regenerate_personas_script, "PersonaGenerator", lambda: recorder)
     monkeypatch.setattr(
         "sys.argv",
-        ["regenerate_personas.py", "--category", "All_Beauty"],
+        ["regenerate_personas.py", "--category", "All_Beauty", "--output-dir", str(tmp_path)],
     )
 
     regenerate_personas_script.main()
@@ -113,6 +124,50 @@ def test_regenerate_personas_script_logs_progress_and_failures(monkeypatch, caps
     assert "[persona] Persona generation succeeded:" in output
     assert "[persona] Persona generation failed: user_id=bad, error=boom" in output
     assert "[persona] Persona regeneration complete: succeeded=1, failed=1, total=2" in output
+    assert "[persona] Run summary saved:" in output
+    summary_files = list(tmp_path.glob("All_Beauty_upsert_*.json"))
+    assert len(summary_files) == 1
+    summary = json.loads(summary_files[0].read_text(encoding="utf-8"))
+    assert summary["category"] == "All_Beauty"
+    assert summary["args"]["category"] == "All_Beauty"
+    assert summary["result"]["personas_generated"] == 1
+    assert summary["result"]["personas_upserted"] == 1
+    assert summary["result"]["failed_users"] == 1
+    assert summary["result"]["failure_reasons"] == [{"user_id": "bad", "error": "boom"}]
+
+
+def test_ingest_script_writes_run_summary(monkeypatch, capsys, tmp_path) -> None:
+    result = {
+        "category": "All_Beauty",
+        "uploaded_reviews": 0,
+        "uploaded_metadata": 0,
+        "dry_run": True,
+    }
+    monkeypatch.setattr(ingest_amazon_script, "ingest_category", lambda **_kwargs: result)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "ingest_amazon.py",
+            "--category",
+            "All_Beauty",
+            "--dry-run",
+            "--output-dir",
+            str(tmp_path),
+        ],
+    )
+
+    ingest_amazon_script.main()
+
+    output = capsys.readouterr().out
+    assert "[ingestion] Run summary saved:" in output
+    assert str(result) in output
+    summary_files = list(tmp_path.glob("All_Beauty_dry_run_*.json"))
+    assert len(summary_files) == 1
+    summary = json.loads(summary_files[0].read_text(encoding="utf-8"))
+    assert summary["category"] == "All_Beauty"
+    assert summary["mode"] == "dry_run"
+    assert summary["args"]["dry_run"] is True
+    assert summary["result"] == result
 
 
 class UpdateQueryRecorder:
