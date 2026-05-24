@@ -9,45 +9,86 @@ from scripts import regenerate_personas
 build_holdout_updates = create_holdout_split.build_holdout_updates
 
 
-def test_holdout_split_does_not_require_review_category() -> None:
+def make_review(user_id: str, index: int, parent_asin: str = "asin-1") -> dict:
+    return {
+        "review_id": f"{user_id}-r{index:02d}",
+        "user_id": user_id,
+        "parent_asin": parent_asin,
+        "rating": 5,
+        "timestamp": f"2024-01-{index + 1:02d}T00:00:00Z",
+        "task_split": "persona_train",
+    }
+
+
+def split_counts_for_updates(updates: list[dict]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for update in updates:
+        counts[update["task_split"]] = counts.get(update["task_split"], 0) + 1
+    return counts
+
+
+def test_holdout_split_uses_ratio_for_twelve_reviews() -> None:
+    updates = build_holdout_updates([make_review("u1", index) for index in range(12)])
+
+    assert split_counts_for_updates(updates) == {
+        "persona_train": 8,
+        "task_a_holdout": 2,
+        "task_b_holdout": 2,
+    }
+
+
+def test_holdout_split_is_deterministic() -> None:
+    reviews = [make_review("u1", index) for index in range(12)]
+
+    assert build_holdout_updates(reviews) == build_holdout_updates(list(reversed(reviews)))
+
+
+def test_holdout_split_is_per_user_not_global() -> None:
     updates = build_holdout_updates(
-        [
-            {"review_id": "old", "user_id": "u1", "rating": 5, "timestamp": "2024-01-01T00:00:00Z"},
-            {"review_id": "mid", "user_id": "u1", "rating": 4, "timestamp": "2024-02-01T00:00:00Z"},
-            {"review_id": "new", "user_id": "u1", "rating": 3, "timestamp": "2024-03-01T00:00:00Z"},
-        ]
+        [make_review("u1", index) for index in range(12)]
+        + [make_review("u2", index) for index in range(12)]
     )
 
-    by_id = {update["review_id"]: update for update in updates}
-    assert by_id["new"]["task_split"] == "task_a_holdout"
-    assert by_id["mid"]["task_split"] == "task_b_holdout"
-    assert by_id["old"]["task_split"] == "persona_train"
+    by_user = {"u1": [], "u2": []}
+    for update in updates:
+        by_user[update["review_id"].split("-")[0]].append(update)
+    assert split_counts_for_updates(by_user["u1"]) == {
+        "persona_train": 8,
+        "task_a_holdout": 2,
+        "task_b_holdout": 2,
+    }
+    assert split_counts_for_updates(by_user["u2"]) == {
+        "persona_train": 8,
+        "task_a_holdout": 2,
+        "task_b_holdout": 2,
+    }
 
 
-def test_holdout_split_uses_most_recent_high_rated_review_for_task_b() -> None:
-    updates = build_holdout_updates(
-        [
-            {"review_id": "old-liked", "user_id": "u1", "rating": 5, "timestamp": "2024-01-01T00:00:00Z"},
-            {"review_id": "mid-low", "user_id": "u1", "rating": 2, "timestamp": "2024-02-01T00:00:00Z"},
-            {"review_id": "new-low", "user_id": "u1", "rating": 3, "timestamp": "2024-03-01T00:00:00Z"},
-        ]
+def test_holdout_split_requires_overwrite_when_already_split() -> None:
+    reviews = [make_review("u1", index) for index in range(12)]
+    reviews[0]["task_split"] = "task_a_holdout"
+
+    try:
+        create_holdout_split.ensure_overwrite_allowed(reviews, overwrite=False)
+    except ValueError as exc:
+        assert "--overwrite" in str(exc)
+    else:
+        raise AssertionError("existing split should require --overwrite")
+
+
+def test_holdout_split_category_filter_uses_product_metadata_signals() -> None:
+    assert create_holdout_split.product_matches_category(
+        {"parent_asin": "p1", "category": "All_Beauty"},
+        "All_Beauty",
     )
-
-    by_id = {update["review_id"]: update for update in updates}
-    assert by_id["new-low"] == {"review_id": "new-low", "task_split": "task_a_holdout"}
-    assert by_id["old-liked"] == {"review_id": "old-liked", "task_split": "task_b_holdout"}
-    assert by_id["mid-low"] == {"review_id": "mid-low", "task_split": "persona_train"}
-
-
-def test_holdout_split_leaves_no_task_b_when_no_high_rated_candidate() -> None:
-    updates = build_holdout_updates(
-        [
-            {"review_id": "old-low", "user_id": "u1", "rating": 2, "timestamp": "2024-01-01T00:00:00Z"},
-            {"review_id": "new-low", "user_id": "u1", "rating": 3, "timestamp": "2024-02-01T00:00:00Z"},
-        ]
+    assert create_holdout_split.product_matches_category(
+        {"parent_asin": "p2", "categories": [["Beauty", "Skin Care"]]},
+        "Skin Care",
     )
-
-    assert {update["task_split"] for update in updates} == {"task_a_holdout", "persona_train"}
+    assert not create_holdout_split.product_matches_category(
+        {"parent_asin": "p3", "main_category": "Electronics"},
+        "All_Beauty",
+    )
 
 
 class QueryRecorder:
@@ -99,11 +140,11 @@ class PersonaGeneratorRecorder:
             },
         )()
 
-    def regenerate_persona(self, user_id, category, store=True):
-        self.calls.append((user_id, category, store))
+    def regenerate_persona(self, user_id, category, max_reviews=10, store=True):
+        self.calls.append((user_id, category, max_reviews, store))
         if user_id == "bad":
             raise RuntimeError("boom")
-        return {"source_review_ids": ["r1", "r2"]}
+        return {"source_review_ids": ["r1", "r2"], "review_count_available": 15, "review_count_used": max_reviews}
 
 
 def test_regenerate_personas_script_logs_progress_and_failures(monkeypatch, capsys, tmp_path) -> None:
@@ -117,7 +158,7 @@ def test_regenerate_personas_script_logs_progress_and_failures(monkeypatch, caps
 
     regenerate_personas_script.main()
 
-    assert recorder.calls == [("good", "All_Beauty", True), ("bad", "All_Beauty", True)]
+    assert recorder.calls == [("good", "All_Beauty", 10, True), ("bad", "All_Beauty", 10, True)]
     output = capsys.readouterr().out
     assert "[persona] Starting persona regeneration: category=All_Beauty, users=2" in output
     assert "[persona] Processing user 1/2: user_id=good" in output
@@ -132,8 +173,33 @@ def test_regenerate_personas_script_logs_progress_and_failures(monkeypatch, caps
     assert summary["args"]["category"] == "All_Beauty"
     assert summary["result"]["personas_generated"] == 1
     assert summary["result"]["personas_upserted"] == 1
+    assert summary["result"]["review_count_available"] == 15
+    assert summary["result"]["review_count_used"] == 10
+    assert summary["result"]["user_review_counts"][0]["source_review_ids"] == ["r1", "r2"]
     assert summary["result"]["failed_users"] == 1
     assert summary["result"]["failure_reasons"] == [{"user_id": "bad", "error": "boom"}]
+
+
+def test_regenerate_personas_script_max_reviews_override(monkeypatch, tmp_path) -> None:
+    recorder = PersonaGeneratorRecorder()
+    monkeypatch.setattr(regenerate_personas_script, "fetch_user_ids", lambda: ["good"])
+    monkeypatch.setattr(regenerate_personas_script, "PersonaGenerator", lambda: recorder)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "regenerate_personas.py",
+            "--category",
+            "All_Beauty",
+            "--max-reviews-per-user",
+            "6",
+            "--output-dir",
+            str(tmp_path),
+        ],
+    )
+
+    regenerate_personas_script.main()
+
+    assert recorder.calls == [("good", "All_Beauty", 6, True)]
 
 
 def test_ingest_script_writes_run_summary(monkeypatch, capsys, tmp_path) -> None:

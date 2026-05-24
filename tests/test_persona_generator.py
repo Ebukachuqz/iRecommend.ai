@@ -111,6 +111,9 @@ def test_prompt_stats_source_review_ids_match_selected_prompt_reviews() -> None:
             "parent_asin": f"asin-{index}",
             "rating": 5,
             "verified_purchase": True,
+            "title": "Useful",
+            "text": "Helpful review",
+            "product": {"title": "Product"},
         }
         for index in range(30)
     ]
@@ -120,4 +123,52 @@ def test_prompt_stats_source_review_ids_match_selected_prompt_reviews() -> None:
     assert stats["review_count"] == 30
     assert stats["eligible_review_count"] == 30
     assert stats["prompt_review_count"] == 12
+    assert stats["review_count_available"] == 30
+    assert stats["review_count_used"] == 12
     assert stats["source_review_ids"] == [f"r{index}" for index in range(18, 30)]
+
+
+def test_prompt_stats_use_at_most_ten_reviews_by_default() -> None:
+    generator = PersonaGenerator(client=ClientRecorder())
+    reviews = [
+        {
+            "review_id": f"r{index}",
+            "parent_asin": f"asin-{index}",
+            "rating": 5,
+            "verified_purchase": True,
+            "title": "Useful",
+            "text": "Helpful review",
+            "product": {"title": "Product"},
+        }
+        for index in range(15)
+    ]
+
+    _context, selected_review_ids = generator.format_review_context(reviews)
+
+    assert selected_review_ids == [f"r{index}" for index in range(5, 15)]
+
+
+def test_prompt_review_selection_prefers_reviews_with_product_metadata() -> None:
+    generator = PersonaGenerator(client=ClientRecorder())
+    reviews = [
+        {
+            "review_id": "without-product",
+            "parent_asin": "asin-1",
+            "rating": 5,
+            "title": "Useful",
+            "text": "Helpful review",
+            "product": {},
+        },
+        {
+            "review_id": "with-product",
+            "parent_asin": "asin-2",
+            "rating": 5,
+            "title": "Useful",
+            "text": "Helpful review",
+            "product": {"title": "Product"},
+        },
+    ]
+
+    selected = generator.select_prompt_reviews(reviews, max_reviews=10)
+
+    assert [review["review_id"] for review in selected] == ["with-product"]

@@ -21,6 +21,13 @@ def log_persona_generation(message: str) -> None:
     print(f"[persona] {message}")
 
 
+DEFAULT_MAX_REVIEWS_PER_PERSONA = 10
+
+
+def has_text(value: Any) -> bool:
+    return bool(str(value or "").strip())
+
+
 class PersonaGenerator:
     def __init__(self, client: Client | None = None) -> None:
         self.settings = get_settings()
@@ -75,8 +82,24 @@ class PersonaGenerator:
             else 0.0,
         }
 
-    def format_review_context(self, reviews: list[dict[str, Any]], max_reviews: int = 20) -> tuple[str, list[str]]:
-        selected = reviews[-max_reviews:]
+    def select_prompt_reviews(self, reviews: list[dict[str, Any]], max_reviews: int) -> list[dict[str, Any]]:
+        with_metadata = [
+            review
+            for review in reviews
+            if has_text(review.get("title"))
+            and has_text(review.get("text"))
+            and bool(review.get("product"))
+        ]
+        with_review_text = [
+            review
+            for review in reviews
+            if has_text(review.get("title")) and has_text(review.get("text"))
+        ]
+        pool = with_metadata or with_review_text or reviews
+        return pool[-max_reviews:]
+
+    def format_review_context(self, reviews: list[dict[str, Any]], max_reviews: int = DEFAULT_MAX_REVIEWS_PER_PERSONA) -> tuple[str, list[str]]:
+        selected = self.select_prompt_reviews(reviews, max_reviews)
         selected_review_ids = [review["review_id"] for review in selected]
         blocks = []
         for review in selected:
@@ -109,6 +132,8 @@ class PersonaGenerator:
             max_reviews=max_reviews,
         )
         stats = self.compute_user_stats(reviews)
+        stats["review_count_available"] = len(reviews)
+        stats["review_count_used"] = len(selected_review_ids)
         stats["prompt_review_count"] = len(selected_review_ids)
         stats["source_review_ids"] = selected_review_ids
         return review_context, stats
@@ -118,7 +143,7 @@ class PersonaGenerator:
         user_id: str,
         category: str | None = None,
         *,
-        max_reviews: int = 20,
+        max_reviews: int = DEFAULT_MAX_REVIEWS_PER_PERSONA,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         category = category or self.settings.default_category
         log_persona_generation(f"Fetching persona_train reviews: user_id={user_id}, category={category}")
@@ -169,7 +194,7 @@ class PersonaGenerator:
         user_id: str,
         category: str | None = None,
         *,
-        max_reviews: int = 20,
+        max_reviews: int = DEFAULT_MAX_REVIEWS_PER_PERSONA,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         raw_payload, stats = self.generate_persona_payload(user_id, category, max_reviews=max_reviews)
         log_persona_generation(f"Validating persona payload: user_id={user_id}")
@@ -207,7 +232,7 @@ class PersonaGenerator:
         user_id: str,
         category: str | None = None,
         *,
-        max_reviews: int = 20,
+        max_reviews: int = DEFAULT_MAX_REVIEWS_PER_PERSONA,
         store: bool = True,
     ) -> dict[str, Any]:
         category = category or self.settings.default_category
@@ -225,4 +250,6 @@ class PersonaGenerator:
             "category": category,
             "persona": persona,
             "source_review_ids": stats["source_review_ids"],
+            "review_count_available": stats.get("review_count_available", len(stats["source_review_ids"])),
+            "review_count_used": stats.get("review_count_used", len(stats["source_review_ids"])),
         }

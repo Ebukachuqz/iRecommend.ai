@@ -140,14 +140,17 @@ Create holdout splits:
 python scripts/create_holdout_split.py --category All_Beauty
 ```
 
+Holdout splitting is deterministic and per user. For each category, reviews are filtered through matching `amazon_product_metadata` rows because `amazon_reviews` intentionally has no category column. Each user's reviews are split into approximately 70% `persona_train`, 15% `task_a_holdout`, and 15% `task_b_holdout`; for example, 12 reviews become 8 persona reviews, 2 Task A holdout reviews, and 2 Task B holdout reviews. If a category has already been split, pass `--overwrite` to intentionally re-split it.
+
 ## Persona Generation
 
 ```powershell
 python scripts/regenerate_personas.py --category All_Beauty --limit 10
 python scripts/regenerate_personas.py --category All_Beauty --limit 20
+python scripts/regenerate_personas.py --category All_Beauty --limit 20 --max-reviews-per-user 10
 ```
 
-Persona generation uses only `task_split='persona_train'` reviews. `amazon_reviews` does not have or require a `category` column.
+Persona generation uses only `task_split='persona_train'` reviews. It sends at most 10 reviews per user to the LLM by default to keep prompt length manageable; use `--max-reviews-per-user` to override this for experiments. The selected review IDs are stored in `user_personas.source_review_ids` and included in the persona run summary. `task_a_holdout` and `task_b_holdout` reviews are reserved for evaluation and should not be used to build personas. `amazon_reviews` does not have or require a `category` column.
 
 ## Task A
 
