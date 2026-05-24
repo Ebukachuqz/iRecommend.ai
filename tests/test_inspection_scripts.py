@@ -133,6 +133,67 @@ def test_list_eval_users_filters_task_b_and_requires_persona_and_taste() -> None
     assert rows[0]["has_taste_vector"] is True
 
 
+def test_list_eval_users_task_b_does_not_require_taste_vector_by_default() -> None:
+    category = "Health_and_Household"
+    products = [{"parent_asin": "p1", "category": category, "main_category": None, "categories": []}]
+    reviews = [
+        {"review_id": "r1", "user_id": "u1", "parent_asin": "p1", "task_split": "task_b_holdout"},
+        {"review_id": "r2", "user_id": "u2", "parent_asin": "p1", "task_split": "task_b_holdout"},
+    ]
+    personas = [{"user_id": "u1", "category": category}, {"user_id": "u2", "category": category}]
+    taste_vectors = []
+    client = FakeClient(
+        {
+            "amazon_product_metadata": products,
+            "amazon_reviews": reviews,
+            "user_personas": personas,
+            "user_taste_vectors": taste_vectors,
+        }
+    )
+
+    rows = list_eval_users.list_eval_users(
+        client,
+        category,
+        limit=10,
+        require_persona=True,
+        require_taste_vector=False,
+        task="task_b",
+    )
+
+    assert [row["user_id"] for row in rows] == ["u1", "u2"]
+    assert all(row["has_taste_vector"] is False for row in rows)
+
+
+def test_list_eval_users_task_b_with_require_taste_vector_filters() -> None:
+    category = "Health_and_Household"
+    products = [{"parent_asin": "p1", "category": category, "main_category": None, "categories": []}]
+    reviews = [
+        {"review_id": "r1", "user_id": "u1", "parent_asin": "p1", "task_split": "task_b_holdout"},
+        {"review_id": "r2", "user_id": "u2", "parent_asin": "p1", "task_split": "task_b_holdout"},
+    ]
+    personas = [{"user_id": "u1", "category": category}, {"user_id": "u2", "category": category}]
+    taste_vectors = [{"user_id": "u2", "category": category}]
+    client = FakeClient(
+        {
+            "amazon_product_metadata": products,
+            "amazon_reviews": reviews,
+            "user_personas": personas,
+            "user_taste_vectors": taste_vectors,
+        }
+    )
+
+    rows = list_eval_users.list_eval_users(
+        client,
+        category,
+        limit=10,
+        require_persona=True,
+        require_taste_vector=True,
+        task="task_b",
+    )
+
+    assert [row["user_id"] for row in rows] == ["u2"]
+
+
 def test_list_user_holdouts_includes_product_titles() -> None:
     category = "Health_and_Household"
     reviews = [

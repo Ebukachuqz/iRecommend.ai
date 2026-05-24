@@ -75,7 +75,8 @@ def list_eval_users(
         if task == "task_a":
             return item["task_a_holdout_count"] > 0 and item["has_persona"]
         if task == "task_b":
-            return item["task_b_holdout_count"] > 0 and item["has_persona"] and item["has_taste_vector"]
+            # For Task B, taste vectors are optional unless explicitly required via --require-taste-vector.
+            return item["task_b_holdout_count"] > 0 and item["has_persona"]
         if task == "both":
             return item["task_a_holdout_count"] > 0 and item["task_b_holdout_count"] > 0 and item["has_persona"]
         raise ValueError("task must be one of task_a, task_b, both")
@@ -111,4 +112,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
