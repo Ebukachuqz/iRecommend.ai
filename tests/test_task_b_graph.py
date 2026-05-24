@@ -147,6 +147,36 @@ def test_service_recommend_returns_graph_output_and_keeps_full_trace_context(mon
     assert len(context["scored_candidates"]) == 2
 
 
+def test_graph_uses_requested_category_for_retrieval_and_storage(monkeypatch) -> None:
+    client = DummyClient()
+    calls = patch_graph_pipeline(monkeypatch)
+
+    output = task_b_service.recommend(
+        RecommendationRequest(user_id="user-1", category="Electronics", request="portable charger", limit=1),
+        client=client,
+        vector_store=DummyVectorStore(),
+    )
+
+    assert output.category == "Electronics"
+    assert calls["retrieve"]["category"] == "Electronics"
+    assert calls["store"]["output"].category == "Electronics"
+    assert calls["store"]["context"]["resolved_category"] == "Electronics"
+
+
+def test_graph_default_category_still_uses_all_beauty(monkeypatch) -> None:
+    calls = patch_graph_pipeline(monkeypatch)
+
+    output = task_b_service.recommend(
+        RecommendationRequest(user_id="user-1", request="gentle skincare", limit=1),
+        client=DummyClient(),
+        vector_store=DummyVectorStore(),
+    )
+
+    assert output.category == "All_Beauty"
+    assert calls["retrieve"]["category"] == "All_Beauty"
+    assert calls["store"]["context"]["resolved_category"] == "All_Beauty"
+
+
 def test_graph_updates_and_stores_session_state(monkeypatch) -> None:
     session = RecommendationSessionState(
         session_id="session-1",

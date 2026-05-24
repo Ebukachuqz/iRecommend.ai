@@ -30,7 +30,15 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.cold_start and not args.user_id:
-        output = recommend(RecommendationRequest(request=args.request, limit=args.limit, cold_start=True))
+        output = recommend(
+            RecommendationRequest(
+                category=args.category,
+                request=args.request,
+                limit=args.limit,
+                session_id=args.session_id,
+                cold_start=True,
+            )
+        )
     else:
         if not args.user_id:
             parser.error("--user-id is required unless --cold-start is used")

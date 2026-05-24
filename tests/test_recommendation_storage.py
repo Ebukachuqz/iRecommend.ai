@@ -38,7 +38,7 @@ class RecordingClient:
 def make_output() -> RecommendationOutput:
     return RecommendationOutput(
         user_id="user-1",
-        category="All_Beauty",
+        category="Electronics",
         request="gentle skincare",
         intent=RecommendationIntent(
             interpreted_need="gentle skincare",
@@ -134,8 +134,17 @@ def test_intent_plan_trace_writes_expected_fields() -> None:
         "prompt_version",
     }
     assert payload["recommendation_run_id"] == "run-1"
+    assert payload["category"] == "Electronics"
     assert payload["implicit_constraints"] == {"avoid": "fragrance"}
     assert payload["prompt_version"] == "intent-v1+rerank-v1"
+
+
+def test_recommendation_run_stores_output_category() -> None:
+    client = RecordingClient()
+
+    payload = store_recommendation_run(make_output(), {"scored_candidates": make_scored_candidates()}, client=client)
+
+    assert payload["category"] == "Electronics"
 
 
 def test_candidate_traces_are_inserted_in_one_batch_with_ranks() -> None:

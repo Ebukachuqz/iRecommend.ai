@@ -9,6 +9,7 @@ from supabase import Client
 from src.config import get_settings
 from src.db.queries import fetch_persona
 from src.db.supabase_client import get_supabase_client
+from src.constants import DEFAULT_CATEGORY
 from src.personas.custom_persona_processor import process_custom_persona
 from src.personas.validator import validate_persona
 from src.task_b_recommendation.candidate_retriever import CandidateRetrievalResult, retrieve_candidates_with_sources
@@ -125,7 +126,7 @@ def cross_domain_adjustments(
     request: RecommendationRequest,
     intent,
 ) -> tuple[Any, dict[str, Any], dict[str, Any]]:
-    source_category = request.category
+    source_category = persona.get("category") or request.category
     target_category = intent.category_filter
     if not categories_are_meaningfully_different(source_category, target_category):
         return intent, persona, {"cross_domain": False}
@@ -159,6 +160,10 @@ def load_or_create_session(
     session = create_session(request.user_id, request.category, persona, session_id=request.session_id)
     store_session(session, client=client)
     return session
+
+
+def resolved_recommendation_category(request: RecommendationRequest, intent: Any) -> str:
+    return request.category or intent.category_filter or DEFAULT_CATEGORY
 
 
 def build_intent_plan_payload(
@@ -395,11 +400,12 @@ def build_task_b_graph(client=None, vector_store: VectorStore | None = None):
 
     def store_recommendation_run_node(state: TaskBGraphState) -> TaskBGraphState:
         request = state["request"]
+        resolved_category = resolved_recommendation_category(request, state["intent"])
         session = state.get("session")
         retrieval_result = state["retrieval_result"]
         output = RecommendationOutput(
             user_id=request.user_id,
-            category=request.category,
+            category=resolved_category,
             request=request.request,
             intent=state["intent"],
             recommendations=state["reranked"].recommendations,
@@ -413,6 +419,7 @@ def build_task_b_graph(client=None, vector_store: VectorStore | None = None):
             output,
             context={
                 **request.context,
+                "resolved_category": resolved_category,
                 "intent": state["intent"].model_dump(mode="json"),
                 "cold_start_metadata": {
                     "cold_start": state["cold_start"],

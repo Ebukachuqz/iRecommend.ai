@@ -4,6 +4,7 @@ from scripts import create_holdout_split
 from scripts import embed_products
 from scripts import ingest_amazon as ingest_amazon_script
 from scripts import build_user_taste_vectors as build_user_taste_vectors_script
+from scripts import run_task_b_recommendation as run_task_b_script
 from scripts import regenerate_personas as regenerate_personas_script
 from scripts import regenerate_personas
 
@@ -401,3 +402,51 @@ def test_build_user_taste_vectors_batch_force_rebuilds_existing(monkeypatch) -> 
     build_user_taste_vectors_script.main()
 
     assert built == ["u1"]
+
+
+def test_task_b_cli_passes_category_for_user_mode(monkeypatch) -> None:
+    captured = {}
+    monkeypatch.setattr(run_task_b_script, "recommend_for_user", lambda *args, **kwargs: captured.update({"args": args, "kwargs": kwargs}) or {"ok": True})
+    monkeypatch.setattr(run_task_b_script, "print_json", lambda _payload: None)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "run_task_b_recommendation.py",
+            "--user-id",
+            "u1",
+            "--category",
+            "Electronics",
+            "--request",
+            "portable charger",
+        ],
+    )
+
+    run_task_b_script.main()
+
+    assert captured["kwargs"]["category"] == "Electronics"
+
+
+def test_task_b_cli_passes_category_for_cold_start(monkeypatch) -> None:
+    captured = {}
+
+    def fake_recommend(request):
+        captured["request"] = request
+        return {"ok": True}
+
+    monkeypatch.setattr(run_task_b_script, "recommend", fake_recommend)
+    monkeypatch.setattr(run_task_b_script, "print_json", lambda _payload: None)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "run_task_b_recommendation.py",
+            "--cold-start",
+            "--category",
+            "Electronics",
+            "--request",
+            "portable charger",
+        ],
+    )
+
+    run_task_b_script.main()
+
+    assert captured["request"].category == "Electronics"
