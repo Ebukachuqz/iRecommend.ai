@@ -3,7 +3,7 @@ USER_ID ?=
 CATEGORY ?= All_Beauty
 LIMIT ?= 100
 
-.PHONY: install test run-api run-streamlit docker-build docker-up docker-down embed-products build-taste-vector
+.PHONY: install test run-api run-streamlit docker-build docker-up docker-down embed-products build-taste-vector check-db migrate-dry-run migrate
 
 install:
 	$(PYTHON) -m pip install -r requirements.txt
@@ -32,3 +32,12 @@ embed-products:
 
 build-taste-vector:
 	$(PYTHON) scripts/build_user_taste_vectors.py --user-id $(USER_ID) --category $(CATEGORY)
+
+check-db:
+	$(PYTHON) scripts/check_db_connection.py
+
+migrate-dry-run:
+	$(PYTHON) scripts/run_migrations.py --dry-run
+
+migrate:
+	$(PYTHON) scripts/run_migrations.py

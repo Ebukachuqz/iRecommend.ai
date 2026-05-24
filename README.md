@@ -27,6 +27,7 @@ Backend variables:
 SUPABASE_URL=
 SUPABASE_PUBLIC_KEY=
 SUPABASE_SECRET_KEY=
+SUPABASE_DB_URL=
 GROQ_API_KEY=
 HF_TOKEN=
 ```
@@ -38,6 +39,8 @@ STREAMLIT_API_BASE_URL=http://127.0.0.1:8000
 ```
 
 `SUPABASE_SECRET_KEY` is for backend scripts, services, and the API only. Do not expose it in frontend/client deployments.
+
+`SUPABASE_URL` is the Supabase API URL used by the application. `SUPABASE_DB_URL` is the direct Postgres connection string used only by migration scripts. Copy it from Supabase Dashboard -> Connect -> connection string or pooler URI. Do not expose or commit real database credentials.
 
 ## Local Setup
 
@@ -54,17 +57,48 @@ Root backend dependencies live in `requirements.txt`. The detachable Streamlit c
 
 ## Supabase SQL Migrations
 
-Run these in the Supabase SQL editor:
+The preferred migration path is the Python runner. Add `SUPABASE_DB_URL` to `.env`, then check connectivity:
+
+```powershell
+python scripts/check_db_connection.py
+```
+
+Preview the active migration order without connecting or changing schema:
+
+```powershell
+python scripts/run_migrations.py --dry-run
+```
+
+Run active stable migrations:
+
+```powershell
+python scripts/run_migrations.py
+```
+
+Run a specific range:
+
+```powershell
+python scripts/run_migrations.py --from 003 --to 005
+```
+
+The reset migration is destructive and skipped by default. To run only the reset, you must be explicit:
+
+```powershell
+python scripts/run_migrations.py --include-reset --confirm-reset --from 000 --to 000
+```
+
+Active stable migrations:
 
 ```text
-src/db/sql/001_initial_schema.sql
-src/db/sql/002_persona_schema_update.sql
-src/db/sql/003_holdout_split.sql
-src/db/sql/004_pgvector_setup.sql
-src/db/sql/005_simulation_results.sql
-src/db/sql/006_recommendation_tables.sql
-src/db/sql/007_task_b_upgrade.sql
+src/db/sql/000_reset_database.sql       optional destructive reset
+src/db/sql/001_core_schema.sql          product metadata, reviews, personas
+src/db/sql/002_task_a_schema.sql        review simulation storage
+src/db/sql/003_task_b_schema.sql        recommendation tables and vector columns
+src/db/sql/004_pgvector_functions.sql   pgvector RPC functions
+src/db/sql/005_indexes.sql              relational and vector indexes
 ```
+
+Old development migrations are archived in `src/db/sql/archive/`. Reviewers should use the stable migrations above. If direct DB access is unavailable, run the same SQL files manually in Supabase SQL Editor, using `000_reset_database.sql` only for clean rebuilds.
 
 Supabase remains hosted externally; Docker Compose does not start a local database.
 
@@ -241,6 +275,9 @@ make docker-up
 make docker-down
 make embed-products LIMIT=100
 make build-taste-vector USER_ID=<USER_ID> CATEGORY=All_Beauty
+make check-db
+make migrate-dry-run
+make migrate
 ```
 
 On Windows without `make`, run the equivalent commands shown in the sections above.
