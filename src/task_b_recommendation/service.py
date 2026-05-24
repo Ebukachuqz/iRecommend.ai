@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from supabase import Client
@@ -31,6 +32,9 @@ from src.task_b_recommendation.taste_vector import (
     fetch_user_taste_vector,
 )
 from src.task_b_recommendation.vector_store import VectorStore
+
+
+logger = logging.getLogger(__name__)
 
 
 class TaskBServiceError(RuntimeError):
@@ -85,6 +89,114 @@ def load_or_create_session(
     return session
 
 
+def build_intent_plan_payload(
+    output: RecommendationOutput,
+    recommendation_run_id: str,
+) -> dict[str, Any]:
+    intent = output.intent
+    return {
+        "recommendation_run_id": recommendation_run_id,
+        "session_id": output.session_id,
+        "user_id": output.user_id,
+        "category": output.category,
+        "raw_request": output.request,
+        "interpreted_need": intent.interpreted_need,
+        "explicit_constraints": intent.explicit_constraints,
+        "implicit_constraints": intent.implicit_constraints_from_persona,
+        "retrieval_query": intent.retrieval_query,
+        "avoid": intent.avoid,
+        "category_filter": intent.category_filter,
+        "price_max": intent.price_max,
+        "required_attributes": intent.required_attributes,
+        "excluded_attributes": intent.excluded_attributes,
+        "model_name": output.model_name,
+        "prompt_version": output.prompt_version,
+    }
+
+
+def store_intent_plan_trace(
+    output: RecommendationOutput,
+    recommendation_run_id: str | None,
+    client: Client,
+) -> None:
+    if not recommendation_run_id:
+        logger.warning("Skipping intent plan trace persistence because recommendation_run_id is missing.")
+        return
+    payload = build_intent_plan_payload(output, recommendation_run_id)
+    client.table("intent_plans").insert(payload).execute()
+
+
+def final_rank_by_parent_asin(output: RecommendationOutput) -> dict[str, int]:
+    return {
+        recommendation.parent_asin: recommendation.rank
+        for recommendation in output.recommendations
+        if recommendation.parent_asin
+    }
+
+
+def candidate_trace_rows(
+    output: RecommendationOutput,
+    context: dict[str, Any],
+    recommendation_run_id: str | None,
+) -> list[dict[str, Any]]:
+    if not recommendation_run_id:
+        logger.warning("Skipping candidate trace persistence because recommendation_run_id is missing.")
+        return []
+    final_ranks = final_rank_by_parent_asin(output)
+    rows: list[dict[str, Any]] = []
+    for rank_before, candidate in enumerate(context.get("scored_candidates") or [], start=1):
+        parent_asin = candidate.get("parent_asin")
+        if not parent_asin:
+            continue
+        score_breakdown = candidate.get("score_breakdown") or {}
+        retrieval_sources = candidate.get("retrieval_sources") or []
+        if not retrieval_sources and candidate.get("retrieval_source"):
+            retrieval_sources = [candidate["retrieval_source"]]
+        row = {
+            "recommendation_run_id": recommendation_run_id,
+            "parent_asin": parent_asin,
+            "candidate_rank": rank_before,
+            "rank_before_rerank": rank_before,
+            "rank_after_rerank": final_ranks.get(parent_asin),
+            "retrieval_source": candidate.get("retrieval_source") or (retrieval_sources[0] if retrieval_sources else None),
+            "retrieval_sources": retrieval_sources,
+            "semantic_similarity": candidate.get("semantic_similarity"),
+            "collaborative_similarity": candidate.get("collaborative_similarity"),
+            "final_score": score_breakdown.get("final_score"),
+            "score_breakdown": score_breakdown,
+        }
+        rows.append(row)
+    return rows
+
+
+def store_candidate_traces(
+    output: RecommendationOutput,
+    context: dict[str, Any],
+    recommendation_run_id: str | None,
+    client: Client,
+) -> None:
+    rows = candidate_trace_rows(output, context, recommendation_run_id)
+    if not rows:
+        return
+    client.table("recommendation_candidates").insert(rows).execute()
+
+
+def store_recommendation_traces_best_effort(
+    output: RecommendationOutput,
+    context: dict[str, Any],
+    recommendation_run_id: str | None,
+    client: Client,
+) -> None:
+    try:
+        store_intent_plan_trace(output, recommendation_run_id, client)
+    except Exception as exc:
+        logger.warning("Failed to persist Task B intent plan trace: %s", exc)
+    try:
+        store_candidate_traces(output, context, recommendation_run_id, client)
+    except Exception as exc:
+        logger.warning("Failed to persist Task B candidate traces: %s", exc)
+
+
 def store_recommendation_run(
     output: RecommendationOutput,
     context: dict[str, Any],
@@ -115,7 +227,14 @@ def store_recommendation_run(
         "embedding_model": DEFAULT_EMBEDDING_MODEL,
     }
     response = client.table("recommendation_runs").insert(payload).execute()
-    return response.data[0] if response.data else payload
+    recommendation_run = response.data[0] if response.data else payload
+    store_recommendation_traces_best_effort(
+        output,
+        context,
+        recommendation_run.get("id"),
+        client,
+    )
+    return recommendation_run
 
 
 def list_recommendation_candidates(

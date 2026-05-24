@@ -35,6 +35,12 @@ Taste vectors are category-aware. Reviews are filtered through `amazon_product_m
 
 Every retrieval run records source counts such as `{"taste_vector": 40, "request_query": 30, "attribute_match": 12}` in `recommendation_runs.retrieval_sources`. These counts describe unique candidates added by each source after dedupe, not only the final top recommendations. If a product appears from multiple sources, its `retrieval_sources` list preserves all sources, but only the first source that added the unique candidate increments the run-level count.
 
+## Audit Trail
+
+Task B persists the recommendation pipeline in three linked tables. `recommendation_runs` remains the primary record and stores the final ranked recommendations, request context, source counts, and reproducibility metadata. `intent_plans` stores the agent's structured reasoning brief for the same run, including explicit constraints, persona-derived implicit constraints, retrieval query, required attributes, and avoid lists. `recommendation_candidates` stores one row per scored candidate with retrieval sources, similarity signals, score breakdown, `rank_before_rerank`, and `rank_after_rerank` when the candidate appears in the final LLM-ranked list.
+
+Intent and candidate trace writes are best-effort. If trace persistence fails, recommendation generation still returns the final output and keeps the `recommendation_runs` record as the source of truth. Together these tables provide an audit trail for debugging, ablations, evaluation, and the solution paper.
+
 ## Product Embeddings
 
 Product embeddings are built from rich metadata rather than title-only text. `product_embeddings.product_text` includes the title, full category path, top product features, the first description entries/sentences, brand/store, a semantic price tier, and useful details. The stored `product_text` is intentionally kept for debugging and reproducibility: it shows exactly what text was embedded for a product.

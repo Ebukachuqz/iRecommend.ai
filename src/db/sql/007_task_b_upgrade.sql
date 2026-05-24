@@ -166,6 +166,7 @@ CREATE TABLE IF NOT EXISTS intent_plans (
     recommendation_run_id UUID REFERENCES recommendation_runs(id) ON DELETE CASCADE,
     session_id TEXT,
     user_id TEXT,
+    category TEXT,
     raw_request TEXT,
     interpreted_need TEXT,
     explicit_constraints JSONB DEFAULT '{}'::jsonb,
@@ -187,19 +188,34 @@ ON intent_plans (recommendation_run_id);
 CREATE INDEX IF NOT EXISTS intent_plans_user_idx
 ON intent_plans (user_id);
 
+ALTER TABLE intent_plans
+ADD COLUMN IF NOT EXISTS category TEXT;
+
 CREATE TABLE IF NOT EXISTS recommendation_candidates (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     recommendation_run_id UUID REFERENCES recommendation_runs(id) ON DELETE CASCADE,
     parent_asin TEXT,
     candidate_rank INTEGER,
+    rank_before_rerank INTEGER,
+    rank_after_rerank INTEGER,
     retrieval_source TEXT,
     retrieval_sources JSONB DEFAULT '[]'::jsonb,
     semantic_similarity FLOAT,
+    collaborative_similarity FLOAT,
     final_score FLOAT,
     score_breakdown JSONB DEFAULT '{}'::jsonb,
     product_snapshot JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT now()
 );
+
+ALTER TABLE recommendation_candidates
+ADD COLUMN IF NOT EXISTS collaborative_similarity FLOAT;
+
+ALTER TABLE recommendation_candidates
+ADD COLUMN IF NOT EXISTS rank_before_rerank INTEGER;
+
+ALTER TABLE recommendation_candidates
+ADD COLUMN IF NOT EXISTS rank_after_rerank INTEGER;
 
 CREATE INDEX IF NOT EXISTS recommendation_candidates_run_idx
 ON recommendation_candidates (recommendation_run_id);

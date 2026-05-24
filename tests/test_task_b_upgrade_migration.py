@@ -49,6 +49,11 @@ def test_task_b_upgrade_migration_adds_debug_tables() -> None:
 
     assert "create table if not exists intent_plans" in sql
     assert "create table if not exists recommendation_candidates" in sql
+    assert "add column if not exists category text" in sql
+    assert "prompt_version text" in sql
+    assert "collaborative_similarity" in sql
+    assert "rank_before_rerank" in sql
+    assert "rank_after_rerank" in sql
 
 
 def test_task_b_upgrade_migration_adds_similar_user_rpc() -> None:
