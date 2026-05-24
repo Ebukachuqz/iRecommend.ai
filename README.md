@@ -40,7 +40,7 @@ STREAMLIT_API_BASE_URL=http://127.0.0.1:8000
 
 `SUPABASE_SECRET_KEY` is for backend scripts, services, and the API only. Do not expose it in frontend/client deployments.
 
-`SUPABASE_URL` is the Supabase API URL used by the application. `SUPABASE_DB_URL` is the direct Postgres connection string used only by migration scripts. Copy it from Supabase Dashboard -> Connect -> connection string or pooler URI. Do not expose or commit real database credentials.
+`SUPABASE_URL` is the Supabase API URL used by the application. `SUPABASE_DB_URL` is the Postgres connection string used only by migration scripts. Copy it from Supabase Dashboard -> Connect. If Supabase marks the direct connection string as not IPv4 compatible, use the Session Pooler URI instead. A connection timeout from `scripts/check_db_connection.py` usually means the direct IPv6-only database host is unreachable from your current network. Do not expose or commit real database credentials.
 
 ## Local Setup
 
@@ -62,6 +62,8 @@ The preferred migration path is the Python runner. Add `SUPABASE_DB_URL` to `.en
 ```powershell
 python scripts/check_db_connection.py
 ```
+
+If this command times out and Supabase says the direct connection string is not IPv4 compatible, replace `SUPABASE_DB_URL` with the Session Pooler connection string from Supabase Dashboard -> Connect.
 
 Preview the active migration order without connecting or changing schema:
 
