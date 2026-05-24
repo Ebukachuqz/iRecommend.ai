@@ -249,6 +249,10 @@ def upsert_metadata(client: Client, metadata: list[dict[str, Any]]) -> None:
         client.table("amazon_product_metadata").upsert(metadata, on_conflict="parent_asin").execute()
 
 
+def log_ingestion(message: str) -> None:
+    print(f"[ingestion] {message}")
+
+
 def limited(items: Iterable[dict[str, Any]], limit: int | None) -> Iterator[dict[str, Any]]:
     yield from items if limit is None else islice(items, limit)
 
@@ -456,18 +460,32 @@ def ingest_category(
     normalized_reviews = [normalize_review(review) for review in plan["reviews_to_upload"]]
     normalized_metadata = [normalize_metadata(item, category) for item in plan["metadata_to_upload"]]
 
+    log_ingestion(
+        "Prepared upload: "
+        f"category={category}, dry_run={dry_run}, "
+        f"reviews={len(normalized_reviews)}, metadata_rows={len(normalized_metadata)}, "
+        f"selected_users={len(plan['selected_user_ids'])}, extra_products_added={len(plan['extra_metadata'])}"
+    )
+
     uploaded_reviews = 0
     uploaded_metadata = 0
     if not dry_run:
         client = client or get_supabase_client()
-        for batch in batched(normalized_reviews, batch_size):
+        log_ingestion("Review upsert starting.")
+        for batch_index, batch in enumerate(batched(normalized_reviews, batch_size), start=1):
+            log_ingestion(f"Upserting review batch {batch_index}: {len(batch):,} rows")
             upsert_reviews(client, batch)
             uploaded_reviews += len(batch)
+        log_ingestion(f"Review upsert complete: {uploaded_reviews:,} rows")
 
-        for batch in batched(normalized_metadata, batch_size):
+        log_ingestion("Metadata upsert starting.")
+        for batch_index, batch in enumerate(batched(normalized_metadata, batch_size), start=1):
+            log_ingestion(f"Upserting metadata batch {batch_index}: {len(batch):,} rows")
             upsert_metadata(client, batch)
             uploaded_metadata += len(batch)
+        log_ingestion(f"Metadata upsert complete: {uploaded_metadata:,} rows")
     else:
+        log_ingestion("Dry run enabled; no Supabase upserts will be performed.")
         uploaded_reviews = 0
         uploaded_metadata = 0
 
@@ -490,14 +508,20 @@ def ingest_category(
 
     if verify and not dry_run:
         client = client or get_supabase_client()
-        result.update(
-            verify_uploaded_counts(
-                client,
-                [review["review_id"] for review in normalized_reviews],
-                [metadata["parent_asin"] for metadata in normalized_metadata],
-                min_reviews=effective_min_reviews,
-                batch_size=batch_size,
-            )
+        log_ingestion("DB verification starting.")
+        verification = verify_uploaded_counts(
+            client,
+            [review["review_id"] for review in normalized_reviews],
+            [metadata["parent_asin"] for metadata in normalized_metadata],
+            min_reviews=effective_min_reviews,
+            batch_size=batch_size,
+        )
+        result.update(verification)
+        log_ingestion(
+            "DB verification result: "
+            f"users_with_min_reviews={verification['db_users_with_min_reviews']}, "
+            f"reviews_with_matching_metadata={verification['db_reviews_with_matching_metadata']}, "
+            f"reviews_missing_metadata={verification['db_reviews_missing_metadata']}"
         )
     elif verify:
         result.update(
@@ -508,4 +532,5 @@ def ingest_category(
             }
         )
 
+    log_ingestion(f"Final result: {result}")
     return result

@@ -466,7 +466,7 @@ class FailingClient:
         raise AssertionError("dry-run should not upload")
 
 
-def test_dry_run_performs_no_upload(monkeypatch) -> None:
+def test_dry_run_performs_no_upload(monkeypatch, capsys) -> None:
     monkeypatch.setattr(ingest_amazon, "stream_reviews", lambda _category: [valid_review("u1", "p1", 1)])
     monkeypatch.setattr(ingest_amazon, "stream_metadata", lambda _category: [valid_metadata("p1")])
 
@@ -483,6 +483,97 @@ def test_dry_run_performs_no_upload(monkeypatch) -> None:
     assert result["uploaded_reviews"] == 0
     assert result["uploaded_metadata"] == 0
     assert result["selected_eligible_users"] == 1
+    output = capsys.readouterr().out
+    assert "[ingestion] Prepared upload:" in output
+    assert "[ingestion] Dry run enabled; no Supabase upserts will be performed." in output
+    assert "[ingestion] Final result:" in output
+
+
+class UpsertQuery:
+    def __init__(self, client, table_name):
+        self.client = client
+        self.table_name = table_name
+
+    def upsert(self, rows, on_conflict):
+        self.client.upserts.append(
+            {
+                "table": self.table_name,
+                "rows": list(rows),
+                "on_conflict": on_conflict,
+            }
+        )
+        return self
+
+    def execute(self):
+        return type("Response", (), {"data": []})()
+
+
+class UpsertClient:
+    def __init__(self):
+        self.upserts = []
+
+    def table(self, name):
+        return UpsertQuery(self, name)
+
+
+def test_real_upload_path_logs_batches_and_preserves_counts(monkeypatch, capsys) -> None:
+    reviews = [valid_review("u1", "p1", 1), valid_review("u1", "p2", 2), valid_review("u1", "p3", 3)]
+    metadata = [valid_metadata("p1"), valid_metadata("p2"), valid_metadata("p3")]
+    monkeypatch.setattr(ingest_amazon, "stream_reviews", lambda _category: reviews)
+    monkeypatch.setattr(ingest_amazon, "stream_metadata", lambda _category: metadata)
+    client = UpsertClient()
+
+    result = ingest_amazon.ingest_category(
+        category="All_Beauty",
+        min_reviews=1,
+        max_users=100,
+        extra_products=0,
+        batch_size=2,
+        dry_run=False,
+        client=client,
+    )
+
+    assert result["uploaded_reviews"] == 3
+    assert result["uploaded_metadata"] == 3
+    assert [len(call["rows"]) for call in client.upserts] == [2, 1, 2, 1]
+    output = capsys.readouterr().out
+    assert "[ingestion] Review upsert starting." in output
+    assert "[ingestion] Upserting review batch 1: 2 rows" in output
+    assert "[ingestion] Upserting review batch 2: 1 rows" in output
+    assert "[ingestion] Review upsert complete: 3 rows" in output
+    assert "[ingestion] Metadata upsert starting." in output
+    assert "[ingestion] Upserting metadata batch 1: 2 rows" in output
+    assert "[ingestion] Upserting metadata batch 2: 1 rows" in output
+    assert "[ingestion] Metadata upsert complete: 3 rows" in output
+
+
+def test_verify_path_logs_verification_summary(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(ingest_amazon, "stream_reviews", lambda _category: [valid_review("u1", "p1", 1)])
+    monkeypatch.setattr(ingest_amazon, "stream_metadata", lambda _category: [valid_metadata("p1")])
+    monkeypatch.setattr(
+        ingest_amazon,
+        "verify_uploaded_counts",
+        lambda *_args, **_kwargs: {
+            "db_users_with_min_reviews": 1,
+            "db_reviews_with_matching_metadata": 1,
+            "db_reviews_missing_metadata": 0,
+        },
+    )
+
+    result = ingest_amazon.ingest_category(
+        category="All_Beauty",
+        min_reviews=1,
+        max_users=100,
+        extra_products=0,
+        dry_run=False,
+        verify=True,
+        client=UpsertClient(),
+    )
+
+    assert result["db_users_with_min_reviews"] == 1
+    output = capsys.readouterr().out
+    assert "[ingestion] DB verification starting." in output
+    assert "[ingestion] DB verification result: users_with_min_reviews=1" in output
 
 
 class SelectQuery:
