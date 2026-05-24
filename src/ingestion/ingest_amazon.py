@@ -205,16 +205,6 @@ def build_ingestion_plan(
     review_limit: int | None = None,
 ) -> dict[str, Any]:
     raw_reviews = list(limited(reviews, review_limit))
-    raw_metadata = list(metadata)
-
-    valid_metadata_by_asin: dict[str, dict[str, Any]] = {}
-    skipped_sparse_metadata = 0
-    for item in raw_metadata:
-        if not is_valid_metadata(item, category):
-            skipped_sparse_metadata += 1
-            continue
-        parent_asin = str(item["parent_asin"]).strip()
-        valid_metadata_by_asin.setdefault(parent_asin, item)
 
     valid_reviews: list[dict[str, Any]] = []
     skipped_invalid_reviews = 0
@@ -224,10 +214,36 @@ def build_ingestion_plan(
         else:
             skipped_invalid_reviews += 1
 
+    candidate_parent_asins = {parent_asin for review in valid_reviews if (parent_asin := review_parent_asin(review))}
+    reviewed_metadata_by_asin: dict[str, dict[str, Any]] = {}
+    extra_metadata_by_asin: dict[str, dict[str, Any]] = {}
+    seen_metadata_asins: set[str] = set()
+    skipped_sparse_metadata = 0
+    valid_metadata_rows = 0
+
+    for item in metadata:
+        if not has_value(item.get("parent_asin")):
+            skipped_sparse_metadata += 1
+            continue
+        parent_asin = str(item["parent_asin"]).strip()
+        if parent_asin in seen_metadata_asins:
+            continue
+        seen_metadata_asins.add(parent_asin)
+
+        if not is_valid_metadata(item, category):
+            skipped_sparse_metadata += 1
+            continue
+
+        valid_metadata_rows += 1
+        if parent_asin in candidate_parent_asins:
+            reviewed_metadata_by_asin[parent_asin] = item
+        elif extra_products > 0 and len(extra_metadata_by_asin) < extra_products:
+            extra_metadata_by_asin[parent_asin] = item
+
     valid_pairs = [
         review
         for review in valid_reviews
-        if (parent_asin := review_parent_asin(review)) and parent_asin in valid_metadata_by_asin
+        if (parent_asin := review_parent_asin(review)) and parent_asin in reviewed_metadata_by_asin
     ]
 
     selected_user_ids = set(select_eligible_users(valid_pairs, min_reviews=min_reviews, max_users=max_users))
@@ -236,21 +252,17 @@ def build_ingestion_plan(
     selected_parent_asins = {review_parent_asin(review) for review in selected_reviews}
     selected_parent_asins.discard(None)
     metadata_to_upload = [
-        valid_metadata_by_asin[parent_asin]
+        reviewed_metadata_by_asin[parent_asin]
         for parent_asin in sorted(selected_parent_asins)
-        if parent_asin in valid_metadata_by_asin
+        if parent_asin in reviewed_metadata_by_asin
     ]
 
-    extra_metadata: list[dict[str, Any]] = []
-    if extra_products > 0:
-        existing = {item["parent_asin"] for item in metadata_to_upload}
-        for parent_asin in sorted(valid_metadata_by_asin):
-            if parent_asin in existing:
-                continue
-            extra_metadata.append(valid_metadata_by_asin[parent_asin])
-            existing.add(parent_asin)
-            if len(extra_metadata) >= extra_products:
-                break
+    uploaded_parent_asins = {item["parent_asin"] for item in metadata_to_upload}
+    extra_metadata = [
+        item
+        for parent_asin, item in extra_metadata_by_asin.items()
+        if parent_asin not in uploaded_parent_asins
+    ]
 
     return {
         "category": category,
@@ -261,7 +273,7 @@ def build_ingestion_plan(
         "reviews_to_upload": selected_reviews,
         "metadata_to_upload": metadata_to_upload + extra_metadata,
         "extra_metadata": extra_metadata,
-        "valid_metadata_rows": len(valid_metadata_by_asin),
+        "valid_metadata_rows": valid_metadata_rows,
         "valid_review_rows": len(valid_reviews),
         "valid_review_product_pairs": len(valid_pairs),
         "skipped_invalid_reviews": skipped_invalid_reviews,

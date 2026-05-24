@@ -169,6 +169,55 @@ def test_extra_products_must_be_valid_and_are_deduplicated() -> None:
     assert [item["parent_asin"] for item in plan["extra_metadata"]] == ["extra-1", "extra-3"]
 
 
+class StreamingOnlyMetadata:
+    def __init__(self, rows):
+        self.rows = rows
+        self.consumed = 0
+
+    def __iter__(self):
+        for row in self.rows:
+            self.consumed += 1
+            yield row
+
+    def __len__(self):
+        raise AssertionError("metadata stream should not be sized")
+
+    def __getitem__(self, _index):
+        raise AssertionError("metadata stream should not be indexed")
+
+
+def test_metadata_iterable_is_consumed_as_stream_not_materialized() -> None:
+    metadata = StreamingOnlyMetadata([valid_metadata("p1"), valid_metadata("extra-1"), valid_metadata("extra-2")])
+
+    plan = ingest_amazon.build_ingestion_plan(
+        [valid_review("u1", "p1", 1)],
+        metadata,
+        category="All_Beauty",
+        min_reviews=1,
+        max_users=100,
+        extra_products=1,
+    )
+
+    assert metadata.consumed == 3
+    assert [item["parent_asin"] for item in plan["metadata_to_upload"]] == ["p1", "extra-1"]
+
+
+def test_unrelated_metadata_is_not_stored_beyond_extra_product_limit() -> None:
+    metadata = [valid_metadata("p1"), valid_metadata("extra-1"), valid_metadata("extra-2"), valid_metadata("extra-3")]
+
+    plan = ingest_amazon.build_ingestion_plan(
+        [valid_review("u1", "p1", 1)],
+        metadata,
+        category="All_Beauty",
+        min_reviews=1,
+        max_users=100,
+        extra_products=1,
+    )
+
+    assert [item["parent_asin"] for item in plan["metadata_to_upload"]] == ["p1", "extra-1"]
+    assert [item["parent_asin"] for item in plan["extra_metadata"]] == ["extra-1"]
+
+
 class FailingClient:
     def table(self, _name):
         raise AssertionError("dry-run should not upload")
