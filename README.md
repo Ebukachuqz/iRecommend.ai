@@ -106,8 +106,28 @@ Supabase remains hosted externally; Docker Compose does not start a local databa
 
 ## Data Ingestion
 
+Preferred rebuild order:
+
+```text
+migrations -> ingestion -> create_holdout_split.py -> regenerate personas
+```
+
+Quick dry-run test:
+
 ```powershell
-python scripts/ingest_amazon.py --category All_Beauty
+python scripts/ingest_amazon.py --category All_Beauty --min-reviews 15 --max-users 20 --extra-products 100 --dry-run
+```
+
+Normal evaluation rebuild:
+
+```powershell
+python scripts/ingest_amazon.py --category All_Beauty --min-reviews 15 --max-users 100 --extra-products 1000 --verify
+```
+
+Larger final rebuild:
+
+```powershell
+python scripts/ingest_amazon.py --category All_Beauty --min-reviews 15 --max-users 300 --extra-products 5000 --verify
 ```
 
 Create holdout splits:
@@ -120,6 +140,7 @@ python scripts/create_holdout_split.py --category All_Beauty
 
 ```powershell
 python scripts/regenerate_personas.py --category All_Beauty --limit 10
+python scripts/regenerate_personas.py --category All_Beauty --limit 20
 ```
 
 Persona generation uses only `task_split='persona_train'` reviews. `amazon_reviews` does not have or require a `category` column.

@@ -9,19 +9,32 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.ingestion.ingest_amazon import ingest_category
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Ingest Amazon Reviews 2023 into Supabase.")
     parser.add_argument("--category", default=None)
-    parser.add_argument("--min-user-reviews", type=int, default=10)
+    parser.add_argument("--min-reviews", "--min-user-reviews", dest="min_reviews", type=int, default=15)
+    parser.add_argument("--max-users", type=int, default=100)
+    parser.add_argument("--extra-products", type=int, default=1000)
+    parser.add_argument("--review-limit", "--max-reviews", dest="review_limit", type=int, default=None)
     parser.add_argument("--batch-size", type=int, default=500)
-    parser.add_argument("--max-reviews", type=int, default=None)
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--verify", action="store_true")
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
     args = parser.parse_args()
 
     result = ingest_category(
         category=args.category,
-        min_user_reviews=args.min_user_reviews,
+        min_reviews=args.min_reviews,
+        max_users=args.max_users,
+        extra_products=args.extra_products,
+        review_limit=args.review_limit,
         batch_size=args.batch_size,
-        max_reviews=args.max_reviews,
+        dry_run=args.dry_run,
+        verify=args.verify,
     )
     print(result)
 
