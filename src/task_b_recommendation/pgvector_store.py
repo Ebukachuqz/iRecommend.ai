@@ -54,3 +54,21 @@ class SupabasePgVectorStore(VectorStore):
             .execute()
         )
         return response.data[0] if response.data else None
+
+    def search_similar_users(
+        self,
+        query_embedding: list[float],
+        category: str,
+        limit: int,
+        exclude_user_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        response = self.client.rpc(
+            "match_user_taste_vectors",
+            {
+                "query_embedding": query_embedding,
+                "target_category": category,
+                "match_count": limit,
+                "exclude_user_id": exclude_user_id,
+            },
+        ).execute()
+        return list(response.data or [])

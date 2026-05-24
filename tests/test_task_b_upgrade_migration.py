@@ -49,3 +49,10 @@ def test_task_b_upgrade_migration_adds_debug_tables() -> None:
 
     assert "create table if not exists intent_plans" in sql
     assert "create table if not exists recommendation_candidates" in sql
+
+
+def test_task_b_upgrade_migration_adds_similar_user_rpc() -> None:
+    sql = read_migration()
+
+    assert "create or replace function match_user_taste_vectors" in sql
+    assert "exclude_user_id" in sql

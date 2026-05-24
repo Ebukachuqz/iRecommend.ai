@@ -26,3 +26,12 @@ class VectorStore(ABC):
     @abstractmethod
     def get_product_embedding(self, parent_asin: str) -> dict | None:
         pass
+
+    def search_similar_users(
+        self,
+        query_embedding: list[float],
+        category: str,
+        limit: int,
+        exclude_user_id: str | None = None,
+    ) -> list[dict]:
+        return []

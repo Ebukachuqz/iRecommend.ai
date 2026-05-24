@@ -9,7 +9,7 @@ from src.db.queries import fetch_persona
 from src.db.supabase_client import get_supabase_client
 from src.personas.custom_persona_processor import process_custom_persona
 from src.personas.validator import validate_persona
-from src.task_b_recommendation.candidate_retriever import retrieve_candidates
+from src.task_b_recommendation.candidate_retriever import retrieve_candidates, retrieve_candidates_with_sources
 from src.task_b_recommendation.cold_start import build_cold_start_persona
 from src.task_b_recommendation.embeddings import DEFAULT_EMBEDDING_MODEL
 from src.task_b_recommendation.intent_planner import INTENT_PROMPT_VERSION, plan_intent
@@ -91,10 +91,12 @@ def store_recommendation_run(
     client: Client,
 ) -> dict[str, Any]:
     recommendations = [item.model_dump(mode="json") for item in output.recommendations]
-    retrieval_sources: dict[str, int] = {}
-    for candidate in context.get("retrieved_candidates") or context.get("scored_candidates") or []:
-        source = candidate.get("retrieval_source") or "unknown"
-        retrieval_sources[source] = retrieval_sources.get(source, 0) + 1
+    retrieval_sources: dict[str, int] = dict(context.get("retrieval_source_counts") or {})
+    if not retrieval_sources:
+        for candidate in context.get("retrieved_candidates") or context.get("scored_candidates") or []:
+            sources = candidate.get("retrieval_sources") or [candidate.get("retrieval_source") or "unknown"]
+            for source in sources:
+                retrieval_sources[source] = retrieval_sources.get(source, 0) + 1
 
     payload = {
         "user_id": output.user_id,
@@ -135,18 +137,22 @@ def recommend(request: RecommendationRequest, client: Client | None = None, vect
     client = client or get_supabase_client()
     persona, cold_start = resolve_persona_for_recommendation(request, client)
     session = load_or_create_session(request, persona, client)
+    taste_vector_row = None
     if request.user_id and not cold_start:
-        build_or_get_user_taste_vector(request.user_id, request.category, client=client)
+        taste_vector_row = build_or_get_user_taste_vector(request.user_id, request.category, client=client)
 
     intent = plan_intent(persona, request.request, session)
-    candidates = retrieve_candidates(
+    retrieval_result = retrieve_candidates_with_sources(
         request.user_id,
         request.category,
         intent,
         limit=max(50, request.limit * 5),
         client=client,
         vector_store=vector_store,
+        persona=persona,
+        taste_vector_row=taste_vector_row,
     )
+    candidates = retrieval_result.candidates
     scored = score_candidates(candidates, persona, intent)
     reranked = rerank_recommendations(persona, request.request, intent, scored, limit=request.limit)
     session_id = request.session_id
@@ -176,6 +182,7 @@ def recommend(request: RecommendationRequest, client: Client | None = None, vect
         context={
             **request.context,
             "intent": intent.model_dump(mode="json"),
+            "retrieval_source_counts": retrieval_result.source_counts,
             "retrieved_candidates": [candidate.model_dump(mode="json") for candidate in candidates],
             "scored_candidates": [candidate.model_dump(mode="json") for candidate in scored],
         },

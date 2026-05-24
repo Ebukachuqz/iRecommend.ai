@@ -19,9 +19,21 @@ Task B can run from a stored user persona or from a caller-provided custom perso
 
 ## Retrieval
 
-Candidate retrieval first tries the user's stored taste vector from `user_taste_vectors`. Taste vectors are built only from `amazon_reviews.task_split='persona_train'` liked reviews with rating >= 4, and products already reviewed by the user are always excluded. If no taste vector exists, retrieval falls back to high-quality/popular product metadata.
+Candidate retrieval builds a broad pool before scoring and LLM reranking. It now combines five sources:
+
+- `taste_vector`: pgvector nearest-neighbour search from the user's category-specific taste vector.
+- `request_query`: semantic search from the intent planner's retrieval query. This is the main cold-start and custom-persona path.
+- `collaborative`: similar users are found through `user_taste_vectors`, then their highly rated `persona_train` products are considered.
+- `attribute_match`: product text is matched against persona liked attributes, product types, values, and intent-required attributes.
+- `quality_fallback`: highly rated/popular products fill the pool when other sources are sparse.
+
+Collaborative filtering is deliberately only one source among several. The recommender goes beyond "users like you liked this" by using persona values, request intent, metadata semantics, transparent scoring, and LLM reranking together.
+
+Taste vectors are built only from `amazon_reviews.task_split='persona_train'` liked reviews with rating >= 4, and products already reviewed by the user are always excluded. If no taste vector exists, request-query retrieval and quality fallback still work, which keeps cold-start and custom persona flows useful.
 
 Taste vectors are category-aware. Reviews are filtered through `amazon_product_metadata` by `parent_asin`, using `category` first and falling back to `main_category`/`categories`, before product embeddings are averaged. This prevents a beauty taste vector from being polluted by books, electronics, or other category histories.
+
+Every retrieval run records source counts such as `{"taste_vector": 40, "request_query": 30, "attribute_match": 12}` in `recommendation_runs.retrieval_sources`. These counts describe the retrieved candidate pool, not only the final top recommendations.
 
 ## Product Embeddings
 

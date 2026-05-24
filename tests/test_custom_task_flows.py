@@ -122,7 +122,11 @@ def test_task_b_persona_only_request_uses_custom_persona(monkeypatch) -> None:
         "plan_intent",
         lambda persona, request, session_state=None: RecommendationIntent(retrieval_query=request or ""),
     )
-    monkeypatch.setattr(task_b_service, "retrieve_candidates", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        task_b_service,
+        "retrieve_candidates_with_sources",
+        lambda *args, **kwargs: type("RetrievalResult", (), {"candidates": [], "source_counts": {}})(),
+    )
     monkeypatch.setattr(task_b_service, "score_candidates", lambda *args, **kwargs: [])
     monkeypatch.setattr(task_b_service, "rerank_recommendations", lambda *args, **kwargs: type("Reranked", (), {"recommendations": []})())
     monkeypatch.setattr(task_b_service, "store_recommendation_run", lambda *args, **kwargs: {})

@@ -39,6 +39,32 @@ ON user_taste_vectors
 USING ivfflat (embedding vector_cosine_ops)
 WITH (lists = 50);
 
+CREATE OR REPLACE FUNCTION match_user_taste_vectors(
+    query_embedding vector(384),
+    target_category TEXT,
+    match_count INT DEFAULT 5,
+    exclude_user_id TEXT DEFAULT NULL
+)
+RETURNS TABLE (
+    user_id TEXT,
+    category TEXT,
+    similarity FLOAT
+)
+LANGUAGE SQL
+STABLE
+AS $$
+    SELECT
+        user_taste_vectors.user_id,
+        user_taste_vectors.category,
+        1 - (user_taste_vectors.embedding <=> query_embedding) AS similarity
+    FROM user_taste_vectors
+    WHERE user_taste_vectors.embedding IS NOT NULL
+      AND user_taste_vectors.category = target_category
+      AND (exclude_user_id IS NULL OR user_taste_vectors.user_id <> exclude_user_id)
+    ORDER BY user_taste_vectors.embedding <=> query_embedding
+    LIMIT match_count;
+$$;
+
 -- recommendation_runs keeps the existing table name and adds retrieval,
 -- evaluation, cold-start, and reproducibility fields.
 ALTER TABLE recommendation_runs

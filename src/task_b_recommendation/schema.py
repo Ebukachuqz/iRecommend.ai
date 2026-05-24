@@ -46,7 +46,22 @@ class RecommendationCandidate(BaseModel):
     title: str | None = None
     product: dict[str, Any] = Field(default_factory=dict)
     semantic_similarity: float = Field(default=0.0, ge=0.0, le=1.0)
+    collaborative_similarity: float | None = Field(default=None, ge=0.0, le=1.0)
     retrieval_source: str = "fallback"
+    retrieval_sources: list[str] = Field(default_factory=list)
+    source_evidence: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+    @field_validator("retrieval_sources", "source_evidence", "warnings", mode="before")
+    @classmethod
+    def coerce_string_lists(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [value] if value else []
+        if isinstance(value, list):
+            return [str(item) for item in value if item is not None and str(item).strip()]
+        return [str(value)]
 
 
 class RecommendationScoreBreakdown(BaseModel):

@@ -120,6 +120,8 @@ Build a user taste vector:
 python scripts/build_user_taste_vectors.py --user-id <USER_ID> --category All_Beauty
 ```
 
+Taste vectors are category-specific and unit-normalized after averaging liked product embeddings. They are built from rating >= 4 `persona_train` reviews whose products match the requested metadata category.
+
 Run recommendations:
 
 ```powershell
@@ -128,6 +130,8 @@ python scripts/run_task_b_recommendation.py --cold-start --request "I need affor
 ```
 
 Successful recommendation calls are stored in `recommendation_runs`.
+
+Task B retrieves candidates from multiple sources before scoring: taste-vector semantic search, request-query semantic search, collaborative signals from similar users' taste vectors, persona/intent attribute matching, and a quality/popularity fallback. Collaborative filtering is only one signal; the system goes beyond it by grounding retrieval, scoring, and final reasons in the user's persona and request intent. Cold-start and custom-persona requests still work through request-query retrieval and quality fallback when no stored taste vector exists.
 
 Task B also accepts a custom persona JSON through `POST /recommendations/generate`. This supports the direct persona -> recommendations flow. The normalizer supports common fields such as `likes`, `interests`, `preferred_products`, `dislikes`, `avoid`, `concerns`, `values`, `priorities`, `budget`, `tone`, `average_rating`, and category signals. It does not attempt to map every possible arbitrary schema.
 
