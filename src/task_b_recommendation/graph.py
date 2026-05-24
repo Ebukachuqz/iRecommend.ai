@@ -240,6 +240,10 @@ def candidate_trace_rows(
                 "retrieval_sources": retrieval_sources,
                 "semantic_similarity": candidate.get("semantic_similarity"),
                 "collaborative_similarity": candidate.get("collaborative_similarity"),
+                "preference_match": score_breakdown.get("preference_match"),
+                "product_quality": score_breakdown.get("product_quality"),
+                "price_fit": score_breakdown.get("price_fit"),
+                "popularity_reliability": score_breakdown.get("popularity_reliability"),
                 "final_score": score_breakdown.get("final_score"),
                 "score_breakdown": score_breakdown,
             }

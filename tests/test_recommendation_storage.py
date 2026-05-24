@@ -70,7 +70,13 @@ def make_scored_candidates() -> list[dict]:
             "retrieval_sources": ["taste_vector", "request_query"],
             "semantic_similarity": 0.9,
             "collaborative_similarity": 0.7,
-            "score_breakdown": {"final_score": 0.91, "preference_match": 0.8},
+            "score_breakdown": {
+                "final_score": 0.91,
+                "preference_match": 0.8,
+                "product_quality": 0.9,
+                "price_fit": 0.7,
+                "popularity_reliability": 0.6,
+            },
         },
         {
             "parent_asin": "asin-2",
@@ -78,7 +84,13 @@ def make_scored_candidates() -> list[dict]:
             "retrieval_sources": ["attribute_match"],
             "semantic_similarity": 0.4,
             "collaborative_similarity": None,
-            "score_breakdown": {"final_score": 0.85, "preference_match": 0.95},
+            "score_breakdown": {
+                "final_score": 0.85,
+                "preference_match": 0.95,
+                "product_quality": 0.8,
+                "price_fit": 0.65,
+                "popularity_reliability": 0.4,
+            },
         },
         {
             "parent_asin": "asin-3",
@@ -86,7 +98,13 @@ def make_scored_candidates() -> list[dict]:
             "retrieval_sources": ["quality_fallback"],
             "semantic_similarity": 0.0,
             "collaborative_similarity": None,
-            "score_breakdown": {"final_score": 0.5},
+            "score_breakdown": {
+                "final_score": 0.5,
+                "preference_match": 0.3,
+                "product_quality": 0.7,
+                "price_fit": 0.5,
+                "popularity_reliability": 0.9,
+            },
         },
     ]
 
@@ -166,6 +184,10 @@ def test_candidate_traces_are_inserted_in_one_batch_with_ranks() -> None:
         "retrieval_sources",
         "semantic_similarity",
         "collaborative_similarity",
+        "preference_match",
+        "product_quality",
+        "price_fit",
+        "popularity_reliability",
         "final_score",
         "score_breakdown",
     }
@@ -176,8 +198,14 @@ def test_candidate_traces_are_inserted_in_one_batch_with_ranks() -> None:
     assert rows[0]["rank_after_rerank"] == 2
     assert rows[0]["retrieval_sources"] == ["taste_vector", "request_query"]
     assert rows[0]["collaborative_similarity"] == 0.7
+    assert rows[0]["preference_match"] == 0.8
+    assert rows[0]["product_quality"] == 0.9
+    assert rows[0]["price_fit"] == 0.7
+    assert rows[0]["popularity_reliability"] == 0.6
     assert rows[0]["final_score"] == 0.91
+    assert rows[0]["score_breakdown"]["preference_match"] == 0.8
     assert rows[1]["rank_after_rerank"] == 1
+    assert rows[1]["collaborative_similarity"] is None
     assert rows[2]["rank_after_rerank"] is None
 
 
