@@ -41,12 +41,77 @@ def sparse_metadata(parent_asin: str) -> dict:
     return item
 
 
+class SelectColumnsDataset:
+    column_names = ["parent_asin", "title", "images", "details"]
+
+    def __init__(self) -> None:
+        self.selected = None
+
+    def select_columns(self, columns):
+        self.selected = columns
+        return self
+
+
+class RemoveColumnsDataset:
+    column_names = ["parent_asin", "title", "images", "details"]
+
+    def __init__(self) -> None:
+        self.removed = None
+
+    def select_columns(self, _columns):
+        raise RuntimeError("select unavailable")
+
+    def remove_columns(self, columns):
+        self.removed = columns
+        return self
+
+
+class ProblemColumnFallbackDataset:
+    column_names = []
+
+    def __init__(self) -> None:
+        self.removed = []
+
+    def remove_columns(self, columns):
+        self.removed.extend(columns)
+        return self
+
+
+def test_metadata_pruning_prefers_select_columns() -> None:
+    dataset = SelectColumnsDataset()
+
+    assert ingest_amazon.prune_metadata_columns(dataset) is dataset
+    assert dataset.selected == ["parent_asin", "title", "details"]
+
+
+def test_metadata_pruning_falls_back_to_remove_columns() -> None:
+    dataset = RemoveColumnsDataset()
+
+    assert ingest_amazon.prune_metadata_columns(dataset) is dataset
+    assert dataset.removed == ["images"]
+
+
+def test_metadata_pruning_removes_known_problem_columns_without_column_names() -> None:
+    dataset = ProblemColumnFallbackDataset()
+
+    assert ingest_amazon.prune_metadata_columns(dataset) is dataset
+    assert "images" in dataset.removed
+    assert "variants" in dataset.removed
+
+
 def test_cli_defaults_are_evaluation_friendly() -> None:
     args = ingest_script.build_parser().parse_args([])
 
     assert args.min_reviews == 15
     assert args.max_users == 100
     assert args.extra_products == 1000
+    assert args.require_rating_number is False
+
+
+def test_cli_supports_require_rating_number() -> None:
+    args = ingest_script.build_parser().parse_args(["--require-rating-number"])
+
+    assert args.require_rating_number is True
 
 
 def test_cli_keeps_backward_compatible_aliases() -> None:
@@ -128,6 +193,60 @@ def test_sparse_metadata_and_reviews_pointing_to_it_are_dropped() -> None:
     assert [item["parent_asin"] for item in plan["metadata_to_upload"]] == ["good"]
 
 
+def test_review_missing_title_is_invalid() -> None:
+    review = valid_review("u1", "p1", 1)
+    review["title"] = ""
+
+    assert ingest_amazon.is_valid_review(review) is False
+
+
+def test_review_missing_text_is_invalid() -> None:
+    review = valid_review("u1", "p1", 1)
+    review["text"] = ""
+
+    assert ingest_amazon.is_valid_review(review) is False
+
+
+def test_review_missing_timestamp_is_valid() -> None:
+    review = valid_review("u1", "p1", 1)
+    review.pop("timestamp")
+
+    assert ingest_amazon.is_valid_review(review) is True
+
+
+def test_product_required_metadata_fields_are_enforced() -> None:
+    required_fields = [
+        "description",
+        "features",
+        "price",
+        "average_rating",
+        "store",
+        "details",
+    ]
+
+    for field in required_fields:
+        item = valid_metadata(f"missing-{field}")
+        item[field] = [] if field in {"description", "features"} else None
+        if field == "details":
+            item[field] = {}
+
+        assert ingest_amazon.is_valid_metadata(item, "All_Beauty") is False, field
+
+
+def test_product_missing_rating_number_is_valid_by_default() -> None:
+    item = valid_metadata("p1")
+    item["rating_number"] = None
+
+    assert ingest_amazon.is_valid_metadata(item, "All_Beauty") is True
+
+
+def test_product_missing_rating_number_is_invalid_when_required() -> None:
+    item = valid_metadata("p1")
+    item["rating_number"] = None
+
+    assert ingest_amazon.is_valid_metadata(item, "All_Beauty", require_rating_number=True) is False
+
+
 def test_invalid_reviews_are_not_counted_or_uploaded() -> None:
     invalid = valid_review("u1", "p2", 2)
     invalid["text"] = ""
@@ -167,6 +286,24 @@ def test_extra_products_must_be_valid_and_are_deduplicated() -> None:
 
     assert [item["parent_asin"] for item in plan["metadata_to_upload"]] == ["p1", "extra-1", "extra-3"]
     assert [item["parent_asin"] for item in plan["extra_metadata"]] == ["extra-1", "extra-3"]
+
+
+def test_rating_number_requirement_affects_valid_pair_selection() -> None:
+    metadata = valid_metadata("p1")
+    metadata["rating_number"] = None
+
+    plan = ingest_amazon.build_ingestion_plan(
+        [valid_review("u1", "p1", 1)],
+        [metadata],
+        category="All_Beauty",
+        min_reviews=1,
+        max_users=100,
+        extra_products=0,
+        require_rating_number=True,
+    )
+
+    assert plan["selected_user_ids"] == []
+    assert plan["valid_review_product_pairs"] == 0
 
 
 class StreamingOnlyMetadata:

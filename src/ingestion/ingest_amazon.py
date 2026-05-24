@@ -17,6 +17,28 @@ from src.ingestion.data_models import AmazonProductMetadata, AmazonReview, parse
 
 DATASET_NAME = "McAuley-Lab/Amazon-Reviews-2023"
 
+METADATA_KEEP_COLUMNS = [
+    "parent_asin",
+    "title",
+    "main_category",
+    "categories",
+    "features",
+    "description",
+    "price",
+    "average_rating",
+    "rating_number",
+    "store",
+    "details",
+]
+
+PROBLEMATIC_METADATA_COLUMNS = [
+    "images",
+    "image",
+    "videos",
+    "video",
+    "variants",
+]
+
 
 def review_config_name(category: str) -> str:
     return f"raw_review_{category}"
@@ -59,14 +81,42 @@ def stream_reviews(category: str) -> Iterable[dict[str, Any]]:
     )
 
 
+def prune_metadata_columns(dataset: Any) -> Any:
+    """Keep only metadata fields needed by ingestion before iterating."""
+
+    column_names = list(getattr(dataset, "column_names", []) or [])
+    keep_columns = [column for column in METADATA_KEEP_COLUMNS if not column_names or column in column_names]
+    if hasattr(dataset, "select_columns"):
+        try:
+            return dataset.select_columns(keep_columns)
+        except Exception:
+            pass
+
+    if hasattr(dataset, "remove_columns"):
+        if column_names:
+            drop_columns = [column for column in column_names if column not in METADATA_KEEP_COLUMNS]
+            if drop_columns:
+                try:
+                    return dataset.remove_columns(drop_columns)
+                except Exception:
+                    pass
+        for column in PROBLEMATIC_METADATA_COLUMNS:
+            try:
+                dataset = dataset.remove_columns([column])
+            except Exception:
+                pass
+    return dataset
+
+
 def stream_metadata(category: str) -> Iterable[dict[str, Any]]:
-    return load_dataset(
+    dataset = load_dataset(
         DATASET_NAME,
         metadata_config_name(category),
         split="full",
         streaming=True,
         trust_remote_code=True,
     )
+    return prune_metadata_columns(dataset)
 
 
 def count_users(reviews: Iterable[dict[str, Any]], max_reviews: int | None = None) -> Counter[str]:
@@ -104,26 +154,29 @@ def is_valid_review(review: dict[str, Any]) -> bool:
             has_value(review.get("rating")),
             has_value(review.get("title")),
             has_value(review.get("text")),
-            parse_amazon_timestamp(review.get("timestamp")) is not None,
         ]
     )
 
 
-def is_valid_metadata(item: dict[str, Any], category: str) -> bool:
-    return all(
+def is_valid_metadata(item: dict[str, Any], category: str, require_rating_number: bool = False) -> bool:
+    has_required_fields = all(
         [
             has_value(item.get("parent_asin")),
             has_value(item.get("title")),
-            has_value(category) or has_value(item.get("main_category")) or has_value(item.get("category")),
+            has_value(item.get("main_category")) or has_value(item.get("categories")) or has_value(category),
             has_value(item.get("features")),
             has_value(item.get("description")),
             parse_price(item.get("price")) is not None,
             has_value(item.get("average_rating")),
-            has_value(item.get("rating_number")),
             has_value(item.get("store")),
             has_value(item.get("details")),
         ]
     )
+    if not has_required_fields:
+        return False
+    if require_rating_number and not has_value(item.get("rating_number")):
+        return False
+    return True
 
 
 def normalize_review(review: dict[str, Any]) -> dict[str, Any]:
@@ -208,6 +261,7 @@ def build_ingestion_plan(
     max_users: int = 100,
     extra_products: int = 1000,
     review_limit: int | None = None,
+    require_rating_number: bool = False,
 ) -> dict[str, Any]:
     candidate_parent_asins: set[str] = set()
     valid_review_rows = 0
@@ -235,7 +289,7 @@ def build_ingestion_plan(
             continue
         seen_metadata_asins.add(parent_asin)
 
-        if not is_valid_metadata(item, category):
+        if not is_valid_metadata(item, category, require_rating_number=require_rating_number):
             skipped_sparse_metadata += 1
             continue
 
@@ -360,6 +414,7 @@ def ingest_category(
     max_users: int = 100,
     extra_products: int = 1000,
     review_limit: int | None = None,
+    require_rating_number: bool = False,
     dry_run: bool = False,
     verify: bool = False,
     client: Client | None = None,
@@ -380,6 +435,7 @@ def ingest_category(
         max_users=max_users,
         extra_products=extra_products,
         review_limit=effective_review_limit,
+        require_rating_number=require_rating_number,
     )
 
     normalized_reviews = [normalize_review(review) for review in plan["reviews_to_upload"]]

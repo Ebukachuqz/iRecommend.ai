@@ -106,6 +106,10 @@ Supabase remains hosted externally; Docker Compose does not start a local databa
 
 ## Data Ingestion
 
+Note: the Hugging Face dataset `McAuley-Lab/Amazon-Reviews-2023` currently uses a dataset loading script. Hugging Face `datasets>=4.0.0` removed loading-script support, so ingestion currently requires `datasets<4.0.0` (see `requirements.txt`).
+
+Validation is practical but evaluation-focused. Reviews must include `user_id`, `parent_asin` or `asin`, `rating`, `title`, and `text`; timestamp, verified purchase, and helpful votes are kept when available but are not required. Product metadata must include `parent_asin`, `title`, a category signal, `description`, `features`, `price`, `average_rating`, `store`, and `details`. `rating_number` is optional by default; pass `--require-rating-number` to drop metadata rows without it.
+
 Preferred rebuild order:
 
 ```text
