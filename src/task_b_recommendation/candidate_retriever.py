@@ -132,14 +132,14 @@ def add_vector_matches(
         if not product_matches_requested_category(product, category):
             continue
         similarity = float(match.get("similarity") or 0)
-        merge_candidate(
+        added = merge_candidate(
             candidates_by_asin,
             product,
             retrieval_source,
             semantic_similarity=similarity,
             evidence=[f"{retrieval_source} similarity {similarity:.2f}"],
         )
-        if source_counts is not None:
+        if source_counts is not None and added:
             source_counts[retrieval_source] = source_counts.get(retrieval_source, 0) + 1
 
 
@@ -336,14 +336,15 @@ def retrieve_candidates_with_sources(
         except Exception:
             collaborative = []
         for product, similarity, evidence in collaborative:
-            merge_candidate(
+            added = merge_candidate(
                 candidates_by_asin,
                 product,
                 "collaborative",
                 collaborative_similarity=similarity,
                 evidence=evidence,
             )
-            source_counts["collaborative"] = source_counts.get("collaborative", 0) + 1
+            if added:
+                source_counts["collaborative"] = source_counts.get("collaborative", 0) + 1
 
     try:
         attribute_matches = retrieve_attribute_match_candidates(
@@ -357,8 +358,9 @@ def retrieve_candidates_with_sources(
     except Exception:
         attribute_matches = []
     for product, evidence, warnings in attribute_matches:
-        merge_candidate(candidates_by_asin, product, "attribute_match", evidence=evidence, warnings=warnings)
-        source_counts["attribute_match"] = source_counts.get("attribute_match", 0) + 1
+        added = merge_candidate(candidates_by_asin, product, "attribute_match", evidence=evidence, warnings=warnings)
+        if added:
+            source_counts["attribute_match"] = source_counts.get("attribute_match", 0) + 1
 
     candidates = list(candidates_by_asin.values())
     if len(candidates) < limit:

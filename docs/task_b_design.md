@@ -33,7 +33,7 @@ Taste vectors are built only from `amazon_reviews.task_split='persona_train'` li
 
 Taste vectors are category-aware. Reviews are filtered through `amazon_product_metadata` by `parent_asin`, using `category` first and falling back to `main_category`/`categories`, before product embeddings are averaged. This prevents a beauty taste vector from being polluted by books, electronics, or other category histories.
 
-Every retrieval run records source counts such as `{"taste_vector": 40, "request_query": 30, "attribute_match": 12}` in `recommendation_runs.retrieval_sources`. These counts describe the retrieved candidate pool, not only the final top recommendations.
+Every retrieval run records source counts such as `{"taste_vector": 40, "request_query": 30, "attribute_match": 12}` in `recommendation_runs.retrieval_sources`. These counts describe unique candidates added by each source after dedupe, not only the final top recommendations. If a product appears from multiple sources, its `retrieval_sources` list preserves all sources, but only the first source that added the unique candidate increments the run-level count.
 
 ## Product Embeddings
 

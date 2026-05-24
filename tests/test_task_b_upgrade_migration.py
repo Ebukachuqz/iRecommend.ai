@@ -56,3 +56,11 @@ def test_task_b_upgrade_migration_adds_similar_user_rpc() -> None:
 
     assert "create or replace function match_user_taste_vectors" in sql
     assert "exclude_user_id" in sql
+
+
+def test_task_b_upgrade_migration_ensures_product_vector_rpc() -> None:
+    sql = read_migration()
+
+    assert "create or replace function match_product_embeddings" in sql
+    assert "exclude_parent_asins" in sql
+    assert "similarity float" in sql

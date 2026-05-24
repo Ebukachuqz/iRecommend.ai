@@ -20,6 +20,28 @@ ON product_embeddings
 USING ivfflat (embedding vector_cosine_ops)
 WITH (lists = 100);
 
+CREATE OR REPLACE FUNCTION match_product_embeddings(
+    query_embedding vector(384),
+    match_count INT DEFAULT 20,
+    exclude_parent_asins TEXT[] DEFAULT ARRAY[]::TEXT[]
+)
+RETURNS TABLE (
+    parent_asin TEXT,
+    similarity FLOAT
+)
+LANGUAGE SQL
+STABLE
+AS $$
+    SELECT
+        product_embeddings.parent_asin,
+        1 - (product_embeddings.embedding <=> query_embedding) AS similarity
+    FROM product_embeddings
+    WHERE product_embeddings.embedding IS NOT NULL
+      AND NOT (product_embeddings.parent_asin = ANY(exclude_parent_asins))
+    ORDER BY product_embeddings.embedding <=> query_embedding
+    LIMIT match_count;
+$$;
+
 -- Taste vectors remain keyed by user_id + category. The new provenance columns
 -- explain how much evidence contributed to the vector.
 ALTER TABLE user_taste_vectors

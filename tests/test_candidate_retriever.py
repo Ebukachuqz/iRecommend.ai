@@ -369,7 +369,7 @@ def test_dedupe_preserves_multiple_retrieval_sources(monkeypatch) -> None:
     assert result.candidates[0].parent_asin == "taste-1"
     assert result.candidates[0].retrieval_sources == ["taste_vector", "request_query"]
     assert result.source_counts["taste_vector"] == 1
-    assert result.source_counts["request_query"] == 1
+    assert result.source_counts.get("request_query", 0) == 0
 
 
 def test_reviewed_products_are_excluded_from_vector_sources(monkeypatch) -> None:
