@@ -17,6 +17,10 @@ from src.personas.prompts import PERSONA_PROMPT, PERSONA_SCHEMA_EXAMPLE, PERSONA
 from src.personas.validator import persona_to_storage_dict, validate_persona
 
 
+def log_persona_generation(message: str) -> None:
+    print(f"[persona] {message}")
+
+
 class PersonaGenerator:
     def __init__(self, client: Client | None = None) -> None:
         self.settings = get_settings()
@@ -117,12 +121,19 @@ class PersonaGenerator:
         max_reviews: int = 20,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         category = category or self.settings.default_category
+        log_persona_generation(f"Fetching persona_train reviews: user_id={user_id}, category={category}")
         reviews = self.fetch_user_reviews(user_id)
         if not reviews:
             raise ValueError(f"No persona_train reviews found for user_id={user_id!r}, category={category!r}.")
 
+        log_persona_generation(f"Fetched {len(reviews):,} persona_train reviews for user_id={user_id}")
         enriched_reviews = self.enrich_reviews(reviews)
         review_context, stats = self.build_prompt_stats(reviews, enriched_reviews, max_reviews)
+        log_persona_generation(
+            "Prepared LLM prompt context: "
+            f"user_id={user_id}, source_reviews={stats['review_count']:,}, "
+            f"prompt_reviews={stats['prompt_review_count']:,}"
+        )
         prompt_input = {
             "instructions": PERSONA_SYSTEM_INSTRUCTIONS,
             "category": category,
@@ -132,9 +143,13 @@ class PersonaGenerator:
         }
         llm = get_groq_chat(self.settings.groq_model)
         chain = PERSONA_PROMPT | llm
+        log_persona_generation(
+            f"Calling LLM for persona: user_id={user_id}, model={self.settings.groq_model}"
+        )
         raw_message = chain.invoke(prompt_input)
         raw_text = getattr(raw_message, "content", str(raw_message))
         raw_payload, cleaned_json_text = parse_json_from_llm_text(raw_text)
+        log_persona_generation(f"LLM persona response parsed: user_id={user_id}")
         log_llm_response(
             "persona_generation",
             {
@@ -157,7 +172,9 @@ class PersonaGenerator:
         max_reviews: int = 20,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         raw_payload, stats = self.generate_persona_payload(user_id, category, max_reviews=max_reviews)
+        log_persona_generation(f"Validating persona payload: user_id={user_id}")
         persona = validate_persona(raw_payload, repair=True)
+        log_persona_generation(f"Persona validation complete: user_id={user_id}")
         return persona_to_storage_dict(persona), stats
 
     def store_persona(
@@ -178,7 +195,12 @@ class PersonaGenerator:
             "average_rating": stats["average_rating"],
             "source_review_ids": stats["source_review_ids"],
         }
+        log_persona_generation(
+            "Upserting persona: "
+            f"user_id={user_id}, category={category}, source_reviews={len(stats['source_review_ids']):,}"
+        )
         self.client.table("user_personas").upsert(payload, on_conflict="user_id,category").execute()
+        log_persona_generation(f"Persona upsert complete: user_id={user_id}, category={category}")
 
     def regenerate_persona(
         self,
@@ -189,9 +211,15 @@ class PersonaGenerator:
         store: bool = True,
     ) -> dict[str, Any]:
         category = category or self.settings.default_category
+        log_persona_generation(f"Regenerating persona: user_id={user_id}, category={category}, store={store}")
         persona, stats = self.generate_and_validate(user_id, category, max_reviews=max_reviews)
         if store:
             self.store_persona(user_id, category, persona, stats)
+        else:
+            log_persona_generation(f"Store disabled; persona not upserted: user_id={user_id}")
+        log_persona_generation(
+            f"Persona regeneration complete: user_id={user_id}, source_reviews={len(stats['source_review_ids']):,}"
+        )
         return {
             "user_id": user_id,
             "category": category,

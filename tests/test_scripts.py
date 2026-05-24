@@ -1,5 +1,6 @@
 from scripts import create_holdout_split
 from scripts import embed_products
+from scripts import regenerate_personas as regenerate_personas_script
 from scripts import regenerate_personas
 
 build_holdout_updates = create_holdout_split.build_holdout_updates
@@ -81,6 +82,37 @@ def test_regenerate_user_lookup_does_not_filter_by_category(monkeypatch) -> None
 
     assert regenerate_personas.fetch_user_ids() == ["u1"]
     assert not any(column == "category" for column, _value in client.query.filters)
+
+
+class PersonaGeneratorRecorder:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def regenerate_persona(self, user_id, category, store=True):
+        self.calls.append((user_id, category, store))
+        if user_id == "bad":
+            raise RuntimeError("boom")
+        return {"source_review_ids": ["r1", "r2"]}
+
+
+def test_regenerate_personas_script_logs_progress_and_failures(monkeypatch, capsys) -> None:
+    recorder = PersonaGeneratorRecorder()
+    monkeypatch.setattr(regenerate_personas_script, "fetch_user_ids", lambda: ["good", "bad"])
+    monkeypatch.setattr(regenerate_personas_script, "PersonaGenerator", lambda: recorder)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["regenerate_personas.py", "--category", "All_Beauty"],
+    )
+
+    regenerate_personas_script.main()
+
+    assert recorder.calls == [("good", "All_Beauty", True), ("bad", "All_Beauty", True)]
+    output = capsys.readouterr().out
+    assert "[persona] Starting persona regeneration: category=All_Beauty, users=2" in output
+    assert "[persona] Processing user 1/2: user_id=good" in output
+    assert "[persona] Persona generation succeeded:" in output
+    assert "[persona] Persona generation failed: user_id=bad, error=boom" in output
+    assert "[persona] Persona regeneration complete: succeeded=1, failed=1, total=2" in output
 
 
 class UpdateQueryRecorder:

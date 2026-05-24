@@ -8,7 +8,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.config import get_settings
 from src.db.supabase_client import get_supabase_client
-from src.personas.generator import PersonaGenerator
+from src.personas.generator import PersonaGenerator, log_persona_generation
 
 
 def fetch_user_ids() -> list[str]:
@@ -45,10 +45,27 @@ def main() -> None:
     if args.limit:
         user_ids = user_ids[: args.limit]
 
+    log_persona_generation(
+        f"Starting persona regeneration: category={args.category}, users={len(user_ids)}, limit={args.limit}"
+    )
     generator = PersonaGenerator()
-    for user_id in user_ids:
-        result = generator.regenerate_persona(user_id=user_id, category=args.category, store=True)
-        print({"user_id": user_id, "source_review_count": len(result["source_review_ids"])})
+    success_count = 0
+    failure_count = 0
+    for index, user_id in enumerate(user_ids, start=1):
+        log_persona_generation(f"Processing user {index}/{len(user_ids)}: user_id={user_id}")
+        try:
+            result = generator.regenerate_persona(user_id=user_id, category=args.category, store=True)
+        except Exception as exc:
+            failure_count += 1
+            log_persona_generation(f"Persona generation failed: user_id={user_id}, error={exc}")
+            continue
+        success_count += 1
+        summary = {"user_id": user_id, "source_review_count": len(result["source_review_ids"])}
+        log_persona_generation(f"Persona generation succeeded: {summary}")
+        print(summary)
+    log_persona_generation(
+        f"Persona regeneration complete: succeeded={success_count}, failed={failure_count}, total={len(user_ids)}"
+    )
 
 
 if __name__ == "__main__":

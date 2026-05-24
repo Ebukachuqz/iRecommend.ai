@@ -66,6 +66,43 @@ def test_store_persona_payload_includes_review_stats() -> None:
     assert query.payload["source_review_ids"] == ["r1", "r2"]
 
 
+def test_store_persona_logs_upsert_progress(capsys) -> None:
+    client = ClientRecorder()
+    generator = PersonaGenerator(client=client)
+    stats = {
+        "review_count": 8,
+        "average_rating": 4.25,
+        "source_review_ids": ["r1", "r2"],
+    }
+
+    generator.store_persona("user-1", "All_Beauty", {"writing_style": {}}, stats)
+
+    output = capsys.readouterr().out
+    assert "[persona] Upserting persona: user_id=user-1" in output
+    assert "[persona] Persona upsert complete: user_id=user-1, category=All_Beauty" in output
+
+
+def test_regenerate_persona_logs_when_store_disabled(monkeypatch, capsys) -> None:
+    generator = PersonaGenerator(client=ClientRecorder())
+
+    monkeypatch.setattr(
+        generator,
+        "generate_and_validate",
+        lambda *_args, **_kwargs: (
+            {"writing_style": {}},
+            {"source_review_ids": ["r1", "r2"]},
+        ),
+    )
+
+    result = generator.regenerate_persona("user-1", "All_Beauty", store=False)
+
+    assert result["source_review_ids"] == ["r1", "r2"]
+    output = capsys.readouterr().out
+    assert "[persona] Regenerating persona: user_id=user-1" in output
+    assert "[persona] Store disabled; persona not upserted: user_id=user-1" in output
+    assert "[persona] Persona regeneration complete: user_id=user-1, source_reviews=2" in output
+
+
 def test_prompt_stats_source_review_ids_match_selected_prompt_reviews() -> None:
     generator = PersonaGenerator(client=ClientRecorder())
     reviews = [
