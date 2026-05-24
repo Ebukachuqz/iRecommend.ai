@@ -53,6 +53,7 @@ Output:
       "title": "string",
       "reason": "personalized reason",
       "confidence": 0.0,
+      "is_discovery_candidate": false,
       "evidence": [],
       "score_breakdown": {{}}
     }}
@@ -129,6 +130,7 @@ def build_fallback_recommendation(
         title=candidate.title,
         reason=build_fallback_reason(candidate, intent, evidence),
         confidence=candidate.score_breakdown.final_score,
+        is_discovery_candidate=candidate.score_breakdown.is_discovery_candidate,
         evidence=evidence,
         score_breakdown=candidate.score_breakdown.model_dump(mode="json"),
     )
@@ -165,14 +167,24 @@ def dedupe_and_backfill_recommendations(
             evidence = dedupe_terms(recommendation.evidence)
         if not evidence and candidate:
             evidence = build_fallback_recommendation(candidate, len(final) + 1, intent).evidence
+        score_breakdown = recommendation.score_breakdown or (
+            candidate.score_breakdown.model_dump(mode="json") if candidate else {}
+        )
+        if candidate:
+            score_breakdown = {
+                **score_breakdown,
+                "is_discovery_candidate": candidate.score_breakdown.is_discovery_candidate,
+            }
         final.append(
             recommendation.model_copy(
                 update={
                     "rank": len(final) + 1,
                     "title": title,
+                    "is_discovery_candidate": candidate.score_breakdown.is_discovery_candidate
+                    if candidate
+                    else recommendation.is_discovery_candidate,
                     "evidence": evidence,
-                    "score_breakdown": recommendation.score_breakdown
-                    or (candidate.score_breakdown.model_dump(mode="json") if candidate else {}),
+                    "score_breakdown": score_breakdown,
                 }
             )
         )
@@ -229,6 +241,7 @@ def rerank_recommendations(
                 "store": candidate.product.get("store"),
             },
             "score_breakdown": candidate.score_breakdown.model_dump(mode="json"),
+            "is_discovery_candidate": candidate.score_breakdown.is_discovery_candidate,
         }
         for candidate in top_candidates
     ]
@@ -254,8 +267,11 @@ def rerank_recommendations(
                     update={
                         "rank": len(filtered) + 1,
                         "title": recommendation.title or candidate.title,
-                        "score_breakdown": recommendation.score_breakdown
-                        or candidate.score_breakdown.model_dump(mode="json"),
+                        "is_discovery_candidate": candidate.score_breakdown.is_discovery_candidate,
+                        "score_breakdown": {
+                            **(recommendation.score_breakdown or candidate.score_breakdown.model_dump(mode="json")),
+                            "is_discovery_candidate": candidate.score_breakdown.is_discovery_candidate,
+                        },
                     }
                 )
             )

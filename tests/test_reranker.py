@@ -183,3 +183,14 @@ def test_evidence_normalizes_underscored_terms_to_readable_phrases() -> None:
     assert "oil free" in output.recommendations[0].evidence
     assert "non comedogenic" in output.recommendations[0].evidence
     assert all("_" not in term for term in output.recommendations[0].evidence)
+
+
+def test_fallback_rerank_preserves_discovery_candidate_flag() -> None:
+    candidate = make_scored_candidate("asin-1", "Limited Review Face Cream")
+    candidate.score_breakdown.is_discovery_candidate = True
+
+    output = fallback_rerank([candidate], limit=1, intent=RecommendationIntent(required_attributes=["skincare"]))
+
+    recommendation = output.recommendations[0]
+    assert recommendation.is_discovery_candidate is True
+    assert recommendation.score_breakdown["is_discovery_candidate"] is True

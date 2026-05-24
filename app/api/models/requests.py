@@ -23,6 +23,7 @@ class RecommendationAPIRequest(BaseModel):
     category: str = DEFAULT_CATEGORY
     persona: dict[str, Any] | str | None = None
     request: str | None = None
+    onboarding_answers: dict[str, Any] | None = None
     limit: int = Field(default=5, ge=1, le=50)
     session_id: str | None = None
     cold_start: bool = False
@@ -32,6 +33,7 @@ class RecommendationAPIRequest(BaseModel):
 class ColdStartRecommendationAPIRequest(BaseModel):
     request: str
     limit: int = Field(default=5, ge=1, le=50)
+    onboarding_answers: dict[str, Any] | None = None
     context: dict[str, Any] = Field(default_factory=dict)
 
 

@@ -68,7 +68,8 @@ def resolve_persona_for_recommendation(
         row = fetch_persona(request.user_id, request.category, client=client)
         if row and row.get("persona"):
             return validate_persona(row["persona"], repair=True).model_dump(mode="json"), False
-    return build_cold_start_persona(request.request, request.context), True
+    onboarding_answers = request.onboarding_answers or request.context.get("onboarding_answers")
+    return build_cold_start_persona(request.request, onboarding_answers), True
 
 
 def build_or_get_user_taste_vector(
@@ -419,6 +420,10 @@ def build_task_b_graph(client=None, vector_store: VectorStore | None = None):
                     or state["persona"].get("extra_persona_signals", {}).get("persona_confidence"),
                     "persona_source": state["persona"].get("persona_source")
                     or state["persona"].get("extra_persona_signals", {}).get("persona_source"),
+                    "has_onboarding_answers": bool(
+                        state["request"].onboarding_answers
+                        or state["request"].context.get("onboarding_answers")
+                    ),
                 },
                 "cross_domain": state.get("cross_domain_metadata", {}),
                 "excluded_parent_asins": sorted(state.get("excluded_parent_asins") or []),

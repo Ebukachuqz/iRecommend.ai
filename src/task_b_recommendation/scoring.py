@@ -247,7 +247,8 @@ def score_candidate(
     request_adjustment, request_matches, request_warnings = request_fit_adjustment(product, intent)
     matched.extend(term for term in request_matches if term not in matched)
     warnings.extend(request_warnings)
-    if is_low_review_product(product):
+    is_discovery_candidate = is_low_review_product(product)
+    if is_discovery_candidate:
         warnings.append("Discovery candidate: limited review history.")
     quality_score = product_quality_score(product)
     price_score = price_fit_score(persona, product, intent)
@@ -268,6 +269,7 @@ def score_candidate(
         price_fit=price_score,
         popularity_reliability=reliability_score,
         final_score=round(clamp_score(final_score), 4),
+        is_discovery_candidate=is_discovery_candidate,
         matched_persona_signals=matched,
         warnings=warnings,
     )

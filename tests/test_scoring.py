@@ -176,4 +176,5 @@ def test_low_review_products_are_flagged_but_not_excluded() -> None:
     scored = score_candidates([candidate], {}, RecommendationIntent(required_attributes=["reliable"]))
 
     assert scored[0].parent_asin == "new-1"
+    assert scored[0].score_breakdown.is_discovery_candidate is True
     assert "Discovery candidate: limited review history." in scored[0].score_breakdown.warnings

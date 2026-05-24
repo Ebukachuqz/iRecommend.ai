@@ -35,6 +35,7 @@ class RecommendationRequest(BaseModel):
     category: str = DEFAULT_CATEGORY
     request: str | None = None
     persona: dict[str, Any] | str | None = None
+    onboarding_answers: dict[str, Any] | None = None
     limit: int = Field(default=5, ge=1, le=50)
     session_id: str | None = None
     cold_start: bool = False
@@ -71,6 +72,7 @@ class RecommendationScoreBreakdown(BaseModel):
     price_fit: float = Field(ge=0.0, le=1.0)
     popularity_reliability: float = Field(ge=0.0, le=1.0)
     final_score: float = Field(ge=0.0, le=1.0)
+    is_discovery_candidate: bool = False
     matched_persona_signals: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
@@ -85,6 +87,7 @@ class RerankedRecommendation(BaseModel):
     title: str | None = None
     reason: str
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    is_discovery_candidate: bool = False
     evidence: list[str] = Field(default_factory=list)
     score_breakdown: dict[str, Any] = Field(default_factory=dict)
 

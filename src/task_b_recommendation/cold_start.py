@@ -85,6 +85,69 @@ def coerce_list(value: Any) -> list[str]:
     return [str(value).strip()] if str(value).strip() else []
 
 
+def first_present(mapping: dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        if key in mapping and mapping[key] not in (None, "", []):
+            return mapping[key]
+    return None
+
+
+def answers_have_signal(answers: dict[str, Any]) -> bool:
+    return any(value not in (None, "", [], {}) for value in answers.values())
+
+
+def normalize_strictness(value: Any) -> str:
+    normalized = normalize_category_label(str(value)) if value is not None else None
+    if normalized in {"strict", "moderate", "generous"}:
+        return normalized
+    if normalized in {"hard", "critical", "picky"}:
+        return "strict"
+    if normalized in {"easy", "lenient"}:
+        return "generous"
+    return "moderate"
+
+
+def rating_defaults_for_strictness(strictness: str) -> dict[str, Any]:
+    if strictness == "strict":
+        return {
+            "average_rating": 3.4,
+            "rating_distribution": {"1": 1, "2": 1, "3": 2, "4": 2, "5": 0},
+            "rating_patterns": "Temporary cold-start estimate; user says they are strict with ratings.",
+        }
+    if strictness == "generous":
+        return {
+            "average_rating": 4.2,
+            "rating_distribution": {"1": 0, "2": 0, "3": 1, "4": 2, "5": 2},
+            "rating_patterns": "Temporary cold-start estimate; user says they give high ratings more easily.",
+        }
+    return {
+        "average_rating": 3.8,
+        "rating_distribution": {"1": 0, "2": 0, "3": 1, "4": 2, "5": 1},
+        "rating_patterns": "Temporary cold-start estimate.",
+    }
+
+
+def classify_priority_signals(priorities: list[str]) -> tuple[list[str], str | None, str | None]:
+    values: list[str] = []
+    price_sensitivity: str | None = None
+    quality_sensitivity: str | None = None
+    for priority in priorities:
+        normalized = normalize_category_label(priority) or ""
+        if any(term in normalized for term in ("affordable", "budget", "cheap", "value", "price")):
+            values.extend(["value for money", "affordable"])
+            price_sensitivity = "high"
+        elif "premium" in normalized:
+            values.append("premium quality")
+            price_sensitivity = "low"
+            quality_sensitivity = "high"
+        elif any(term in normalized for term in ("quality", "durable", "durability", "reliable", "reliability", "sturdy")):
+            values.append(priority)
+            quality_sensitivity = "high"
+        elif normalized:
+            values.append(priority)
+    return list(dict.fromkeys(values)), price_sensitivity, quality_sensitivity
+
+
 def normalize_category_label(category: str | None) -> str | None:
     if not category:
         return None
@@ -156,11 +219,27 @@ def request_derived_signals(request_text: str) -> dict[str, list[str] | str]:
 
 def build_cold_start_persona(request: str | None = None, onboarding_answers: dict[str, Any] | None = None) -> dict[str, Any]:
     answers = onboarding_answers or {}
+    has_onboarding = answers_have_signal(answers)
     request_text = request or ""
     request_signals = request_derived_signals(request_text)
-    liked_attributes = coerce_list(answers.get("liked_attributes")) + list(request_signals["liked_attributes"])
-    values = coerce_list(answers.get("what_they_value")) + list(request_signals["what_they_value"])
-    preferred_categories = coerce_list(answers.get("preferred_categories")) + list(request_signals["preferred_categories"])
+    interests = coerce_list(first_present(answers, "interests", "product_interests", "preferred_products", "categories"))
+    priorities = coerce_list(first_present(answers, "priorities", "values", "shopping_priorities", "what_they_value"))
+    priority_values, priority_price_sensitivity, priority_quality_sensitivity = classify_priority_signals(priorities)
+    liked_attributes = (
+        coerce_list(first_present(answers, "liked_attributes", "likes"))
+        + list(request_signals["liked_attributes"])
+    )
+    values = priority_values + coerce_list(answers.get("what_they_value")) + list(request_signals["what_they_value"])
+    preferred_categories = (
+        coerce_list(first_present(answers, "preferred_categories", "categories", "product_interests"))
+        + list(request_signals["preferred_categories"])
+    )
+    dislikes = coerce_list(first_present(answers, "disliked_attributes", "dislikes", "avoid", "attributes_to_avoid"))
+    strictness = normalize_strictness(first_present(answers, "rating_strictness", "strictness", "rating_style"))
+    rating_defaults = rating_defaults_for_strictness(strictness)
+    persona_source = "onboarding" if has_onboarding else "request_context"
+    loved_examples = coerce_list(first_present(answers, "loved_products", "loved_product_examples", "positive_examples"))
+    disliked_examples = coerce_list(first_present(answers, "disliked_products", "disliked_product_examples", "negative_examples"))
     return {
         "writing_style": {
             "tone": "unknown",
@@ -171,38 +250,43 @@ def build_cold_start_persona(request: str | None = None, onboarding_answers: dic
             "common_phrases": [],
         },
         "preferences": {
-            "liked_product_types": coerce_list(answers.get("liked_product_types")),
+            "liked_product_types": list(dict.fromkeys(coerce_list(answers.get("liked_product_types")) + interests)),
             "disliked_product_types": coerce_list(answers.get("disliked_product_types")),
             "liked_attributes": list(dict.fromkeys(liked_attributes)),
-            "disliked_attributes": coerce_list(answers.get("disliked_attributes")),
+            "disliked_attributes": list(dict.fromkeys(dislikes)),
             "what_they_value": list(dict.fromkeys(values)),
             "common_complaints": coerce_list(answers.get("common_complaints")),
         },
         "rating_behavior": {
-            "average_rating": 3.8,
-            "rating_distribution": {"1": 0, "2": 0, "3": 1, "4": 2, "5": 1},
-            "strictness": "moderate",
-            "rating_patterns": "Temporary cold-start estimate.",
+            "average_rating": rating_defaults["average_rating"],
+            "rating_distribution": rating_defaults["rating_distribution"],
+            "strictness": strictness,
+            "rating_patterns": rating_defaults["rating_patterns"],
         },
         "purchase_behavior": {
             "preferred_categories": list(dict.fromkeys(preferred_categories)),
-            "price_sensitivity": answers.get("price_sensitivity") or request_signals["price_sensitivity"],
-            "quality_sensitivity": answers.get("quality_sensitivity") or request_signals["quality_sensitivity"],
+            "price_sensitivity": answers.get("price_sensitivity")
+            or priority_price_sensitivity
+            or request_signals["price_sensitivity"],
+            "quality_sensitivity": answers.get("quality_sensitivity")
+            or priority_quality_sensitivity
+            or request_signals["quality_sensitivity"],
             "verified_purchase_ratio": 0.0,
         },
         "cultural_signals": "",
         "evidence": {
-            "positive_examples": [],
-            "negative_examples": [],
+            "positive_examples": loved_examples,
+            "negative_examples": disliked_examples,
         },
         "extra_persona_signals": {
             "cold_start": True,
             "request_context": request_text,
             "persona_confidence": "low",
-            "persona_source": "request_context",
+            "persona_source": persona_source,
+            "onboarding_answers": answers if has_onboarding else {},
         },
         "persona_confidence": "low",
-        "persona_source": "request_context",
+        "persona_source": persona_source,
     }
 
 

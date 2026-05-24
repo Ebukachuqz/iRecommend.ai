@@ -9,7 +9,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.task_b_recommendation.service import recommend_for_user, recommend_from_persona
+from src.task_b_recommendation.schema import RecommendationRequest
+from src.task_b_recommendation.service import recommend, recommend_for_user
 
 
 def print_json(payload: object) -> None:
@@ -29,7 +30,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.cold_start and not args.user_id:
-        output = recommend_from_persona({}, request=args.request, limit=args.limit)
+        output = recommend(RecommendationRequest(request=args.request, limit=args.limit, cold_start=True))
     else:
         if not args.user_id:
             parser.error("--user-id is required unless --cold-start is used")

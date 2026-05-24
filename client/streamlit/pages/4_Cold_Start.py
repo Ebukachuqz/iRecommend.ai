@@ -21,15 +21,51 @@ request_text = st.text_area(
     value="I need affordable skincare for oily skin",
     height=100,
 )
+with st.expander("Optional onboarding answers", expanded=False):
+    st.caption("These answers help create a low-confidence starter persona for cold-start recommendations.")
+    interests_text = st.text_input("Product interests or categories", placeholder="skincare, electronics, books")
+    priorities_text = st.text_input("Shopping priorities", placeholder="affordable, durable, simple, reliable")
+    dislikes_text = st.text_input("Dislikes or things to avoid", placeholder="strong fragrance, flimsy build")
+    strictness = st.selectbox("Rating strictness", ["", "strict", "moderate", "generous"], index=0)
+    loved_examples_text = st.text_input("Products you loved and why", placeholder="optional")
+    disliked_examples_text = st.text_input("Products you disliked and why", placeholder="optional")
 limit = st.slider("Limit", min_value=1, max_value=10, value=5)
+
+
+def comma_terms(value: str) -> list[str]:
+    return [term.strip() for term in value.split(",") if term.strip()]
+
+
+def onboarding_payload() -> dict:
+    payload: dict = {}
+    if comma_terms(interests_text):
+        payload["interests"] = comma_terms(interests_text)
+    if comma_terms(priorities_text):
+        payload["priorities"] = comma_terms(priorities_text)
+    if comma_terms(dislikes_text):
+        payload["dislikes"] = comma_terms(dislikes_text)
+    if strictness:
+        payload["rating_strictness"] = strictness
+    if loved_examples_text.strip():
+        payload["loved_product_examples"] = [loved_examples_text.strip()]
+    if disliked_examples_text.strip():
+        payload["disliked_product_examples"] = [disliked_examples_text.strip()]
+    return payload
+
 
 if st.button("Run cold-start recommendation", type="primary"):
     if not request_text.strip():
         st.warning("Enter a request first.")
     else:
         try:
+            answers = onboarding_payload()
             result = api_client.cold_start_recommendations(
-                {"request": request_text.strip(), "limit": limit, "context": {}}
+                {
+                    "request": request_text.strip(),
+                    "limit": limit,
+                    "onboarding_answers": answers or None,
+                    "context": {},
+                }
             )
             st.session_state["latest_cold_start"] = result
         except Exception as exc:

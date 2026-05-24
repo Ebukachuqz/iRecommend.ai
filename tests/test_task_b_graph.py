@@ -216,6 +216,32 @@ def test_cold_start_persona_uses_request_signals_and_low_confidence_metadata() -
     assert "electronics" in persona["purchase_behavior"]["preferred_categories"]
 
 
+def test_cold_start_persona_uses_onboarding_answers_when_available() -> None:
+    persona = build_cold_start_persona(
+        "I need something for daily use",
+        {
+            "interests": ["electronics"],
+            "priorities": ["affordable", "durable"],
+            "dislikes": ["flimsy build"],
+            "rating_strictness": "strict",
+            "loved_product_examples": ["A reliable power bank"],
+            "disliked_product_examples": ["A cheap charger that broke"],
+        },
+    )
+
+    assert persona["persona_confidence"] == "low"
+    assert persona["persona_source"] == "onboarding"
+    assert "electronics" in persona["preferences"]["liked_product_types"]
+    assert "value for money" in persona["preferences"]["what_they_value"]
+    assert "durable" in persona["preferences"]["what_they_value"]
+    assert "flimsy build" in persona["preferences"]["disliked_attributes"]
+    assert persona["rating_behavior"]["strictness"] == "strict"
+    assert persona["purchase_behavior"]["price_sensitivity"] == "high"
+    assert persona["purchase_behavior"]["quality_sensitivity"] == "high"
+    assert persona["evidence"]["positive_examples"] == ["A reliable power bank"]
+    assert persona["evidence"]["negative_examples"] == ["A cheap charger that broke"]
+
+
 def test_cold_start_graph_does_not_fetch_or_build_taste_vector(monkeypatch) -> None:
     calls = patch_graph_pipeline(monkeypatch, persona=build_cold_start_persona("affordable skincare"), cold_start=True)
     monkeypatch.setattr(
@@ -233,6 +259,56 @@ def test_cold_start_graph_does_not_fetch_or_build_taste_vector(monkeypatch) -> N
     assert output.cold_start is True
     assert calls["retrieve"]["taste_vector_row"] is None
     assert calls["store"]["context"]["cold_start_metadata"]["persona_confidence"] == "low"
+
+
+def test_cold_start_graph_passes_onboarding_answers_to_starter_persona(monkeypatch) -> None:
+    captured = {}
+    original_resolve = task_b_graph.resolve_persona_for_recommendation
+    calls = patch_graph_pipeline(monkeypatch, persona=build_cold_start_persona("affordable skincare"), cold_start=True)
+
+    def fake_build_cold_start_persona(request_text, onboarding_answers=None):
+        captured["request_text"] = request_text
+        captured["onboarding_answers"] = onboarding_answers
+        return build_cold_start_persona(request_text, onboarding_answers)
+
+    monkeypatch.setattr(task_b_graph, "build_cold_start_persona", fake_build_cold_start_persona)
+    monkeypatch.setattr(task_b_graph, "resolve_persona_for_recommendation", original_resolve)
+    monkeypatch.setattr(
+        task_b_graph,
+        "build_or_get_user_taste_vector",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("cold-start should not fetch taste vector")),
+    )
+
+    output = task_b_service.recommend(
+        RecommendationRequest(
+            request="affordable skincare",
+            cold_start=True,
+            onboarding_answers={"priorities": ["affordable"], "rating_strictness": "strict"},
+            limit=1,
+        ),
+        client=DummyClient(),
+        vector_store=DummyVectorStore(),
+    )
+
+    assert output.cold_start is True
+    assert captured["onboarding_answers"] == {"priorities": ["affordable"], "rating_strictness": "strict"}
+    assert calls["store"]["context"]["cold_start_metadata"]["has_onboarding_answers"] is True
+
+
+def test_cold_start_accepts_onboarding_answers_from_context() -> None:
+    persona, cold_start = task_b_graph.resolve_persona_for_recommendation(
+        RecommendationRequest(
+            request="daily use",
+            cold_start=True,
+            context={"onboarding_answers": {"interests": ["books"], "rating_strictness": "generous"}},
+        ),
+        DummyClient(),
+    )
+
+    assert cold_start is True
+    assert persona["persona_source"] == "onboarding"
+    assert persona["rating_behavior"]["strictness"] == "generous"
+    assert "books" in persona["preferences"]["liked_product_types"]
 
 
 def test_cross_domain_detection_is_conservative() -> None:

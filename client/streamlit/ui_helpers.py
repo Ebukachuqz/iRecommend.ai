@@ -119,6 +119,8 @@ def render_recommendation_card(item: dict[str, Any]) -> None:
         cols[0].metric("Confidence", format_score(item.get("confidence")))
         score_breakdown = item.get("score_breakdown") or {}
         cols[1].metric("Final score", format_score(score_breakdown.get("final_score")))
+        if item.get("is_discovery_candidate") or score_breakdown.get("is_discovery_candidate"):
+            st.info("Discovery candidate: limited review history.")
         evidence = item.get("evidence") or []
         if evidence:
             st.write("Evidence: " + ", ".join(str(term) for term in evidence))

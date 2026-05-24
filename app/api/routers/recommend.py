@@ -39,6 +39,7 @@ def cold_start_recommendations(
         request = RecommendationRequest(
             request=payload.request,
             limit=payload.limit,
+            onboarding_answers=payload.onboarding_answers,
             cold_start=True,
             context=payload.context,
         )

@@ -24,10 +24,15 @@ def test_review_simulation_request_accepts_custom_text_inputs() -> None:
 
 
 def test_recommendation_request_accepts_user_id() -> None:
-    request = RecommendationAPIRequest(user_id="user-1", request="gentle toner")
+    request = RecommendationAPIRequest(
+        user_id="user-1",
+        request="gentle toner",
+        onboarding_answers={"priorities": ["affordable"]},
+    )
 
     assert request.user_id == "user-1"
     assert request.limit == 5
+    assert request.onboarding_answers == {"priorities": ["affordable"]}
 
 
 def test_recommendation_request_accepts_custom_text_persona() -> None:
@@ -37,9 +42,13 @@ def test_recommendation_request_accepts_custom_text_persona() -> None:
 
 
 def test_cold_start_request_requires_request_text() -> None:
-    payload = ColdStartRecommendationAPIRequest(request="affordable skincare")
+    payload = ColdStartRecommendationAPIRequest(
+        request="affordable skincare",
+        onboarding_answers={"rating_strictness": "strict"},
+    )
 
     assert payload.request == "affordable skincare"
+    assert payload.onboarding_answers == {"rating_strictness": "strict"}
 
 
 def test_session_message_request_validates_message() -> None:
