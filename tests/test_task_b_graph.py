@@ -3,6 +3,11 @@ from types import SimpleNamespace
 from src.task_b_recommendation import graph as task_b_graph
 from src.task_b_recommendation import service as task_b_service
 from src.task_b_recommendation.candidate_retriever import CandidateRetrievalResult
+from src.task_b_recommendation.cold_start import (
+    build_cold_start_persona,
+    build_cross_domain_retrieval_query,
+    categories_are_meaningfully_different,
+)
 from src.task_b_recommendation.schema import (
     RecommendationCandidate,
     RecommendationIntent,
@@ -60,9 +65,9 @@ def make_scored(parent_asin: str, score: float) -> ScoredRecommendationCandidate
     )
 
 
-def patch_graph_pipeline(monkeypatch, session=None):
+def patch_graph_pipeline(monkeypatch, session=None, intent=None, persona=PERSONA, cold_start=False):
     calls = {}
-    intent = RecommendationIntent(
+    intent = intent or RecommendationIntent(
         interpreted_need="gentle skincare",
         retrieval_query="gentle skincare",
         required_attributes=["gentle"],
@@ -82,7 +87,7 @@ def patch_graph_pipeline(monkeypatch, session=None):
     )
 
     monkeypatch.setattr(task_b_graph, "get_settings", lambda: SimpleNamespace(groq_model="test-model"))
-    monkeypatch.setattr(task_b_graph, "resolve_persona_for_recommendation", lambda request, client: (PERSONA, False))
+    monkeypatch.setattr(task_b_graph, "resolve_persona_for_recommendation", lambda request, client: (persona, cold_start))
     monkeypatch.setattr(
         task_b_graph,
         "build_or_get_user_taste_vector",
@@ -100,6 +105,7 @@ def patch_graph_pipeline(monkeypatch, session=None):
             "vector_store": kwargs["vector_store"],
             "persona": kwargs["persona"],
             "taste_vector_row": kwargs["taste_vector_row"],
+            "exclude_parent_asins": kwargs["exclude_parent_asins"],
             "limit": kwargs["limit"],
         }
         return CandidateRetrievalResult(candidates=candidates, source_counts={"request_query": 1, "quality_fallback": 1})
@@ -170,6 +176,7 @@ def test_graph_updates_and_stores_session_state(monkeypatch) -> None:
     assert stored_sessions[0].shown_products == ["asin-1"]
     assert stored_sessions[0].conversation_history[-1]["content"] == "gentle skincare"
     assert calls["store"]["output"].session_id == "session-1"
+    assert "asin-1" in stored_sessions[0].shown_products
 
 
 def test_custom_persona_path_remains_available_through_service(monkeypatch) -> None:
@@ -197,3 +204,103 @@ def test_custom_persona_path_remains_available_through_service(monkeypatch) -> N
     assert output.cold_start is True
     assert persona_inputs == [{"likes": ["gentle skincare"]}]
     assert calls["store"]["output"].cold_start is True
+
+
+def test_cold_start_persona_uses_request_signals_and_low_confidence_metadata() -> None:
+    persona = build_cold_start_persona("I need affordable reliable electronics")
+
+    assert persona["persona_confidence"] == "low"
+    assert persona["persona_source"] == "request_context"
+    assert persona["purchase_behavior"]["price_sensitivity"] == "high"
+    assert "value for money" in persona["preferences"]["what_they_value"]
+    assert "electronics" in persona["purchase_behavior"]["preferred_categories"]
+
+
+def test_cold_start_graph_does_not_fetch_or_build_taste_vector(monkeypatch) -> None:
+    calls = patch_graph_pipeline(monkeypatch, persona=build_cold_start_persona("affordable skincare"), cold_start=True)
+    monkeypatch.setattr(
+        task_b_graph,
+        "build_or_get_user_taste_vector",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("cold-start should not fetch taste vector")),
+    )
+
+    output = task_b_service.recommend(
+        RecommendationRequest(request="affordable skincare", cold_start=True, limit=1),
+        client=DummyClient(),
+        vector_store=DummyVectorStore(),
+    )
+
+    assert output.cold_start is True
+    assert calls["retrieve"]["taste_vector_row"] is None
+    assert calls["store"]["context"]["cold_start_metadata"]["persona_confidence"] == "low"
+
+
+def test_cross_domain_detection_is_conservative() -> None:
+    assert categories_are_meaningfully_different("All_Beauty", "Electronics") is True
+    assert categories_are_meaningfully_different("All_Beauty", "Books") is True
+    assert categories_are_meaningfully_different("Beauty_and_Personal_Care", "Electronics") is True
+    assert categories_are_meaningfully_different("All_Beauty", "Beauty_and_Personal_Care") is False
+    assert categories_are_meaningfully_different("Skincare", "Beauty") is False
+
+
+def test_cross_domain_query_uses_transferable_values_not_source_product_terms() -> None:
+    persona = {
+        "preferences": {
+            "liked_attributes": ["fragrance free"],
+            "liked_product_types": ["moisturizer"],
+            "what_they_value": ["value for money", "durability"],
+            "common_complaints": ["overhyped products", "strong fragrance"],
+        },
+        "purchase_behavior": {"price_sensitivity": "high", "quality_sensitivity": "high"},
+        "rating_behavior": {"strictness": "strict"},
+    }
+
+    query = build_cross_domain_retrieval_query(persona, "Electronics", "something for daily use")
+
+    assert "Electronics" in query
+    assert "value for money" in query
+    assert "durability" in query
+    assert "fragrance" not in query
+    assert "moisturizer" not in query
+
+
+def test_graph_applies_cross_domain_metadata_and_excludes_shown_products(monkeypatch) -> None:
+    session = RecommendationSessionState(
+        session_id="session-1",
+        user_id="user-1",
+        category="All_Beauty",
+        persona=PERSONA,
+        shown_products=["shown-1"],
+    )
+    persona = {
+        **PERSONA,
+        "purchase_behavior": {"price_sensitivity": "high", "quality_sensitivity": "high"},
+        "preferences": {
+            "liked_attributes": ["fragrance free"],
+            "liked_product_types": ["moisturizer"],
+            "what_they_value": ["value for money"],
+            "common_complaints": ["overhyped products"],
+        },
+    }
+    intent = RecommendationIntent(
+        interpreted_need="electronics",
+        retrieval_query="electronics",
+        category_filter="Electronics",
+        required_attributes=["electronics"],
+    )
+    calls = patch_graph_pipeline(monkeypatch, session=session, intent=intent, persona=persona)
+    monkeypatch.setattr(task_b_graph, "store_session", lambda *args, **kwargs: None)
+
+    output = task_b_service.recommend(
+        RecommendationRequest(user_id="user-1", category="All_Beauty", request="I need electronics", session_id="session-1", limit=1),
+        client=DummyClient(),
+        vector_store=DummyVectorStore(),
+    )
+
+    context = calls["store"]["context"]
+    assert output.recommendations[0].parent_asin == "asin-1"
+    assert context["cross_domain"]["cross_domain"] is True
+    assert context["cross_domain"]["target_category"] == "Electronics"
+    assert "shown-1" in context["excluded_parent_asins"]
+    assert "shown-1" in calls["retrieve"]["exclude_parent_asins"]
+    assert "fragrance free" not in calls["retrieve"]["persona"]["preferences"]["liked_attributes"]

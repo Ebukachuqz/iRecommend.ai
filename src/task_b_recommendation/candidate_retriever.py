@@ -150,9 +150,11 @@ def fetch_quality_fallback_products(
     category: str | None = None,
     intent: RecommendationIntent | None = None,
     reviewed: set[str] | None = None,
+    exclude_parent_asins: set[str] | None = None,
 ) -> list[RecommendationCandidate]:
     client = client or get_supabase_client()
     reviewed = reviewed if reviewed is not None else (fetch_reviewed_parent_asins(user_id, client=client) if user_id else set())
+    reviewed = set(reviewed) | set(exclude_parent_asins or set())
     query = client.table("amazon_product_metadata").select("*")
     if intent and intent.price_max is not None and hasattr(query, "lte"):
         query = query.lte("price", intent.price_max)
@@ -288,9 +290,11 @@ def retrieve_candidates_with_sources(
     vector_store: VectorStore | None = None,
     persona: dict[str, Any] | None = None,
     taste_vector_row: dict[str, Any] | None = None,
+    exclude_parent_asins: set[str] | list[str] | None = None,
 ) -> CandidateRetrievalResult:
     client = client or get_supabase_client()
     reviewed = fetch_reviewed_parent_asins(user_id, client=client) if user_id else set()
+    reviewed = set(reviewed) | set(exclude_parent_asins or [])
     vector_store = vector_store or SupabasePgVectorStore(client=client)
     category_filter = effective_category(category, intent)
     vector_row = taste_vector_row or (fetch_user_taste_vector(user_id, category, client=client) if user_id else None)
@@ -372,6 +376,7 @@ def retrieve_candidates_with_sources(
             category=category_filter,
             intent=intent,
             reviewed=reviewed,
+            exclude_parent_asins=reviewed,
         )
         for candidate in fallback:
             if candidate.parent_asin in seen:
@@ -382,6 +387,7 @@ def retrieve_candidates_with_sources(
             if len(candidates) >= limit:
                 break
 
+    candidates = [candidate for candidate in candidates if candidate.parent_asin not in reviewed]
     return CandidateRetrievalResult(candidates=candidates[:limit], source_counts=source_counts)
 
 
@@ -394,6 +400,7 @@ def retrieve_candidates(
     vector_store: VectorStore | None = None,
     persona: dict[str, Any] | None = None,
     taste_vector_row: dict[str, Any] | None = None,
+    exclude_parent_asins: set[str] | list[str] | None = None,
 ) -> list[RecommendationCandidate]:
     return retrieve_candidates_with_sources(
         user_id,
@@ -404,4 +411,5 @@ def retrieve_candidates(
         vector_store=vector_store,
         persona=persona,
         taste_vector_row=taste_vector_row,
+        exclude_parent_asins=exclude_parent_asins,
     ).candidates

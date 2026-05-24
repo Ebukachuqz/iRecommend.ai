@@ -12,7 +12,12 @@ from src.db.supabase_client import get_supabase_client
 from src.personas.custom_persona_processor import process_custom_persona
 from src.personas.validator import validate_persona
 from src.task_b_recommendation.candidate_retriever import CandidateRetrievalResult, retrieve_candidates_with_sources
-from src.task_b_recommendation.cold_start import build_cold_start_persona
+from src.task_b_recommendation.cold_start import (
+    build_cold_start_persona,
+    build_cross_domain_retrieval_query,
+    categories_are_meaningfully_different,
+    cross_domain_persona,
+)
 from src.task_b_recommendation.embeddings import DEFAULT_EMBEDDING_MODEL
 from src.task_b_recommendation.intent_planner import INTENT_PROMPT_VERSION, plan_intent
 from src.task_b_recommendation.reranker import RERANKER_PROMPT_VERSION, rerank_recommendations
@@ -23,6 +28,7 @@ from src.task_b_recommendation.schema import (
 )
 from src.task_b_recommendation.scoring import score_candidates
 from src.task_b_recommendation.session_state import (
+    apply_request_constraints,
     create_session,
     load_session,
     store_session,
@@ -42,6 +48,9 @@ class TaskBGraphState(TypedDict, total=False):
     session: RecommendationSessionState | None
     taste_vector_row: dict[str, Any] | None
     intent: Any
+    retrieval_persona: dict[str, Any]
+    cross_domain_metadata: dict[str, Any]
+    excluded_parent_asins: set[str]
     retrieval_result: CandidateRetrievalResult
     candidates: list[Any]
     scored_candidates: list[Any]
@@ -80,6 +89,60 @@ def build_or_get_user_taste_vector(
         "embedding": embedding,
         "source_parent_asins": sources,
     }
+
+
+def merge_session_constraints_into_intent(intent, session: RecommendationSessionState | None):
+    if not session:
+        return intent
+    constraints = session.active_constraints or {}
+    required = list(intent.required_attributes)
+    for item in constraints.get("required_attributes") or []:
+        if item not in required:
+            required.append(item)
+    excluded = list(intent.excluded_attributes)
+    for item in constraints.get("excluded_attributes") or []:
+        if item not in excluded:
+            excluded.append(item)
+    avoid = list(intent.avoid)
+    for item in (constraints.get("excluded_brands") or []) + (constraints.get("excluded_products") or []):
+        if item not in avoid:
+            avoid.append(item)
+    updates = {
+        "required_attributes": required,
+        "excluded_attributes": excluded,
+        "avoid": avoid,
+    }
+    if constraints.get("price_max") is not None:
+        updates["price_max"] = constraints["price_max"]
+    if constraints.get("category_filter"):
+        updates["category_filter"] = constraints["category_filter"]
+    return intent.model_copy(update=updates)
+
+
+def cross_domain_adjustments(
+    persona: dict[str, Any],
+    request: RecommendationRequest,
+    intent,
+) -> tuple[Any, dict[str, Any], dict[str, Any]]:
+    source_category = request.category
+    target_category = intent.category_filter
+    if not categories_are_meaningfully_different(source_category, target_category):
+        return intent, persona, {"cross_domain": False}
+    retrieval_query = build_cross_domain_retrieval_query(persona, target_category or "", request.request)
+    explicit_constraints = dict(intent.explicit_constraints)
+    explicit_constraints["cross_domain"] = True
+    metadata = {
+        "cross_domain": True,
+        "source_category": source_category,
+        "target_category": target_category,
+        "cold_start_type": "cross_domain",
+        "transfer_strategy": "transferable_values_only",
+    }
+    return (
+        intent.model_copy(update={"retrieval_query": retrieval_query, "explicit_constraints": explicit_constraints}),
+        cross_domain_persona(persona),
+        metadata,
+    )
 
 
 def load_or_create_session(
@@ -261,15 +324,28 @@ def build_task_b_graph(client=None, vector_store: VectorStore | None = None):
 
     def load_session_state(state: TaskBGraphState) -> TaskBGraphState:
         session = load_or_create_session(state["request"], state["persona"], client)
+        if session:
+            session = apply_request_constraints(session, state["request"].request, append_history=False)
         return {**state, "session": session}
 
     def plan_request_intent(state: TaskBGraphState) -> TaskBGraphState:
         request = state["request"]
         intent = plan_intent(state["persona"], request.request, state.get("session"))
-        return {**state, "intent": intent}
+        intent = merge_session_constraints_into_intent(intent, state.get("session"))
+        intent, retrieval_persona, cross_domain_metadata = cross_domain_adjustments(state["persona"], request, intent)
+        return {
+            **state,
+            "intent": intent,
+            "retrieval_persona": retrieval_persona,
+            "cross_domain_metadata": cross_domain_metadata,
+        }
 
     def retrieve_recommendation_candidates(state: TaskBGraphState) -> TaskBGraphState:
         request = state["request"]
+        session = state.get("session")
+        constraints = session.active_constraints if session else {}
+        excluded_parent_asins = set(session.shown_products if session else [])
+        excluded_parent_asins.update(constraints.get("excluded_products") or [])
         retrieval_result = retrieve_candidates_with_sources(
             request.user_id,
             request.category,
@@ -277,19 +353,25 @@ def build_task_b_graph(client=None, vector_store: VectorStore | None = None):
             limit=max(50, request.limit * 5),
             client=client,
             vector_store=vector_store,
-            persona=state["persona"],
+            persona=state.get("retrieval_persona") or state["persona"],
             taste_vector_row=state.get("taste_vector_row"),
+            exclude_parent_asins=excluded_parent_asins,
         )
-        return {**state, "retrieval_result": retrieval_result, "candidates": retrieval_result.candidates}
+        return {
+            **state,
+            "excluded_parent_asins": excluded_parent_asins,
+            "retrieval_result": retrieval_result,
+            "candidates": retrieval_result.candidates,
+        }
 
     def score_recommendation_candidates(state: TaskBGraphState) -> TaskBGraphState:
-        scored = score_candidates(state["candidates"], state["persona"], state["intent"])
+        scored = score_candidates(state["candidates"], state.get("retrieval_persona") or state["persona"], state["intent"])
         return {**state, "scored_candidates": scored}
 
     def llm_rerank(state: TaskBGraphState) -> TaskBGraphState:
         request = state["request"]
         reranked = rerank_recommendations(
-            state["persona"],
+            state.get("retrieval_persona") or state["persona"],
             request.request,
             state["intent"],
             state["scored_candidates"],
@@ -331,6 +413,15 @@ def build_task_b_graph(client=None, vector_store: VectorStore | None = None):
             context={
                 **request.context,
                 "intent": state["intent"].model_dump(mode="json"),
+                "cold_start_metadata": {
+                    "cold_start": state["cold_start"],
+                    "persona_confidence": state["persona"].get("persona_confidence")
+                    or state["persona"].get("extra_persona_signals", {}).get("persona_confidence"),
+                    "persona_source": state["persona"].get("persona_source")
+                    or state["persona"].get("extra_persona_signals", {}).get("persona_source"),
+                },
+                "cross_domain": state.get("cross_domain_metadata", {}),
+                "excluded_parent_asins": sorted(state.get("excluded_parent_asins") or []),
                 "retrieval_source_counts": retrieval_result.source_counts,
                 "retrieved_candidates": [candidate.model_dump(mode="json") for candidate in state["candidates"]],
                 "scored_candidates": [candidate.model_dump(mode="json") for candidate in state["scored_candidates"]],

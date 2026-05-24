@@ -157,3 +157,23 @@ def test_broad_skincare_request_penalizes_hair_nail_and_travel_products() -> Non
 
     assert scored[0].parent_asin == "skin-1"
     assert scored[1].score_breakdown.warnings
+
+
+def test_low_review_products_are_flagged_but_not_excluded() -> None:
+    candidate = RecommendationCandidate(
+        parent_asin="new-1",
+        title="New Gentle Gadget",
+        semantic_similarity=0.7,
+        product={
+            "title": "New Gentle Gadget",
+            "features": ["simple reliable design"],
+            "average_rating": 0,
+            "rating_number": 2,
+            "price": 20,
+        },
+    )
+
+    scored = score_candidates([candidate], {}, RecommendationIntent(required_attributes=["reliable"]))
+
+    assert scored[0].parent_asin == "new-1"
+    assert "Discovery candidate: limited review history." in scored[0].score_breakdown.warnings

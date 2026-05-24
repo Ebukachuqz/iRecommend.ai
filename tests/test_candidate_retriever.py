@@ -388,3 +388,31 @@ def test_reviewed_products_are_excluded_from_vector_sources(monkeypatch) -> None
     )
 
     assert all(candidate.parent_asin != "seen-1" for candidate in result.candidates)
+
+
+def test_explicit_excluded_parent_asins_are_removed_from_all_retrieval_sources(monkeypatch) -> None:
+    client = MultiSourceClient()
+    vector_store = VectorStoreRecorder(
+        [
+            {"parent_asin": "taste-1", "similarity": 0.95},
+            {"parent_asin": "query-1", "similarity": 0.9},
+        ]
+    )
+    vector_store.similar_users = [{"user_id": "similar-1", "similarity": 0.88}]
+    monkeypatch.setattr("src.task_b_recommendation.candidate_retriever.embed_text", lambda text: [0.3, 0.4])
+
+    result = retrieve_candidates_with_sources(
+        user_id="user-1",
+        category="All_Beauty",
+        intent=RecommendationIntent(retrieval_query="query", required_attributes=["hydrating"]),
+        limit=3,
+        client=client,
+        vector_store=vector_store,
+        persona={"preferences": {"liked_attributes": ["fragrance free"]}},
+        taste_vector_row={"embedding": [0.1, 0.2]},
+        exclude_parent_asins={"taste-1", "query-1", "collab-1", "attr-1"},
+    )
+
+    assert all(candidate.parent_asin not in {"taste-1", "query-1", "collab-1", "attr-1"} for candidate in result.candidates)
+    assert vector_store.calls[0]["exclude_parent_asins"] == {"seen-1", "taste-1", "query-1", "collab-1", "attr-1"}
+    assert [candidate.parent_asin for candidate in result.candidates] == ["fallback-1"]

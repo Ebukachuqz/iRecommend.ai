@@ -207,6 +207,13 @@ def popularity_reliability_score(product: dict[str, Any]) -> float:
     return clamp_score(rating_number / 500)
 
 
+def is_low_review_product(product: dict[str, Any], threshold: int = 10) -> bool:
+    rating_number = product.get("rating_number")
+    if rating_number is None:
+        return True
+    return int(rating_number or 0) < threshold
+
+
 def price_fit_score(persona: dict[str, Any], product: dict[str, Any], intent: RecommendationIntent) -> float:
     price = product.get("price")
     if price is None:
@@ -240,6 +247,8 @@ def score_candidate(
     request_adjustment, request_matches, request_warnings = request_fit_adjustment(product, intent)
     matched.extend(term for term in request_matches if term not in matched)
     warnings.extend(request_warnings)
+    if is_low_review_product(product):
+        warnings.append("Discovery candidate: limited review history.")
     quality_score = product_quality_score(product)
     price_score = price_fit_score(persona, product, intent)
     reliability_score = popularity_reliability_score(product)
