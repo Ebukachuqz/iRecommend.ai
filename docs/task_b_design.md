@@ -13,6 +13,8 @@ persona + request
 -> recommendation_runs storage
 ```
 
+The runtime path is now explicit in `src/task_b_recommendation/graph.py` using LangGraph. FastAPI, CLI scripts, and other callers still enter through `service.recommend()`, and the service delegates to the graph runner so public behavior and response models remain stable. The graph nodes wrap the existing business functions rather than reimplementing retrieval, scoring, reranking, or storage.
+
 The implementation keeps pgvector behind `VectorStore`, with `SupabasePgVectorStore` as the first backend. Business logic calls the abstraction rather than raw pgvector tables.
 
 Task B can run from a stored user persona or from a caller-provided custom persona. Custom personas are normalized through the same bounded persona normalizer used by Task A, so common fields such as `likes`, `interests`, `avoid`, `concerns`, `budget`, `tone`, and `average_rating` can drive request planning, retrieval, scoring, and reranking. Unknown fields are preserved for inspection rather than silently discarded.

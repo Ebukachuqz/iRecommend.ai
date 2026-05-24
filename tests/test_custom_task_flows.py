@@ -1,5 +1,6 @@
 from src.task_a_simulation import service as task_a_service
 from src.task_a_simulation.schema import LLMReviewSimulationOutput, ReviewSimulationRequest
+from src.task_b_recommendation import graph as task_b_graph
 from src.task_b_recommendation import service as task_b_service
 from src.task_b_recommendation.schema import RecommendationIntent, RecommendationRequest
 
@@ -113,23 +114,24 @@ def test_task_a_rejects_missing_user_id_and_missing_custom_payload() -> None:
 def test_task_b_persona_only_request_uses_custom_persona(monkeypatch) -> None:
     persona_calls = []
     monkeypatch.setattr(
-        task_b_service,
+        task_b_graph,
         "process_custom_persona",
         lambda raw: persona_calls.append(raw) or CUSTOM_PERSONA,
     )
     monkeypatch.setattr(
-        task_b_service,
+        task_b_graph,
         "plan_intent",
         lambda persona, request, session_state=None: RecommendationIntent(retrieval_query=request or ""),
     )
     monkeypatch.setattr(
-        task_b_service,
+        task_b_graph,
         "retrieve_candidates_with_sources",
         lambda *args, **kwargs: type("RetrievalResult", (), {"candidates": [], "source_counts": {}})(),
     )
-    monkeypatch.setattr(task_b_service, "score_candidates", lambda *args, **kwargs: [])
-    monkeypatch.setattr(task_b_service, "rerank_recommendations", lambda *args, **kwargs: type("Reranked", (), {"recommendations": []})())
-    monkeypatch.setattr(task_b_service, "store_recommendation_run", lambda *args, **kwargs: {})
+    monkeypatch.setattr(task_b_graph, "score_candidates", lambda *args, **kwargs: [])
+    monkeypatch.setattr(task_b_graph, "rerank_recommendations", lambda *args, **kwargs: type("Reranked", (), {"recommendations": []})())
+    monkeypatch.setattr(task_b_graph, "store_recommendation_run", lambda *args, **kwargs: {})
+    monkeypatch.setattr(task_b_graph, "get_settings", lambda: type("Settings", (), {"groq_model": "test-model"})())
 
     output = task_b_service.recommend(
         RecommendationRequest(persona={"likes": ["hydrating skincare"]}, request="gentle moisturizer"),

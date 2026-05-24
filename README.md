@@ -129,6 +129,8 @@ python scripts/run_task_b_recommendation.py --user-id <USER_ID> --request "I wan
 python scripts/run_task_b_recommendation.py --cold-start --request "I need affordable skincare for oily skin"
 ```
 
+FastAPI and CLI callers use the Task B service layer, and `service.recommend()` now wraps the explicit LangGraph workflow for intent planning, retrieval, scoring, reranking, session update, and storage.
+
 Successful recommendation calls are stored in `recommendation_runs`.
 
 Task B retrieves candidates from multiple sources before scoring: taste-vector semantic search, request-query semantic search, collaborative signals from similar users' taste vectors, persona/intent attribute matching, and a quality/popularity fallback. Collaborative filtering is only one signal; the system goes beyond it by grounding retrieval, scoring, and final reasons in the user's persona and request intent. Cold-start and custom-persona requests still work through request-query retrieval and quality fallback when no stored taste vector exists.
