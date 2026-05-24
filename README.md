@@ -259,6 +259,13 @@ The Streamlit client only needs `STREAMLIT_API_BASE_URL`. It does not need Supab
 
 ## Docker
 
+Build the two service images directly:
+
+```powershell
+docker build -t irecommend-api -f Dockerfile .
+docker build -t irecommend-streamlit -f client/streamlit/Dockerfile client/streamlit
+```
+
 Build images:
 
 ```powershell
@@ -289,6 +296,57 @@ Docker uses `.env` for the API service. The Streamlit service receives only:
 ```text
 STREAMLIT_API_BASE_URL=http://api:8000
 ```
+
+The Docker entrypoints respect Render's `PORT` environment variable while keeping local defaults of `8000` for FastAPI and `8501` for Streamlit.
+
+## Render Deployment
+
+iRecommend deploys to Render as two separate Docker web services: one FastAPI backend and one Streamlit frontend. Supabase stays external and must already be migrated, populated, and have product embeddings/personas prepared before demo use.
+
+1. Push the repository to GitHub.
+2. Create the FastAPI backend service on Render.
+   - Runtime: Docker.
+   - Dockerfile path: `./Dockerfile`.
+   - Docker context: `.`.
+   - Health check path: `/health`.
+3. Add backend environment variables:
+
+```text
+SUPABASE_URL
+SUPABASE_PUBLIC_KEY
+SUPABASE_SECRET_KEY
+GROQ_API_KEY
+HF_TOKEN
+GROQ_MODEL
+```
+
+`GROQ_MODEL` can use the default `qwen/qwen3-32b` unless you intentionally changed models. `SUPABASE_DB_URL` is not needed by the web service unless you plan to run migration scripts manually from that environment, which is not recommended.
+
+4. Test the deployed API:
+
+```text
+https://<your-api-service>.onrender.com/health
+https://<your-api-service>.onrender.com/ready
+https://<your-api-service>.onrender.com/docs
+```
+
+5. Create the Streamlit frontend service on Render.
+   - Runtime: Docker.
+   - Dockerfile path: `./client/streamlit/Dockerfile`.
+   - Docker context: `./client/streamlit`.
+6. Set the frontend environment variable:
+
+```text
+STREAMLIT_API_BASE_URL=https://<your-api-service>.onrender.com
+```
+
+7. Open the Streamlit service URL and check the health/readiness cards. Streamlit calls to `/health` or `/ready` can also wake the API after Render Free spin-down.
+
+Render Free services sleep after inactivity. The first request after sleep can be slow while the API or Streamlit container wakes up.
+
+The included `render.yaml` is a convenience blueprint for creating the two Docker web services. You still need to provide real secret values in Render.
+
+Long-running ingestion, embedding, persona generation, taste-vector builds, migration runs, and evaluation scripts should be run locally or in a dedicated job environment, not as Render web services.
 
 ## Makefile
 

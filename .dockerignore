@@ -12,6 +12,7 @@ __pycache__/
 logs/*.jsonl
 logs/*.log
 data/
+outputs/
 dist/
 build/
 *.egg-info/

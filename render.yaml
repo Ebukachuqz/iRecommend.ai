@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: irecommend-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLIC_KEY
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: HF_TOKEN
+        sync: false
+      - key: GROQ_MODEL
+        value: qwen/qwen3-32b
+
+  - type: web
+    name: irecommend-streamlit
+    runtime: docker
+    plan: free
+    dockerfilePath: ./client/streamlit/Dockerfile
+    dockerContext: ./client/streamlit
+    envVars:
+      - key: STREAMLIT_API_BASE_URL
+        sync: false
