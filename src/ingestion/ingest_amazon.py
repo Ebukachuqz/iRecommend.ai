@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import re
@@ -131,7 +132,67 @@ def prune_metadata_columns(dataset: Any) -> Any:
     return dataset
 
 
+def is_metadata_cast_error(exc: BaseException) -> bool:
+    message = str(exc).lower()
+    return "unsupported cast" in message and "struct" in message
+
+
+def iter_jsonl_metadata_file(file_obj: Any, *, gzip_compressed: bool = False) -> Iterator[dict[str, Any]]:
+    stream = gzip.GzipFile(fileobj=file_obj) if gzip_compressed else file_obj
+    with stream:
+        for line in stream:
+            if isinstance(line, bytes):
+                line = line.decode("utf-8")
+            try:
+                row = json.loads(line)
+            except (TypeError, json.JSONDecodeError):
+                continue
+            if isinstance(row, dict):
+                yield row
+
+
+def stream_metadata_jsonl_fallback(category: str) -> Iterable[dict[str, Any]]:
+    """Read raw Amazon metadata JSONL when Hugging Face feature casting fails."""
+
+    from huggingface_hub import HfFileSystem
+
+    fs = HfFileSystem()
+    base_path = f"datasets/{DATASET_NAME}/raw/meta_categories/meta_{category}.jsonl"
+    candidate_paths = [base_path, f"{base_path}.gz"]
+    last_error: Exception | None = None
+    for path in candidate_paths:
+        try:
+            file_obj = fs.open(path, "rb")
+        except Exception as exc:  # noqa: BLE001 - try the next known storage suffix
+            last_error = exc
+            continue
+        return iter_jsonl_metadata_file(file_obj, gzip_compressed=path.endswith(".gz"))
+    raise RuntimeError(f"Unable to open raw Amazon metadata JSONL for category {category}.") from last_error
+
+
+class MetadataIterableWithFallback:
+    def __init__(self, primary: Iterable[dict[str, Any]], fallback_factory: Callable[[], Iterable[dict[str, Any]]]) -> None:
+        self.primary = primary
+        self.fallback_factory = fallback_factory
+
+    def __iter__(self) -> Iterator[dict[str, Any]]:
+        try:
+            yield from self.primary
+        except Exception as exc:  # noqa: BLE001 - narrow by predicate below
+            if not is_metadata_cast_error(exc):
+                raise
+            log_ingestion(
+                "Hugging Face metadata streaming hit a nested-field cast error; "
+                "falling back to raw JSONL metadata streaming."
+            )
+            yield from self.fallback_factory()
+
+
 def stream_metadata(category: str) -> Iterable[dict[str, Any]]:
+    return stream_metadata_jsonl_fallback(category)
+
+
+def stream_metadata_via_datasets(category: str) -> Iterable[dict[str, Any]]:
     dataset = load_dataset(
         DATASET_NAME,
         metadata_config_name(category),
@@ -139,8 +200,10 @@ def stream_metadata(category: str) -> Iterable[dict[str, Any]]:
         streaming=True,
         trust_remote_code=True,
     )
-    return prune_metadata_columns(dataset)
-
+    return MetadataIterableWithFallback(
+        prune_metadata_columns(dataset),
+        fallback_factory=lambda: stream_metadata_jsonl_fallback(category),
+    )
 
 def count_users(reviews: Iterable[dict[str, Any]], max_reviews: int | None = None) -> Counter[str]:
     counts: Counter[str] = Counter()

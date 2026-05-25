@@ -100,6 +100,61 @@ def test_metadata_pruning_removes_known_problem_columns_without_column_names() -
     assert "variants" in dataset.removed
 
 
+def test_stream_metadata_uses_raw_jsonl_fallback_by_default(monkeypatch) -> None:
+    monkeypatch.setattr(ingest_amazon, "stream_metadata_jsonl_fallback", lambda category: [{"category": category}])
+
+    assert list(ingest_amazon.stream_metadata("All_Beauty")) == [{"category": "All_Beauty"}]
+
+
+class CastFailingMetadata:
+    def __iter__(self):
+        raise RuntimeError("Unsupported cast from list<item: struct<thumb: string>> to struct using function cast_struct")
+
+
+def test_metadata_iterable_falls_back_on_nested_cast_error(capsys) -> None:
+    rows = list(
+        ingest_amazon.MetadataIterableWithFallback(
+            CastFailingMetadata(),
+            fallback_factory=lambda: [valid_metadata("p1")],
+        )
+    )
+
+    assert rows == [valid_metadata("p1")]
+    assert "falling back to raw JSONL metadata streaming" in capsys.readouterr().out
+
+
+def test_metadata_iterable_does_not_hide_other_errors() -> None:
+    class BrokenMetadata:
+        def __iter__(self):
+            raise RuntimeError("regular failure")
+
+    try:
+        list(ingest_amazon.MetadataIterableWithFallback(BrokenMetadata(), fallback_factory=lambda: []))
+    except RuntimeError as exc:
+        assert "regular failure" in str(exc)
+    else:
+        raise AssertionError("expected non-cast errors to propagate")
+
+
+def test_iter_jsonl_metadata_file_preserves_nested_optional_fields() -> None:
+    import io
+
+    raw = (
+        '{"parent_asin": "p1", "images": [{"thumb": "https://example.com/t.jpg"}], '
+        '"bought_together": ["p2"]}\n'
+    )
+
+    rows = list(ingest_amazon.iter_jsonl_metadata_file(io.BytesIO(raw.encode("utf-8"))))
+
+    assert rows == [
+        {
+            "parent_asin": "p1",
+            "images": [{"thumb": "https://example.com/t.jpg"}],
+            "bought_together": ["p2"],
+        }
+    ]
+
+
 def test_cli_defaults_are_evaluation_friendly() -> None:
     args = ingest_script.build_parser().parse_args([])
 
