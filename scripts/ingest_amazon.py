@@ -6,7 +6,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.ingestion.ingest_amazon import ingest_category
+from src.ingestion.ingest_amazon import IngestionUploadError, ingest_category
 from src.utils.run_summary import build_run_summary, save_run_summary
 
 
@@ -29,17 +29,20 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
-    result = ingest_category(
-        category=args.category,
-        min_reviews=args.min_reviews,
-        max_users=args.max_users,
-        extra_products=args.extra_products,
-        review_limit=args.review_limit,
-        batch_size=args.batch_size,
-        require_rating_number=args.require_rating_number,
-        dry_run=args.dry_run,
-        verify=args.verify,
-    )
+    try:
+        result = ingest_category(
+            category=args.category,
+            min_reviews=args.min_reviews,
+            max_users=args.max_users,
+            extra_products=args.extra_products,
+            review_limit=args.review_limit,
+            batch_size=args.batch_size,
+            require_rating_number=args.require_rating_number,
+            dry_run=args.dry_run,
+            verify=args.verify,
+        )
+    except IngestionUploadError as exc:
+        parser.exit(1, f"[ingestion] Upload failed: {exc}\n")
     mode = "dry_run" if args.dry_run else "ingest"
     summary = build_run_summary(
         category=result.get("category") or args.category,

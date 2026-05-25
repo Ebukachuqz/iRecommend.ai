@@ -310,6 +310,24 @@ def test_invalid_reviews_are_not_counted_or_uploaded() -> None:
     assert [review["parent_asin"] for review in plan["reviews_to_upload"]] == ["p1"]
 
 
+def test_duplicate_reviews_do_not_count_toward_user_eligibility() -> None:
+    duplicate = valid_review("u1", "p1", 1)
+
+    plan = ingest_amazon.build_ingestion_plan(
+        [duplicate, dict(duplicate)],
+        [valid_metadata("p1")],
+        category="All_Beauty",
+        min_reviews=2,
+        max_users=100,
+        extra_products=0,
+    )
+
+    assert plan["valid_review_rows"] == 1
+    assert plan["valid_review_product_pairs"] == 1
+    assert plan["duplicate_review_ids_skipped"] == 1
+    assert plan["selected_user_ids"] == []
+
+
 def test_extra_products_must_be_valid_and_are_deduplicated() -> None:
     reviews = [valid_review("u1", "p1", 1)]
     metadata = [
@@ -514,6 +532,63 @@ class UpsertClient:
 
     def table(self, name):
         return UpsertQuery(self, name)
+
+
+def test_upsert_reviews_deduplicates_batch_by_review_id(capsys) -> None:
+    client = UpsertClient()
+    rows = [
+        {"review_id": "r1", "user_id": "u1", "parent_asin": "p1"},
+        {"review_id": "r1", "user_id": "u1", "parent_asin": "p1"},
+    ]
+
+    uploaded = ingest_amazon.upsert_reviews(client, rows)
+
+    assert uploaded == 1
+    assert len(client.upserts[0]["rows"]) == 1
+    assert "Skipped 1 duplicate review_id rows before upsert." in capsys.readouterr().out
+
+
+def test_upsert_metadata_deduplicates_batch_by_parent_asin(capsys) -> None:
+    client = UpsertClient()
+    rows = [
+        {"parent_asin": "p1", "title": "one"},
+        {"parent_asin": "p1", "title": "one duplicate"},
+    ]
+
+    uploaded = ingest_amazon.upsert_metadata(client, rows)
+
+    assert uploaded == 1
+    assert len(client.upserts[0]["rows"]) == 1
+    assert "Skipped 1 duplicate parent_asin metadata rows before upsert." in capsys.readouterr().out
+
+
+class FailingUpsertQuery(UpsertQuery):
+    def execute(self):
+        raise RuntimeError("ON CONFLICT DO UPDATE command cannot affect row a second time")
+
+
+class FailingUpsertClient:
+    def __init__(self):
+        self.upserts = []
+
+    def table(self, name):
+        return FailingUpsertQuery(self, name)
+
+
+def test_upsert_error_message_is_readable() -> None:
+    try:
+        ingest_amazon.upsert_reviews(
+            FailingUpsertClient(),
+            [{"review_id": "r1", "user_id": "u1", "parent_asin": "p1"}],
+            batch_label="review batch 9",
+        )
+    except ingest_amazon.IngestionUploadError as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("expected IngestionUploadError")
+
+    assert "Failed to upsert amazon_reviews (review batch 9)" in message
+    assert "same review_id appeared more than once" in message
 
 
 def test_real_upload_path_logs_batches_and_preserves_counts(monkeypatch, capsys) -> None:

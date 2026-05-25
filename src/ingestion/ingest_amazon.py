@@ -41,6 +41,10 @@ PROBLEMATIC_METADATA_COLUMNS = [
 ]
 
 
+class IngestionUploadError(RuntimeError):
+    """Raised when a database upsert fails with a reviewer-readable message."""
+
+
 def review_config_name(category: str) -> str:
     return f"raw_review_{category}"
 
@@ -70,6 +74,24 @@ def batched(items: Iterable[dict[str, Any]], batch_size: int) -> Iterator[list[d
             batch = []
     if batch:
         yield batch
+
+
+def dedupe_rows_by_key(rows: Iterable[dict[str, Any]], key: str) -> tuple[list[dict[str, Any]], int]:
+    unique: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    skipped = 0
+    for row in rows:
+        value = row.get(key)
+        if value in (None, ""):
+            unique.append(row)
+            continue
+        value_key = str(value)
+        if value_key in seen:
+            skipped += 1
+            continue
+        seen.add(value_key)
+        unique.append(row)
+    return unique, skipped
 
 
 def stream_reviews(category: str) -> Iterable[dict[str, Any]]:
@@ -239,14 +261,47 @@ def parse_price(value: Any) -> float | None:
     return float(match.group(0)) if match else None
 
 
-def upsert_reviews(client: Client, reviews: list[dict[str, Any]]) -> None:
-    if reviews:
-        client.table("amazon_reviews").upsert(reviews, on_conflict="review_id").execute()
+def format_upsert_error(exc: Exception, table_name: str, conflict_key: str, batch_label: str | None = None) -> str:
+    raw_message = str(exc)
+    prefix = f"Failed to upsert {table_name}"
+    if batch_label:
+        prefix = f"{prefix} ({batch_label})"
+    explanation = ""
+    if "ON CONFLICT DO UPDATE command cannot affect row a second time" in raw_message:
+        explanation = (
+            f" This usually means the same {conflict_key} appeared more than once in one upload batch. "
+            "The ingestion code deduplicates rows by the upsert key before upload; if this still appears, "
+            "inspect the prepared batch for duplicate conflict keys."
+        )
+    return f"{prefix}. Supabase/Postgres said: {raw_message}.{explanation}"
 
 
-def upsert_metadata(client: Client, metadata: list[dict[str, Any]]) -> None:
-    if metadata:
-        client.table("amazon_product_metadata").upsert(metadata, on_conflict="parent_asin").execute()
+def upsert_reviews(client: Client, reviews: list[dict[str, Any]], batch_label: str | None = None) -> int:
+    unique_reviews, skipped_duplicates = dedupe_rows_by_key(reviews, "review_id")
+    if skipped_duplicates:
+        log_ingestion(f"Skipped {skipped_duplicates:,} duplicate review_id rows before upsert.")
+    if not unique_reviews:
+        return 0
+    try:
+        client.table("amazon_reviews").upsert(unique_reviews, on_conflict="review_id").execute()
+    except Exception as exc:
+        raise IngestionUploadError(format_upsert_error(exc, "amazon_reviews", "review_id", batch_label)) from exc
+    return len(unique_reviews)
+
+
+def upsert_metadata(client: Client, metadata: list[dict[str, Any]], batch_label: str | None = None) -> int:
+    unique_metadata, skipped_duplicates = dedupe_rows_by_key(metadata, "parent_asin")
+    if skipped_duplicates:
+        log_ingestion(f"Skipped {skipped_duplicates:,} duplicate parent_asin metadata rows before upsert.")
+    if not unique_metadata:
+        return 0
+    try:
+        client.table("amazon_product_metadata").upsert(unique_metadata, on_conflict="parent_asin").execute()
+    except Exception as exc:
+        raise IngestionUploadError(
+            format_upsert_error(exc, "amazon_product_metadata", "parent_asin", batch_label)
+        ) from exc
+    return len(unique_metadata)
 
 
 def log_ingestion(message: str) -> None:
@@ -263,6 +318,18 @@ ReviewSource = Iterable[dict[str, Any]] | Callable[[], Iterable[dict[str, Any]]]
 def iter_reviews(reviews: ReviewSource, limit: int | None) -> Iterator[dict[str, Any]]:
     source = reviews() if callable(reviews) else reviews
     yield from limited(source, limit)
+
+
+def iter_unique_valid_reviews(reviews: ReviewSource, limit: int | None) -> Iterator[dict[str, Any]]:
+    seen_review_ids: set[str] = set()
+    for review in iter_reviews(reviews, limit):
+        if not is_valid_review(review):
+            continue
+        review_id = stable_review_id(review)
+        if review_id in seen_review_ids:
+            continue
+        seen_review_ids.add(review_id)
+        yield review
 
 
 def select_eligible_users_from_counts(counts: Counter[str], min_reviews: int, max_users: int) -> list[str]:
@@ -285,8 +352,15 @@ def build_ingestion_plan(
     candidate_parent_asins: set[str] = set()
     valid_review_rows = 0
     skipped_invalid_reviews = 0
+    duplicate_review_ids_skipped = 0
+    seen_review_ids: set[str] = set()
     for review in iter_reviews(reviews, review_limit):
         if is_valid_review(review):
+            review_id = stable_review_id(review)
+            if review_id in seen_review_ids:
+                duplicate_review_ids_skipped += 1
+                continue
+            seen_review_ids.add(review_id)
             valid_review_rows += 1
             if parent_asin := review_parent_asin(review):
                 candidate_parent_asins.add(parent_asin)
@@ -320,9 +394,7 @@ def build_ingestion_plan(
 
     user_pair_counts: Counter[str] = Counter()
     valid_review_product_pairs = 0
-    for review in iter_reviews(reviews, review_limit):
-        if not is_valid_review(review):
-            continue
+    for review in iter_unique_valid_reviews(reviews, review_limit):
         parent_asin = review_parent_asin(review)
         if parent_asin and parent_asin in reviewed_metadata_by_asin:
             user_pair_counts[str(review["user_id"])] += 1
@@ -332,9 +404,7 @@ def build_ingestion_plan(
         select_eligible_users_from_counts(user_pair_counts, min_reviews=min_reviews, max_users=max_users)
     )
     selected_reviews = []
-    for review in iter_reviews(reviews, review_limit):
-        if not is_valid_review(review):
-            continue
+    for review in iter_unique_valid_reviews(reviews, review_limit):
         parent_asin = review_parent_asin(review)
         if parent_asin and parent_asin in reviewed_metadata_by_asin and str(review["user_id"]) in selected_user_ids:
             selected_reviews.append(review)
@@ -368,6 +438,7 @@ def build_ingestion_plan(
         "valid_review_product_pairs": valid_review_product_pairs,
         "skipped_invalid_reviews": skipped_invalid_reviews,
         "skipped_sparse_metadata": skipped_sparse_metadata,
+        "duplicate_review_ids_skipped": duplicate_review_ids_skipped,
     }
 
 
@@ -457,8 +528,21 @@ def ingest_category(
         require_rating_number=require_rating_number,
     )
 
-    normalized_reviews = [normalize_review(review) for review in plan["reviews_to_upload"]]
-    normalized_metadata = [normalize_metadata(item, category) for item in plan["metadata_to_upload"]]
+    normalized_reviews, upload_duplicate_review_ids_skipped = dedupe_rows_by_key(
+        (normalize_review(review) for review in plan["reviews_to_upload"]),
+        "review_id",
+    )
+    normalized_metadata, duplicate_metadata_parent_asins_skipped = dedupe_rows_by_key(
+        (normalize_metadata(item, category) for item in plan["metadata_to_upload"]),
+        "parent_asin",
+    )
+    duplicate_review_ids_skipped = plan["duplicate_review_ids_skipped"] + upload_duplicate_review_ids_skipped
+    if duplicate_review_ids_skipped:
+        log_ingestion(f"Skipped {duplicate_review_ids_skipped:,} duplicate review_id rows during planning.")
+    if duplicate_metadata_parent_asins_skipped:
+        log_ingestion(
+            f"Skipped {duplicate_metadata_parent_asins_skipped:,} duplicate parent_asin metadata rows during planning."
+        )
 
     log_ingestion(
         "Prepared upload: "
@@ -474,15 +558,13 @@ def ingest_category(
         log_ingestion("Review upsert starting.")
         for batch_index, batch in enumerate(batched(normalized_reviews, batch_size), start=1):
             log_ingestion(f"Upserting review batch {batch_index}: {len(batch):,} rows")
-            upsert_reviews(client, batch)
-            uploaded_reviews += len(batch)
+            uploaded_reviews += upsert_reviews(client, batch, batch_label=f"review batch {batch_index}")
         log_ingestion(f"Review upsert complete: {uploaded_reviews:,} rows")
 
         log_ingestion("Metadata upsert starting.")
         for batch_index, batch in enumerate(batched(normalized_metadata, batch_size), start=1):
             log_ingestion(f"Upserting metadata batch {batch_index}: {len(batch):,} rows")
-            upsert_metadata(client, batch)
-            uploaded_metadata += len(batch)
+            uploaded_metadata += upsert_metadata(client, batch, batch_label=f"metadata batch {batch_index}")
         log_ingestion(f"Metadata upsert complete: {uploaded_metadata:,} rows")
     else:
         log_ingestion("Dry run enabled; no Supabase upserts will be performed.")
@@ -503,6 +585,8 @@ def ingest_category(
         "extra_products_added": len(plan["extra_metadata"]),
         "skipped_invalid_reviews": plan["skipped_invalid_reviews"],
         "skipped_sparse_metadata": plan["skipped_sparse_metadata"],
+        "duplicate_review_ids_skipped": duplicate_review_ids_skipped,
+        "duplicate_metadata_parent_asins_skipped": duplicate_metadata_parent_asins_skipped,
         "dry_run": dry_run,
     }
 
