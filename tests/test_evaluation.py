@@ -109,7 +109,7 @@ def fake_client() -> FakeClient:
                 {"user_id": "u2", "category": category, "persona_version": "v1"},
                 {"user_id": "u3", "category": category, "persona_version": "v1"},
             ],
-            "user_taste_vectors": [{"user_id": "u2", "category": category}],
+            "user_preference_vectors": [{"user_id": "u2", "category": category}],
         }
     )
 

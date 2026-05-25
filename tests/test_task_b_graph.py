@@ -90,7 +90,7 @@ def patch_graph_pipeline(monkeypatch, session=None, intent=None, persona=PERSONA
     monkeypatch.setattr(task_b_graph, "resolve_persona_for_recommendation", lambda request, client: (persona, cold_start))
     monkeypatch.setattr(
         task_b_graph,
-        "build_or_get_user_taste_vector",
+        "build_or_get_user_preference_vector",
         lambda user_id, category, client=None: {"embedding": [0.1, 0.2], "source_parent_asins": ["liked-1"]},
     )
     monkeypatch.setattr(task_b_graph, "load_or_create_session", lambda request, persona, client: session)
@@ -104,7 +104,7 @@ def patch_graph_pipeline(monkeypatch, session=None, intent=None, persona=PERSONA
             "client": kwargs["client"],
             "vector_store": kwargs["vector_store"],
             "persona": kwargs["persona"],
-            "taste_vector_row": kwargs["taste_vector_row"],
+            "preference_vector_row": kwargs["preference_vector_row"],
             "exclude_parent_asins": kwargs["exclude_parent_asins"],
             "limit": kwargs["limit"],
         }
@@ -139,7 +139,7 @@ def test_service_recommend_returns_graph_output_and_keeps_full_trace_context(mon
     assert calls["retrieve"]["client"] is client
     assert calls["retrieve"]["vector_store"] is vector_store
     assert calls["retrieve"]["persona"] == PERSONA
-    assert calls["retrieve"]["taste_vector_row"]["embedding"] == [0.1, 0.2]
+    assert calls["retrieve"]["preference_vector_row"]["embedding"] == [0.1, 0.2]
     assert calls["retrieve"]["limit"] == 50
     context = calls["store"]["context"]
     assert context["retrieval_source_counts"] == {"request_query": 1, "quality_fallback": 1}
@@ -220,8 +220,8 @@ def test_custom_persona_path_remains_available_through_service(monkeypatch) -> N
     monkeypatch.setattr(task_b_graph, "resolve_persona_for_recommendation", fake_resolve)
     monkeypatch.setattr(
         task_b_graph,
-        "build_or_get_user_taste_vector",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("custom persona should not build a user taste vector")),
+        "build_or_get_user_preference_vector",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("custom persona should not build a user preference vector")),
     )
 
     output = task_b_service.recommend(
@@ -272,12 +272,12 @@ def test_cold_start_persona_uses_onboarding_answers_when_available() -> None:
     assert persona["evidence"]["negative_examples"] == ["A cheap charger that broke"]
 
 
-def test_cold_start_graph_does_not_fetch_or_build_taste_vector(monkeypatch) -> None:
+def test_cold_start_graph_does_not_fetch_or_build_preference_vector(monkeypatch) -> None:
     calls = patch_graph_pipeline(monkeypatch, persona=build_cold_start_persona("affordable skincare"), cold_start=True)
     monkeypatch.setattr(
         task_b_graph,
-        "build_or_get_user_taste_vector",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("cold-start should not fetch taste vector")),
+        "build_or_get_user_preference_vector",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("cold-start should not fetch preference vector")),
     )
 
     output = task_b_service.recommend(
@@ -287,7 +287,7 @@ def test_cold_start_graph_does_not_fetch_or_build_taste_vector(monkeypatch) -> N
     )
 
     assert output.cold_start is True
-    assert calls["retrieve"]["taste_vector_row"] is None
+    assert calls["retrieve"]["preference_vector_row"] is None
     assert calls["store"]["context"]["cold_start_metadata"]["persona_confidence"] == "low"
 
 
@@ -305,8 +305,8 @@ def test_cold_start_graph_passes_onboarding_answers_to_starter_persona(monkeypat
     monkeypatch.setattr(task_b_graph, "resolve_persona_for_recommendation", original_resolve)
     monkeypatch.setattr(
         task_b_graph,
-        "build_or_get_user_taste_vector",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("cold-start should not fetch taste vector")),
+        "build_or_get_user_preference_vector",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("cold-start should not fetch preference vector")),
     )
 
     output = task_b_service.recommend(

@@ -23,25 +23,25 @@ Task B can run from a stored user persona or from a caller-provided custom perso
 
 Candidate retrieval builds a broad pool before scoring and LLM reranking. It now combines five sources:
 
-- `taste_vector`: pgvector nearest-neighbour search from the user's category-specific taste vector.
+- `preference_vector`: pgvector nearest-neighbour search from the user's category-specific preference vector.
 - `request_query`: semantic search from the intent planner's retrieval query. This is the main cold-start and custom-persona path.
-- `collaborative`: similar users are found through `user_taste_vectors`, then their highly rated `persona_train` products are considered.
+- `collaborative`: similar users are found through `user_preference_vectors`, then their highly rated `persona_train` products are considered.
 - `attribute_match`: product text is matched against persona liked attributes, product types, values, and intent-required attributes.
 - `quality_fallback`: highly rated/popular products fill the pool when other sources are sparse.
 
 Collaborative filtering is deliberately only one source among several. The recommender goes beyond "users like you liked this" by using persona values, request intent, metadata semantics, transparent scoring, and LLM reranking together.
 
-Taste vectors are built only from `amazon_reviews.task_split='persona_train'` liked reviews with rating >= 4, and products already reviewed by the user are always excluded. If no taste vector exists, request-query retrieval and quality fallback still work, which keeps cold-start and custom persona flows useful.
+Preference vectors are built only from `amazon_reviews.task_split='persona_train'` liked reviews with rating >= 4, and products already reviewed by the user are always excluded. If no preference vector exists, request-query retrieval and quality fallback still work, which keeps cold-start and custom persona flows useful.
 
-Taste vectors are category-aware. Reviews are filtered through `amazon_product_metadata` by `parent_asin`, using `category` first and falling back to `main_category`/`categories`, before product embeddings are averaged. This prevents a beauty taste vector from being polluted by books, electronics, or other category histories.
+Preference vectors are category-aware. Reviews are filtered through `amazon_product_metadata` by `parent_asin`, using `category` first and falling back to `main_category`/`categories`, before product embeddings are averaged. This prevents a beauty preference vector from being polluted by books, electronics, or other category histories.
 
-Session state now contributes an additional exclusion set. Products already shown in the active session are combined with already reviewed products and passed into every retrieval source as excluded parent ASINs. Retrieval is extended rather than rewritten: taste-vector search, request-query search, collaborative retrieval, attribute matching, and quality fallback all keep their existing source labels and provenance.
+Session state now contributes an additional exclusion set. Products already shown in the active session are combined with already reviewed products and passed into every retrieval source as excluded parent ASINs. Retrieval is extended rather than rewritten: preference-vector search, request-query search, collaborative retrieval, attribute matching, and quality fallback all keep their existing source labels and provenance.
 
-Every retrieval run records source counts such as `{"taste_vector": 40, "request_query": 30, "attribute_match": 12}` in `recommendation_runs.retrieval_sources`. These counts describe unique candidates added by each source after dedupe, not only the final top recommendations. If a product appears from multiple sources, its `retrieval_sources` list preserves all sources, but only the first source that added the unique candidate increments the run-level count.
+Every retrieval run records source counts such as `{"preference_vector": 40, "request_query": 30, "attribute_match": 12}` in `recommendation_runs.retrieval_sources`. These counts describe unique candidates added by each source after dedupe, not only the final top recommendations. If a product appears from multiple sources, its `retrieval_sources` list preserves all sources, but only the first source that added the unique candidate increments the run-level count.
 
 ## Cold-Start And Sessions
 
-New-user cold-start builds a low-confidence starter persona from request/context signals such as affordability, quality, reliability, and category mentions. It does not require a taste vector; retrieval falls back to request-query semantic search, attribute matching, and quality fallback.
+New-user cold-start builds a low-confidence starter persona from request/context signals such as affordability, quality, reliability, and category mentions. It does not require a preference vector; retrieval falls back to request-query semantic search, attribute matching, and quality fallback.
 
 Cross-domain transfer is conservative. The graph only marks a run as cross-domain when both source and target categories are known and meaningfully different domains, such as beauty to electronics or books. Close categories such as `All_Beauty`, `Beauty_and_Personal_Care`, `Beauty`, and `Skincare` stay in the same domain. When cross-domain is active, retrieval uses transferable values like price sensitivity, quality sensitivity, strictness, value, reliability, simplicity, durability, and generic complaint patterns rather than source-category product terms.
 

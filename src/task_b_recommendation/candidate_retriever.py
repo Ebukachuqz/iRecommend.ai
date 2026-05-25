@@ -12,7 +12,7 @@ from src.task_b_recommendation.embeddings import embed_text
 from src.task_b_recommendation.pgvector_store import SupabasePgVectorStore
 from src.task_b_recommendation.product_text import build_product_text
 from src.task_b_recommendation.schema import RecommendationCandidate, RecommendationIntent
-from src.task_b_recommendation.taste_vector import fetch_user_taste_vector, parse_embedding, product_matches_category
+from src.task_b_recommendation.preference_vector import fetch_user_preference_vector, parse_embedding, product_matches_category
 from src.task_b_recommendation.vector_store import VectorStore
 
 
@@ -194,14 +194,14 @@ def fetch_quality_fallback_products(
 def retrieve_collaborative_candidates(
     user_id: str,
     category: str,
-    taste_vector: list[float],
+    preference_vector: list[float],
     reviewed: set[str],
     limit: int,
     client: Client,
     vector_store: VectorStore,
 ) -> list[tuple[dict[str, Any], float, list[str]]]:
     similar_users = vector_store.search_similar_users(
-        taste_vector,
+        preference_vector,
         category=category,
         limit=5,
         exclude_user_id=user_id,
@@ -289,7 +289,7 @@ def retrieve_candidates_with_sources(
     client: Client | None = None,
     vector_store: VectorStore | None = None,
     persona: dict[str, Any] | None = None,
-    taste_vector_row: dict[str, Any] | None = None,
+    preference_vector_row: dict[str, Any] | None = None,
     exclude_parent_asins: set[str] | list[str] | None = None,
     allow_reviewed_parent_asins: set[str] | list[str] | None = None,
 ) -> CandidateRetrievalResult:
@@ -299,22 +299,22 @@ def retrieve_candidates_with_sources(
     reviewed = set(reviewed) | set(exclude_parent_asins or [])
     vector_store = vector_store or SupabasePgVectorStore(client=client)
     category_filter = effective_category(category, intent)
-    vector_row = taste_vector_row or (fetch_user_taste_vector(user_id, category, client=client) if user_id else None)
+    vector_row = preference_vector_row or (fetch_user_preference_vector(user_id, category, client=client) if user_id else None)
     candidates_by_asin: dict[str, RecommendationCandidate] = {}
     source_counts: dict[str, int] = {}
 
-    taste_vector: list[float] = []
+    preference_vector: list[float] = []
     if vector_row and vector_row.get("embedding"):
-        taste_vector = parse_embedding(vector_row["embedding"])
+        preference_vector = parse_embedding(vector_row["embedding"])
         try:
             matches = vector_store.search_products(
-                taste_vector,
+                preference_vector,
                 limit=limit,
                 exclude_parent_asins=reviewed,
             )
         except Exception:
             matches = []
-        add_vector_matches(candidates_by_asin, matches, "taste_vector", reviewed, client, category_filter, source_counts)
+        add_vector_matches(candidates_by_asin, matches, "preference_vector", reviewed, client, category_filter, source_counts)
 
     retrieval_query = intent.retrieval_query.strip()
     if retrieval_query:
@@ -328,12 +328,12 @@ def retrieve_candidates_with_sources(
             matches = []
         add_vector_matches(candidates_by_asin, matches, "request_query", reviewed, client, category_filter, source_counts)
 
-    if user_id and taste_vector:
+    if user_id and preference_vector:
         try:
             collaborative = retrieve_collaborative_candidates(
                 user_id,
                 category,
-                taste_vector,
+                preference_vector,
                 reviewed,
                 limit=max(10, limit // 2),
                 client=client,
@@ -401,7 +401,7 @@ def retrieve_candidates(
     client: Client | None = None,
     vector_store: VectorStore | None = None,
     persona: dict[str, Any] | None = None,
-    taste_vector_row: dict[str, Any] | None = None,
+    preference_vector_row: dict[str, Any] | None = None,
     exclude_parent_asins: set[str] | list[str] | None = None,
     allow_reviewed_parent_asins: set[str] | list[str] | None = None,
 ) -> list[RecommendationCandidate]:
@@ -413,7 +413,7 @@ def retrieve_candidates(
         client=client,
         vector_store=vector_store,
         persona=persona,
-        taste_vector_row=taste_vector_row,
+        preference_vector_row=preference_vector_row,
         exclude_parent_asins=exclude_parent_asins,
         allow_reviewed_parent_asins=allow_reviewed_parent_asins,
     ).candidates

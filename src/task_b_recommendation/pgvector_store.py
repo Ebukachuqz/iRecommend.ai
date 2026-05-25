@@ -94,7 +94,7 @@ class SupabasePgVectorStore(VectorStore):
         exclude_user_id: str | None = None,
     ) -> list[dict[str, Any]]:
         builder = self.client.rpc(
-            "match_user_taste_vectors",
+            "match_user_preference_vectors",
             {
                 "query_embedding": query_embedding,
                 "target_category": category,

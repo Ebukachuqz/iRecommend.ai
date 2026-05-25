@@ -42,26 +42,26 @@ AS $$
     LIMIT match_count;
 $$;
 
--- Taste vectors remain keyed by user_id + category. The new provenance columns
+-- Preference vectors remain keyed by user_id + category. The new provenance columns
 -- explain how much evidence contributed to the vector.
-ALTER TABLE user_taste_vectors
+ALTER TABLE user_preference_vectors
 ADD COLUMN IF NOT EXISTS source_parent_asins JSONB DEFAULT '[]'::jsonb;
 
-ALTER TABLE user_taste_vectors
+ALTER TABLE user_preference_vectors
 ADD COLUMN IF NOT EXISTS source_review_count INTEGER DEFAULT 0;
 
-ALTER TABLE user_taste_vectors
+ALTER TABLE user_preference_vectors
 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
 
-ALTER TABLE user_taste_vectors
+ALTER TABLE user_preference_vectors
 ALTER COLUMN embedding_model SET DEFAULT 'sentence-transformers/all-MiniLM-L6-v2';
 
-CREATE INDEX IF NOT EXISTS user_taste_vectors_embedding_ivfflat_idx
-ON user_taste_vectors
+CREATE INDEX IF NOT EXISTS user_preference_vectors_embedding_ivfflat_idx
+ON user_preference_vectors
 USING ivfflat (embedding vector_cosine_ops)
 WITH (lists = 50);
 
-CREATE OR REPLACE FUNCTION match_user_taste_vectors(
+CREATE OR REPLACE FUNCTION match_user_preference_vectors(
     query_embedding vector(384),
     target_category TEXT,
     match_count INT DEFAULT 5,
@@ -76,14 +76,14 @@ LANGUAGE SQL
 STABLE
 AS $$
     SELECT
-        user_taste_vectors.user_id,
-        user_taste_vectors.category,
-        1 - (user_taste_vectors.embedding <=> query_embedding) AS similarity
-    FROM user_taste_vectors
-    WHERE user_taste_vectors.embedding IS NOT NULL
-      AND user_taste_vectors.category = target_category
-      AND (exclude_user_id IS NULL OR user_taste_vectors.user_id <> exclude_user_id)
-    ORDER BY user_taste_vectors.embedding <=> query_embedding
+        user_preference_vectors.user_id,
+        user_preference_vectors.category,
+        1 - (user_preference_vectors.embedding <=> query_embedding) AS similarity
+    FROM user_preference_vectors
+    WHERE user_preference_vectors.embedding IS NOT NULL
+      AND user_preference_vectors.category = target_category
+      AND (exclude_user_id IS NULL OR user_preference_vectors.user_id <> exclude_user_id)
+    ORDER BY user_preference_vectors.embedding <=> query_embedding
     LIMIT match_count;
 $$;
 

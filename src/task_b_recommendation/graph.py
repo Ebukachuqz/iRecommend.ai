@@ -35,7 +35,7 @@ from src.task_b_recommendation.session_state import (
     store_session,
     update_session_after_recommendation,
 )
-from src.task_b_recommendation.taste_vector import build_and_store_user_taste_vector, fetch_user_taste_vector
+from src.task_b_recommendation.preference_vector import build_and_store_user_preference_vector, fetch_user_preference_vector
 from src.task_b_recommendation.vector_store import VectorStore
 
 
@@ -47,7 +47,7 @@ class TaskBGraphState(TypedDict, total=False):
     persona: dict[str, Any]
     cold_start: bool
     session: RecommendationSessionState | None
-    taste_vector_row: dict[str, Any] | None
+    preference_vector_row: dict[str, Any] | None
     intent: Any
     retrieval_persona: dict[str, Any]
     cross_domain_metadata: dict[str, Any]
@@ -73,16 +73,16 @@ def resolve_persona_for_recommendation(
     return build_cold_start_persona(request.request, onboarding_answers), True
 
 
-def build_or_get_user_taste_vector(
+def build_or_get_user_preference_vector(
     user_id: str,
     category: str = DEFAULT_CATEGORY,
     client: Client | None = None,
 ) -> dict[str, Any] | None:
     client = client or get_supabase_client()
-    existing = fetch_user_taste_vector(user_id, category, client=client)
+    existing = fetch_user_preference_vector(user_id, category, client=client)
     if existing:
         return existing
-    embedding, sources = build_and_store_user_taste_vector(user_id, category, client=client)
+    embedding, sources = build_and_store_user_preference_vector(user_id, category, client=client)
     if not embedding:
         return None
     return {
@@ -327,10 +327,10 @@ def build_task_b_graph(client=None, vector_store: VectorStore | None = None):
     def load_or_create_persona(state: TaskBGraphState) -> TaskBGraphState:
         request = state["request"]
         persona, cold_start = resolve_persona_for_recommendation(request, client)
-        taste_vector_row = None
+        preference_vector_row = None
         if request.user_id and not cold_start:
-            taste_vector_row = build_or_get_user_taste_vector(request.user_id, request.category, client=client)
-        return {**state, "persona": persona, "cold_start": cold_start, "taste_vector_row": taste_vector_row}
+            preference_vector_row = build_or_get_user_preference_vector(request.user_id, request.category, client=client)
+        return {**state, "persona": persona, "cold_start": cold_start, "preference_vector_row": preference_vector_row}
 
     def load_session_state(state: TaskBGraphState) -> TaskBGraphState:
         session = load_or_create_session(state["request"], state["persona"], client)
@@ -365,7 +365,7 @@ def build_task_b_graph(client=None, vector_store: VectorStore | None = None):
             client=client,
             vector_store=vector_store,
             persona=state.get("retrieval_persona") or state["persona"],
-            taste_vector_row=state.get("taste_vector_row"),
+            preference_vector_row=state.get("preference_vector_row"),
             exclude_parent_asins=excluded_parent_asins,
             allow_reviewed_parent_asins=allow_reviewed_parent_asins,
         )

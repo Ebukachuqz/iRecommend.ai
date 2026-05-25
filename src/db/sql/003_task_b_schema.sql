@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS product_embeddings (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS user_taste_vectors (
+CREATE TABLE IF NOT EXISTS user_preference_vectors (
     user_id TEXT NOT NULL,
     category TEXT NOT NULL,
     embedding vector(384) NOT NULL,

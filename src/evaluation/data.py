@@ -6,7 +6,7 @@ from typing import Any
 
 from src.constants import PERSONA_TRAIN_SPLIT, TASK_A_HOLDOUT_SPLIT, TASK_B_HOLDOUT_SPLIT
 from src.db.supabase_client import get_supabase_client
-from src.task_b_recommendation.taste_vector import product_matches_category
+from src.task_b_recommendation.preference_vector import product_matches_category
 
 
 PAGE_SIZE = 1000
@@ -47,9 +47,9 @@ def fetch_user_personas(category: str, client: Any | None = None) -> dict[str, d
     return {str(row["user_id"]): row for row in rows if row.get("user_id")}
 
 
-def fetch_user_taste_vectors(category: str, client: Any | None = None) -> set[str]:
+def fetch_user_preference_vectors(category: str, client: Any | None = None) -> set[str]:
     client = client or get_supabase_client()
-    rows = page_query(client.table("user_taste_vectors").select("user_id").eq("category", category))
+    rows = page_query(client.table("user_preference_vectors").select("user_id").eq("category", category))
     return {str(row["user_id"]) for row in rows if row.get("user_id")}
 
 
@@ -119,7 +119,7 @@ def select_task_b_examples(
 ) -> list[dict[str, Any]]:
     products = fetch_category_products(category, client=client)
     personas = fetch_user_personas(category, client=client)
-    taste_vector_users = fetch_user_taste_vectors(category, client=client)
+    preference_vector_users = fetch_user_preference_vectors(category, client=client)
     reviews = fetch_reviews_for_products(
         sorted(products),
         client=client,
@@ -131,7 +131,7 @@ def select_task_b_examples(
         review_user_id = str(review.get("user_id") or "")
         rating = float(review.get("rating") or 0)
         product = products.get(str(review.get("parent_asin") or ""))
-        if rating < 4 or not product or review_user_id not in personas or review_user_id not in taste_vector_users:
+        if rating < 4 or not product or review_user_id not in personas or review_user_id not in preference_vector_users:
             continue
         examples.append({"review": review, "product": product, "persona": personas[review_user_id]})
         if limit and len(examples) >= limit:

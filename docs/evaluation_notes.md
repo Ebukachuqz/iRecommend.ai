@@ -2,7 +2,7 @@
 
 Evaluation uses the stored per-user holdout split:
 
-- `persona_train` builds personas and user taste vectors.
+- `persona_train` builds personas and user preference vectors.
 - `task_a_holdout` evaluates Task A review/rating simulation.
 - `task_b_holdout` evaluates Task B recommendation with positive reviews as hidden liked products.
 

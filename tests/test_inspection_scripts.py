@@ -76,14 +76,14 @@ def test_check_category_readiness_counts_and_flags() -> None:
     ]
     personas = [{"user_id": "u1", "category": category}]
     embeddings = [{"parent_asin": "p1"}, {"parent_asin": "p2"}]
-    taste_vectors = [{"user_id": "u1", "category": category}]
+    preference_vectors = [{"user_id": "u1", "category": category}]
     client = FakeClient(
         {
             "amazon_product_metadata": products,
             "amazon_reviews": reviews,
             "user_personas": personas,
             "product_embeddings": embeddings,
-            "user_taste_vectors": taste_vectors,
+            "user_preference_vectors": preference_vectors,
         }
     )
 
@@ -96,12 +96,12 @@ def test_check_category_readiness_counts_and_flags() -> None:
     assert result["task_b_holdout_reviews"] == 1
     assert result["user_personas"] == 1
     assert result["product_embeddings"] == 2
-    assert result["user_taste_vectors"] == 1
+    assert result["user_preference_vectors"] == 1
     assert result["task_a_smoke_ready"] is True
     assert result["task_b_smoke_ready"] is True
 
 
-def test_list_eval_users_filters_task_b_and_requires_persona_and_taste() -> None:
+def test_list_eval_users_filters_task_b_and_requires_persona_and_preference() -> None:
     category = "Health_and_Household"
     products = [{"parent_asin": "p1", "category": category, "main_category": None, "categories": []}]
     reviews = [
@@ -109,13 +109,13 @@ def test_list_eval_users_filters_task_b_and_requires_persona_and_taste() -> None
         {"review_id": "r2", "user_id": "u2", "parent_asin": "p1", "task_split": "task_b_holdout"},
     ]
     personas = [{"user_id": "u1", "category": category}]
-    taste_vectors = [{"user_id": "u1", "category": category}]
+    preference_vectors = [{"user_id": "u1", "category": category}]
     client = FakeClient(
         {
             "amazon_product_metadata": products,
             "amazon_reviews": reviews,
             "user_personas": personas,
-            "user_taste_vectors": taste_vectors,
+            "user_preference_vectors": preference_vectors,
         }
     )
 
@@ -124,16 +124,16 @@ def test_list_eval_users_filters_task_b_and_requires_persona_and_taste() -> None
         category,
         limit=10,
         require_persona=True,
-        require_taste_vector=True,
+        require_preference_vector=True,
         task="task_b",
     )
 
     assert [row["user_id"] for row in rows] == ["u1"]
     assert rows[0]["has_persona"] is True
-    assert rows[0]["has_taste_vector"] is True
+    assert rows[0]["has_preference_vector"] is True
 
 
-def test_list_eval_users_task_b_does_not_require_taste_vector_by_default() -> None:
+def test_list_eval_users_task_b_does_not_require_preference_vector_by_default() -> None:
     category = "Health_and_Household"
     products = [{"parent_asin": "p1", "category": category, "main_category": None, "categories": []}]
     reviews = [
@@ -141,13 +141,13 @@ def test_list_eval_users_task_b_does_not_require_taste_vector_by_default() -> No
         {"review_id": "r2", "user_id": "u2", "parent_asin": "p1", "task_split": "task_b_holdout"},
     ]
     personas = [{"user_id": "u1", "category": category}, {"user_id": "u2", "category": category}]
-    taste_vectors = []
+    preference_vectors = []
     client = FakeClient(
         {
             "amazon_product_metadata": products,
             "amazon_reviews": reviews,
             "user_personas": personas,
-            "user_taste_vectors": taste_vectors,
+            "user_preference_vectors": preference_vectors,
         }
     )
 
@@ -156,15 +156,15 @@ def test_list_eval_users_task_b_does_not_require_taste_vector_by_default() -> No
         category,
         limit=10,
         require_persona=True,
-        require_taste_vector=False,
+        require_preference_vector=False,
         task="task_b",
     )
 
     assert [row["user_id"] for row in rows] == ["u1", "u2"]
-    assert all(row["has_taste_vector"] is False for row in rows)
+    assert all(row["has_preference_vector"] is False for row in rows)
 
 
-def test_list_eval_users_task_b_with_require_taste_vector_filters() -> None:
+def test_list_eval_users_task_b_with_require_preference_vector_filters() -> None:
     category = "Health_and_Household"
     products = [{"parent_asin": "p1", "category": category, "main_category": None, "categories": []}]
     reviews = [
@@ -172,13 +172,13 @@ def test_list_eval_users_task_b_with_require_taste_vector_filters() -> None:
         {"review_id": "r2", "user_id": "u2", "parent_asin": "p1", "task_split": "task_b_holdout"},
     ]
     personas = [{"user_id": "u1", "category": category}, {"user_id": "u2", "category": category}]
-    taste_vectors = [{"user_id": "u2", "category": category}]
+    preference_vectors = [{"user_id": "u2", "category": category}]
     client = FakeClient(
         {
             "amazon_product_metadata": products,
             "amazon_reviews": reviews,
             "user_personas": personas,
-            "user_taste_vectors": taste_vectors,
+            "user_preference_vectors": preference_vectors,
         }
     )
 
@@ -187,7 +187,7 @@ def test_list_eval_users_task_b_with_require_taste_vector_filters() -> None:
         category,
         limit=10,
         require_persona=True,
-        require_taste_vector=True,
+        require_preference_vector=True,
         task="task_b",
     )
 

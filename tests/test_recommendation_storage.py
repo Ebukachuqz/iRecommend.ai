@@ -66,8 +66,8 @@ def make_scored_candidates() -> list[dict]:
     return [
         {
             "parent_asin": "asin-top",
-            "retrieval_source": "taste_vector",
-            "retrieval_sources": ["taste_vector", "request_query"],
+            "retrieval_source": "preference_vector",
+            "retrieval_sources": ["preference_vector", "request_query"],
             "semantic_similarity": 0.9,
             "collaborative_similarity": 0.7,
             "score_breakdown": {
@@ -112,7 +112,7 @@ def make_scored_candidates() -> list[dict]:
 def test_recommendation_run_counts_retrieval_sources_from_full_candidate_pool() -> None:
     output = make_output()
     candidates = []
-    candidates.extend({"parent_asin": f"taste-{index}", "retrieval_source": "taste_vector"} for index in range(25))
+    candidates.extend({"parent_asin": f"pref-{index}", "retrieval_source": "preference_vector"} for index in range(25))
     candidates.extend({"parent_asin": f"query-{index}", "retrieval_source": "request_query"} for index in range(15))
     candidates.extend({"parent_asin": f"fallback-{index}", "retrieval_source": "quality_fallback"} for index in range(10))
     client = RecordingClient()
@@ -120,7 +120,7 @@ def test_recommendation_run_counts_retrieval_sources_from_full_candidate_pool() 
     payload = store_recommendation_run(output, {"scored_candidates": candidates}, client=client)
 
     assert payload["retrieval_sources"] == {
-        "taste_vector": 25,
+        "preference_vector": 25,
         "request_query": 15,
         "quality_fallback": 10,
     }
@@ -196,7 +196,7 @@ def test_candidate_traces_are_inserted_in_one_batch_with_ranks() -> None:
     assert rows[0]["candidate_rank"] == 1
     assert rows[0]["rank_before_rerank"] == 1
     assert rows[0]["rank_after_rerank"] == 2
-    assert rows[0]["retrieval_sources"] == ["taste_vector", "request_query"]
+    assert rows[0]["retrieval_sources"] == ["preference_vector", "request_query"]
     assert rows[0]["collaborative_similarity"] == 0.7
     assert rows[0]["preference_match"] == 0.8
     assert rows[0]["product_quality"] == 0.9

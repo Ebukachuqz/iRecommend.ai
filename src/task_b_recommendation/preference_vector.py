@@ -126,7 +126,7 @@ def filter_reviews_by_product_category(
     ]
 
 
-def build_user_taste_vector(user_id: str, category: str | None = None, client: Client | None = None) -> tuple[list[float], list[str]]:
+def build_user_preference_vector(user_id: str, category: str | None = None, client: Client | None = None) -> tuple[list[float], list[str]]:
     reviews = fetch_liked_training_reviews(user_id, client=client)
     if category:
         reviews = filter_reviews_by_product_category(reviews, category, client=client)
@@ -146,7 +146,7 @@ def build_user_taste_vector(user_id: str, category: str | None = None, client: C
     return weighted_average(vectors, weights), sources
 
 
-def store_user_taste_vector(
+def store_user_preference_vector(
     user_id: str,
     category: str,
     embedding: list[float],
@@ -155,7 +155,7 @@ def store_user_taste_vector(
     client: Client | None = None,
 ) -> None:
     client = client or get_supabase_client()
-    client.table("user_taste_vectors").upsert(
+    client.table("user_preference_vectors").upsert(
         {
             "user_id": user_id,
             "category": category,
@@ -168,22 +168,22 @@ def store_user_taste_vector(
     ).execute()
 
 
-def build_and_store_user_taste_vector(
+def build_and_store_user_preference_vector(
     user_id: str,
     category: str,
     embedding_model: str = DEFAULT_EMBEDDING_MODEL,
     client: Client | None = None,
 ) -> tuple[list[float], list[str]]:
-    embedding, sources = build_user_taste_vector(user_id, category, client=client)
+    embedding, sources = build_user_preference_vector(user_id, category, client=client)
     if embedding:
-        store_user_taste_vector(user_id, category, embedding, sources, embedding_model=embedding_model, client=client)
+        store_user_preference_vector(user_id, category, embedding, sources, embedding_model=embedding_model, client=client)
     return embedding, sources
 
 
-def fetch_user_taste_vector(user_id: str, category: str, client: Client | None = None) -> dict[str, Any] | None:
+def fetch_user_preference_vector(user_id: str, category: str, client: Client | None = None) -> dict[str, Any] | None:
     client = client or get_supabase_client()
     response = (
-        client.table("user_taste_vectors")
+        client.table("user_preference_vectors")
         .select("*")
         .eq("user_id", user_id)
         .eq("category", category)

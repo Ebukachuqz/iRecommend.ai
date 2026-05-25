@@ -11,9 +11,9 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.task_b_recommendation.embeddings import DEFAULT_EMBEDDING_MODEL
 from src.config import get_settings
 from src.db.supabase_client import get_supabase_client
-from src.task_b_recommendation.taste_vector import (
-    build_and_store_user_taste_vector,
-    fetch_user_taste_vector,
+from src.task_b_recommendation.preference_vector import (
+    build_and_store_user_preference_vector,
+    fetch_user_preference_vector,
 )
 
 
@@ -42,7 +42,7 @@ def fetch_persona_user_ids(category: str, client=None) -> list[str]:
 
 
 def build_one(user_id: str, category: str, embedding_model: str, client=None) -> dict:
-    embedding, sources = build_and_store_user_taste_vector(
+    embedding, sources = build_and_store_user_preference_vector(
         user_id,
         category,
         embedding_model=embedding_model,
@@ -58,7 +58,7 @@ def build_one(user_id: str, category: str, embedding_model: str, client=None) ->
 
 def main() -> None:
     settings = get_settings()
-    parser = argparse.ArgumentParser(description="Build a user taste vector from persona_train liked reviews.")
+    parser = argparse.ArgumentParser(description="Build a user preference vector from persona_train liked reviews.")
     parser.add_argument("--user-id", default=None)
     parser.add_argument("--category", default=settings.default_category)
     parser.add_argument("--model", default=DEFAULT_EMBEDDING_MODEL)
@@ -83,25 +83,25 @@ def main() -> None:
     failed_count = 0
 
     for index, user_id in enumerate(user_ids, start=1):
-        print(f"[taste-vector] Processing user {index}/{users_considered}: user_id={user_id}")
+        print(f"[preference-vector] Processing user {index}/{users_considered}: user_id={user_id}")
         try:
             if not args.force:
-                existing = fetch_user_taste_vector(user_id, args.category, client=client)
+                existing = fetch_user_preference_vector(user_id, args.category, client=client)
                 if existing:
                     skipped_existing += 1
-                    print(f"[taste-vector] Skip existing: user_id={user_id}")
+                    print(f"[preference-vector] Skip existing: user_id={user_id}")
                     continue
 
             result = build_one(user_id, args.category, args.model, client=client)
             if not result["stored"]:
                 skipped_no_sources += 1
-                print(f"[taste-vector] Skip no sources: user_id={user_id}")
+                print(f"[preference-vector] Skip no sources: user_id={user_id}")
                 continue
             built_count += 1
-            print(f"[taste-vector] Built: {result}")
+            print(f"[preference-vector] Built: {result}")
         except Exception as exc:
             failed_count += 1
-            print(f"[taste-vector] Failed: user_id={user_id}, error={exc}")
+            print(f"[preference-vector] Failed: user_id={user_id}, error={exc}")
 
     print(
         {

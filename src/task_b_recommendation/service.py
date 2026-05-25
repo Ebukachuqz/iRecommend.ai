@@ -8,7 +8,7 @@ from src.constants import DEFAULT_CATEGORY
 from src.task_b_recommendation.candidate_retriever import retrieve_candidates
 from src.task_b_recommendation.graph import (
     build_intent_plan_payload,
-    build_or_get_user_taste_vector,
+    build_or_get_user_preference_vector,
     candidate_trace_rows,
     final_rank_by_parent_asin,
     load_or_create_session,

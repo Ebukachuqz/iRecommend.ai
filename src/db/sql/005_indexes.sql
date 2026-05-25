@@ -34,7 +34,7 @@ ON recommendation_candidates (recommendation_run_id);
 CREATE INDEX IF NOT EXISTS recommendation_candidates_parent_asin_idx
 ON recommendation_candidates (parent_asin);
 
--- pgvector ivfflat indexes are best created after product embeddings and taste
+-- pgvector ivfflat indexes are best created after product embeddings and preference
 -- vectors are populated. If these indexes are created before a large bulk load,
 -- recreate or REINDEX them after the rebuild for better recall/performance.
 CREATE INDEX IF NOT EXISTS product_embeddings_embedding_ivfflat_idx
@@ -42,7 +42,7 @@ ON product_embeddings
 USING ivfflat (embedding vector_cosine_ops)
 WITH (lists = 100);
 
-CREATE INDEX IF NOT EXISTS user_taste_vectors_embedding_ivfflat_idx
-ON user_taste_vectors
+CREATE INDEX IF NOT EXISTS user_preference_vectors_embedding_ivfflat_idx
+ON user_preference_vectors
 USING ivfflat (embedding vector_cosine_ops)
 WITH (lists = 50);

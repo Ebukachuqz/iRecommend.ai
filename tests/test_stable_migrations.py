@@ -12,6 +12,7 @@ EXPECTED_ACTIVE_FILES = [
     "004_pgvector_functions.sql",
     "005_indexes.sql",
     "006_product_metadata_optional_fields.sql",
+    "007_rename_user_preference_vectors.sql",
 ]
 ARCHIVED_FILES = [
     "001_initial_schema.sql",
@@ -47,6 +48,7 @@ def test_reset_migration_is_destructive_but_project_scoped() -> None:
     assert "this script deletes all irecommend project data" in sql
     assert "create extension if not exists vector" in sql
     assert "drop function if exists match_product_embeddings(vector(384), integer, text[])" in sql
+    assert "drop function if exists match_user_preference_vectors(vector(384), text, integer, text)" in sql
     assert "drop function if exists match_user_taste_vectors(vector(384), text, integer, text)" in sql
     for table in [
         "recommendation_candidates",
@@ -54,6 +56,7 @@ def test_reset_migration_is_destructive_but_project_scoped() -> None:
         "recommendation_runs",
         "recommendation_sessions",
         "simulation_results",
+        "user_preference_vectors",
         "user_taste_vectors",
         "product_embeddings",
         "user_personas",
@@ -92,7 +95,7 @@ def test_task_b_schema_contains_final_task_b_tables_and_extensions() -> None:
     assert sql.index("create extension if not exists vector") < sql.index("embedding vector(384)")
     for table in [
         "product_embeddings",
-        "user_taste_vectors",
+        "user_preference_vectors",
         "recommendation_runs",
         "recommendation_sessions",
         "intent_plans",
@@ -117,7 +120,7 @@ def test_pgvector_functions_match_python_rpc_names() -> None:
     assert "match_count integer default 20" in sql
     assert "exclude_parent_asins text[] default array[]::text[]" in sql
     assert "returns table" in sql and "parent_asin text" in sql and "similarity double precision" in sql
-    assert "create or replace function match_user_taste_vectors" in sql
+    assert "create or replace function match_user_preference_vectors" in sql
     assert "target_category text" in sql
     assert "exclude_user_id text default null" in sql
 
@@ -138,7 +141,7 @@ def test_indexes_migration_contains_key_indexes() -> None:
         "recommendation_candidates_run_idx",
         "recommendation_candidates_parent_asin_idx",
         "product_embeddings_embedding_ivfflat_idx",
-        "user_taste_vectors_embedding_ivfflat_idx",
+        "user_preference_vectors_embedding_ivfflat_idx",
     ]:
         assert phrase in sql
     assert "ivfflat indexes are best created after" in sql
@@ -150,3 +153,13 @@ def test_product_metadata_optional_fields_migration_is_safe() -> None:
     assert "alter table amazon_product_metadata" in sql
     assert "add column if not exists images jsonb default '[]'::jsonb" in sql
     assert "add column if not exists bought_together jsonb default '[]'::jsonb" in sql
+
+
+def test_user_preference_vector_rename_migration_is_safe() -> None:
+    sql = read_sql("007_rename_user_preference_vectors.sql")
+
+    assert "to_regclass('public.user_taste_vectors')" in sql
+    assert "alter table user_taste_vectors rename to user_preference_vectors" in sql
+    assert "drop function if exists match_user_taste_vectors(vector(384), text, integer, text)" in sql
+    assert "create or replace function match_user_preference_vectors" in sql
+    assert "from user_preference_vectors" in sql

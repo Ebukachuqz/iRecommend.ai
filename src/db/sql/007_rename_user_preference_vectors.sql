@@ -1,26 +1,20 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 
-CREATE OR REPLACE FUNCTION match_product_embeddings(
-    query_embedding vector(384),
-    match_count integer DEFAULT 20,
-    exclude_parent_asins text[] DEFAULT ARRAY[]::text[]
-)
-RETURNS TABLE (
-    parent_asin text,
-    similarity double precision
-)
-LANGUAGE SQL
-STABLE
-AS $$
-    SELECT
-        product_embeddings.parent_asin,
-        1 - (product_embeddings.embedding <=> query_embedding) AS similarity
-    FROM product_embeddings
-    WHERE product_embeddings.embedding IS NOT NULL
-      AND NOT (product_embeddings.parent_asin = ANY(exclude_parent_asins))
-    ORDER BY product_embeddings.embedding <=> query_embedding
-    LIMIT match_count;
-$$;
+DO $$
+BEGIN
+    IF to_regclass('public.user_taste_vectors') IS NOT NULL
+       AND to_regclass('public.user_preference_vectors') IS NULL THEN
+        ALTER TABLE user_taste_vectors RENAME TO user_preference_vectors;
+    END IF;
+
+    IF to_regclass('public.user_taste_vectors_embedding_ivfflat_idx') IS NOT NULL
+       AND to_regclass('public.user_preference_vectors_embedding_ivfflat_idx') IS NULL THEN
+        ALTER INDEX user_taste_vectors_embedding_ivfflat_idx
+            RENAME TO user_preference_vectors_embedding_ivfflat_idx;
+    END IF;
+END $$;
+
+DROP FUNCTION IF EXISTS match_user_taste_vectors(vector(384), text, integer, text);
 
 CREATE OR REPLACE FUNCTION match_user_preference_vectors(
     query_embedding vector(384),
@@ -47,3 +41,8 @@ AS $$
     ORDER BY user_preference_vectors.embedding <=> query_embedding
     LIMIT match_count;
 $$;
+
+CREATE INDEX IF NOT EXISTS user_preference_vectors_embedding_ivfflat_idx
+ON user_preference_vectors
+USING ivfflat (embedding vector_cosine_ops)
+WITH (lists = 50);

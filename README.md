@@ -80,7 +80,7 @@ python scripts/run_migrations.py
 Run a specific range:
 
 ```powershell
-python scripts/run_migrations.py --from 003 --to 006
+python scripts/run_migrations.py --from 003 --to 007
 ```
 
 The reset migration is destructive and skipped by default. To run only the reset, you must be explicit:
@@ -99,6 +99,7 @@ src/db/sql/003_task_b_schema.sql        recommendation tables and vector columns
 src/db/sql/004_pgvector_functions.sql   pgvector RPC functions
 src/db/sql/005_indexes.sql              relational and vector indexes
 src/db/sql/006_product_metadata_optional_fields.sql   safe metadata image/related-product backfill columns
+src/db/sql/007_rename_user_preference_vectors.sql     safe preference-vector table/function rename
 ```
 
 Old development migrations are archived in `src/db/sql/archive/`. Reviewers should use the stable migrations above. If direct DB access is unavailable, run the same SQL files manually in Supabase SQL Editor, using `000_reset_database.sql` only for clean rebuilds.
@@ -166,7 +167,7 @@ List evaluation-friendly users:
 ```powershell
 python scripts/list_eval_users.py --category Health_and_Household --limit 10
 python scripts/list_eval_users.py --category Health_and_Household --task task_a --require-persona --limit 10
-python scripts/list_eval_users.py --category Health_and_Household --task task_b --require-persona --require-taste-vector --limit 10
+python scripts/list_eval_users.py --category Health_and_Household --task task_b --require-persona --require-preference-vector --limit 10
 ```
 
 Pick a user for Task A:
@@ -180,7 +181,7 @@ python scripts/list_user_holdouts.py --user-id <USER_ID> --category Health_and_H
 
 Pick a user for Task B:
 
-1. Choose a row where `has_persona=true`, `has_taste_vector=true`, and `task_b_holdout_count>0`.
+1. Choose a row where `has_persona=true`, `has_preference_vector=true`, and `task_b_holdout_count>0`.
 
 List embedded products (useful for checking whether semantic retrieval has any catalog):
 
@@ -214,21 +215,21 @@ python scripts/embed_products.py --category All_Beauty --force-reembed
 
 Product embeddings are built from rich product metadata: title, category path, features, description, brand/store, price tier, and useful details. The exact raw price is not embedded; the script uses semantic tiers such as `budget`, `mid-range`, `premium`, and `luxury` because those meanings are more stable than a changing seller price. The text used for each embedding is stored in `product_embeddings.product_text` for debugging and reproducibility. Re-run with `--force-reembed` when the product text strategy changes.
 
-Build a user taste vector:
+Build a user preference vector:
 
 ```powershell
-python scripts/build_user_taste_vectors.py --user-id <USER_ID> --category All_Beauty
+python scripts/build_user_preference_vectors.py --user-id <USER_ID> --category All_Beauty
 ```
 
-Build taste vectors for a batch of users in a category (from `user_personas`):
+Build preference vectors for a batch of users in a category (from `user_personas`):
 
 ```powershell
-python scripts/build_user_taste_vectors.py --category Health_and_Household --limit 20
-python scripts/build_user_taste_vectors.py --category Electronics --limit 20
-python scripts/build_user_taste_vectors.py --category Beauty_and_Personal_Care --limit 20
+python scripts/build_user_preference_vectors.py --category Health_and_Household --limit 20
+python scripts/build_user_preference_vectors.py --category Electronics --limit 20
+python scripts/build_user_preference_vectors.py --category Beauty_and_Personal_Care --limit 20
 ```
 
-Taste vectors are category-specific and unit-normalized after averaging liked product embeddings. They are built from rating >= 4 `persona_train` reviews whose products match the requested metadata category.
+Preference vectors are category-specific and unit-normalized after averaging liked product embeddings. They are built from rating >= 4 `persona_train` reviews whose products match the requested metadata category.
 
 Run recommendations:
 
@@ -241,9 +242,9 @@ FastAPI and CLI callers use the Task B service layer, and `service.recommend()` 
 
 Successful recommendation calls are stored in `recommendation_runs`.
 
-Task B retrieves candidates from multiple sources before scoring: taste-vector semantic search, request-query semantic search, collaborative signals from similar users' taste vectors, persona/intent attribute matching, and a quality/popularity fallback. Collaborative filtering is only one signal; the system goes beyond it by grounding retrieval, scoring, and final reasons in the user's persona and request intent. Cold-start and custom-persona requests still work through request-query retrieval and quality fallback when no stored taste vector exists.
+Task B retrieves candidates from multiple sources before scoring: preference-vector semantic search, request-query semantic search, collaborative signals from similar users' preference vectors, persona/intent attribute matching, and a quality/popularity fallback. Collaborative filtering is only one signal; the system goes beyond it by grounding retrieval, scoring, and final reasons in the user's persona and request intent. Cold-start and custom-persona requests still work through request-query retrieval and quality fallback when no stored preference vector exists.
 
-Cold-start requests build a low-confidence starter persona from request/context signals and do not require taste vectors. Cross-domain recommendations are conservative: close beauty/skincare categories stay in-domain, while meaningfully different domains such as beauty -> electronics use transferable values like price sensitivity, quality, reliability, simplicity, durability, and value for money. Multi-turn sessions refine active constraints and exclude products already shown in the same session.
+Cold-start requests build a low-confidence starter persona from request/context signals and do not require preference vectors. Cross-domain recommendations are conservative: close beauty/skincare categories stay in-domain, while meaningfully different domains such as beauty -> electronics use transferable values like price sensitivity, quality, reliability, simplicity, durability, and value for money. Multi-turn sessions refine active constraints and exclude products already shown in the same session.
 
 Task B also stores an audit trail for evaluation and debugging. `intent_plans` records the structured reasoning brief produced by the intent planner, `recommendation_candidates` records the retrieved/scored candidate pool with before/after rerank ranks, and `recommendation_runs` stores the final output. Intent and candidate traces are best-effort; a trace insert failure should not block recommendation generation.
 
@@ -254,7 +255,7 @@ Task B also accepts a custom persona JSON through `POST /recommendations/generat
 Evaluation uses the same runtime services as the app and writes paper-ready artifacts under `outputs/evaluation/`. Run the pipeline in this order:
 
 ```text
-migrations -> ingestion -> create_holdout_split.py -> regenerate_personas.py -> embed_products.py -> build_user_taste_vectors.py -> evaluation
+migrations -> ingestion -> create_holdout_split.py -> regenerate_personas.py -> embed_products.py -> build_user_preference_vectors.py -> evaluation
 ```
 
 Task A evaluates review/rating simulation against `task_a_holdout` reviews. It reports MAE, RMSE, rounded exact-rating accuracy, within-1-star accuracy, predicted/true mean rating, optimistic bias, and a user-average-rating baseline from `persona_train` reviews.
@@ -425,7 +426,7 @@ Render Free services sleep after inactivity. The first request after sleep can b
 
 The included `render.yaml` is a convenience blueprint for creating the two Docker web services. You still need to provide real secret values in Render.
 
-Long-running ingestion, embedding, persona generation, taste-vector builds, migration runs, and evaluation scripts should be run locally or in a dedicated job environment, not as Render web services.
+Long-running ingestion, embedding, persona generation, preference-vector builds, migration runs, and evaluation scripts should be run locally or in a dedicated job environment, not as Render web services.
 
 ## Makefile
 
@@ -438,7 +439,7 @@ make docker-build
 make docker-up
 make docker-down
 make embed-products LIMIT=100
-make build-taste-vector USER_ID=<USER_ID> CATEGORY=All_Beauty
+make build-preference-vector USER_ID=<USER_ID> CATEGORY=All_Beauty
 make check-db
 make migrate-dry-run
 make migrate

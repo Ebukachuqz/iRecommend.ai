@@ -1,12 +1,12 @@
 import math
 
-from src.task_b_recommendation import taste_vector
-from src.task_b_recommendation.taste_vector import (
-    build_and_store_user_taste_vector,
-    build_user_taste_vector,
+from src.task_b_recommendation import preference_vector
+from src.task_b_recommendation.preference_vector import (
+    build_and_store_user_preference_vector,
+    build_user_preference_vector,
     parse_embedding,
     product_matches_category,
-    store_user_taste_vector,
+    store_user_preference_vector,
     weighted_average,
 )
 
@@ -54,10 +54,10 @@ class DummyClient:
         return self.table_obj
 
 
-def test_store_user_taste_vector_records_source_review_count() -> None:
+def test_store_user_preference_vector_records_source_review_count() -> None:
     client = DummyClient()
 
-    store_user_taste_vector(
+    store_user_preference_vector(
         "user-1",
         "All_Beauty",
         [0.1, 0.2],
@@ -76,7 +76,7 @@ def test_product_matches_category_uses_category_then_fallbacks() -> None:
     assert product_matches_category({"category": "Books"}, "All_Beauty") is False
 
 
-def test_build_user_taste_vector_filters_positive_reviews_by_category(monkeypatch) -> None:
+def test_build_user_preference_vector_filters_positive_reviews_by_category(monkeypatch) -> None:
     reviews = [
         {"parent_asin": "beauty-4", "rating": 4},
         {"parent_asin": "beauty-5", "rating": 5},
@@ -93,16 +93,16 @@ def test_build_user_taste_vector_filters_positive_reviews_by_category(monkeypatc
         "book-5": [10.0, 10.0],
     }
 
-    monkeypatch.setattr(taste_vector, "fetch_liked_training_reviews", lambda user_id, client=None: reviews)
-    monkeypatch.setattr(taste_vector, "fetch_product_metadata", lambda parent_asins, client=None: metadata)
+    monkeypatch.setattr(preference_vector, "fetch_liked_training_reviews", lambda user_id, client=None: reviews)
+    monkeypatch.setattr(preference_vector, "fetch_product_metadata", lambda parent_asins, client=None: metadata)
     monkeypatch.setattr(
-        taste_vector,
+        preference_vector,
         "fetch_product_embeddings",
         lambda parent_asins, client=None: {asin: embeddings[asin] for asin in parent_asins},
     )
 
-    beauty_vector, beauty_sources = build_user_taste_vector("user-1", "All_Beauty")
-    book_vector, book_sources = build_user_taste_vector("user-1", "Books")
+    beauty_vector, beauty_sources = build_user_preference_vector("user-1", "All_Beauty")
+    book_vector, book_sources = build_user_preference_vector("user-1", "Books")
 
     assert beauty_sources == ["beauty-4", "beauty-5"]
     assert beauty_vector == [1 / math.sqrt(5), 2 / math.sqrt(5)]
@@ -110,7 +110,7 @@ def test_build_user_taste_vector_filters_positive_reviews_by_category(monkeypatc
     assert book_vector == [1 / math.sqrt(2), 1 / math.sqrt(2)]
 
 
-def test_build_and_store_taste_vector_records_category_specific_source_count(monkeypatch) -> None:
+def test_build_and_store_preference_vector_records_category_specific_source_count(monkeypatch) -> None:
     reviews = [
         {"parent_asin": "beauty-1", "rating": 5},
         {"parent_asin": "book-1", "rating": 5},
@@ -122,16 +122,16 @@ def test_build_and_store_taste_vector_records_category_specific_source_count(mon
     embeddings = {"beauty-1": [1.0, 0.0], "book-1": [0.0, 1.0]}
     stored = []
 
-    monkeypatch.setattr(taste_vector, "fetch_liked_training_reviews", lambda user_id, client=None: reviews)
-    monkeypatch.setattr(taste_vector, "fetch_product_metadata", lambda parent_asins, client=None: metadata)
+    monkeypatch.setattr(preference_vector, "fetch_liked_training_reviews", lambda user_id, client=None: reviews)
+    monkeypatch.setattr(preference_vector, "fetch_product_metadata", lambda parent_asins, client=None: metadata)
     monkeypatch.setattr(
-        taste_vector,
+        preference_vector,
         "fetch_product_embeddings",
         lambda parent_asins, client=None: {asin: embeddings[asin] for asin in parent_asins},
     )
-    monkeypatch.setattr(taste_vector, "store_user_taste_vector", lambda *args, **kwargs: stored.append(args))
+    monkeypatch.setattr(preference_vector, "store_user_preference_vector", lambda *args, **kwargs: stored.append(args))
 
-    build_and_store_user_taste_vector("user-1", "All_Beauty")
+    build_and_store_user_preference_vector("user-1", "All_Beauty")
 
     assert stored[0][3] == ["beauty-1"]
     assert len(stored[0][3]) == 1

@@ -238,8 +238,8 @@ class MultiSourceClient:
         self.product_query = QueryRecorder(
             [
                 {
-                    "parent_asin": "taste-1",
-                    "title": "Taste vector cleanser",
+                    "parent_asin": "pref-1",
+                    "title": "Preference vector cleanser",
                     "category": "All_Beauty",
                     "average_rating": 4.5,
                     "rating_number": 100,
@@ -289,9 +289,9 @@ class MultiSourceClient:
         return self.product_query
 
 
-def test_taste_vector_retrieval_runs_when_taste_vector_exists(monkeypatch) -> None:
+def test_preference_vector_retrieval_runs_when_preference_vector_exists(monkeypatch) -> None:
     client = MultiSourceClient()
-    vector_store = VectorStoreRecorder([{"parent_asin": "taste-1", "similarity": 0.9}])
+    vector_store = VectorStoreRecorder([{"parent_asin": "pref-1", "similarity": 0.9}])
     monkeypatch.setattr("src.task_b_recommendation.candidate_retriever.embed_text", lambda text: [0.3, 0.4])
 
     result = retrieve_candidates_with_sources(
@@ -301,12 +301,12 @@ def test_taste_vector_retrieval_runs_when_taste_vector_exists(monkeypatch) -> No
         limit=1,
         client=client,
         vector_store=vector_store,
-        taste_vector_row={"embedding": [0.1, 0.2]},
+        preference_vector_row={"embedding": [0.1, 0.2]},
     )
 
-    assert result.candidates[0].retrieval_source == "taste_vector"
+    assert result.candidates[0].retrieval_source == "preference_vector"
     assert result.candidates[0].semantic_similarity == 0.9
-    assert result.source_counts["taste_vector"] == 1
+    assert result.source_counts["preference_vector"] == 1
 
 
 def test_collaborative_retrieval_collects_similar_users_liked_products(monkeypatch) -> None:
@@ -322,7 +322,7 @@ def test_collaborative_retrieval_collects_similar_users_liked_products(monkeypat
         limit=1,
         client=client,
         vector_store=vector_store,
-        taste_vector_row={"embedding": [0.1, 0.2]},
+        preference_vector_row={"embedding": [0.1, 0.2]},
     )
 
     assert result.candidates[0].parent_asin == "collab-1"
@@ -353,7 +353,7 @@ def test_attribute_match_retrieval_uses_persona_and_intent_signals(monkeypatch) 
 
 def test_dedupe_preserves_multiple_retrieval_sources(monkeypatch) -> None:
     client = MultiSourceClient()
-    vector_store = VectorStoreRecorder([{"parent_asin": "taste-1", "similarity": 0.75}])
+    vector_store = VectorStoreRecorder([{"parent_asin": "pref-1", "similarity": 0.75}])
     monkeypatch.setattr("src.task_b_recommendation.candidate_retriever.embed_text", lambda text: [0.3, 0.4])
 
     result = retrieve_candidates_with_sources(
@@ -363,12 +363,12 @@ def test_dedupe_preserves_multiple_retrieval_sources(monkeypatch) -> None:
         limit=1,
         client=client,
         vector_store=vector_store,
-        taste_vector_row={"embedding": [0.1, 0.2]},
+        preference_vector_row={"embedding": [0.1, 0.2]},
     )
 
-    assert result.candidates[0].parent_asin == "taste-1"
-    assert result.candidates[0].retrieval_sources == ["taste_vector", "request_query"]
-    assert result.source_counts["taste_vector"] == 1
+    assert result.candidates[0].parent_asin == "pref-1"
+    assert result.candidates[0].retrieval_sources == ["preference_vector", "request_query"]
+    assert result.source_counts["preference_vector"] == 1
     assert result.source_counts.get("request_query", 0) == 0
 
 
@@ -384,7 +384,7 @@ def test_reviewed_products_are_excluded_from_vector_sources(monkeypatch) -> None
         limit=1,
         client=client,
         vector_store=vector_store,
-        taste_vector_row={"embedding": [0.1, 0.2]},
+        preference_vector_row={"embedding": [0.1, 0.2]},
     )
 
     assert all(candidate.parent_asin != "seen-1" for candidate in result.candidates)
@@ -394,7 +394,7 @@ def test_explicit_excluded_parent_asins_are_removed_from_all_retrieval_sources(m
     client = MultiSourceClient()
     vector_store = VectorStoreRecorder(
         [
-            {"parent_asin": "taste-1", "similarity": 0.95},
+            {"parent_asin": "pref-1", "similarity": 0.95},
             {"parent_asin": "query-1", "similarity": 0.9},
         ]
     )
@@ -409,10 +409,10 @@ def test_explicit_excluded_parent_asins_are_removed_from_all_retrieval_sources(m
         client=client,
         vector_store=vector_store,
         persona={"preferences": {"liked_attributes": ["fragrance free"]}},
-        taste_vector_row={"embedding": [0.1, 0.2]},
-        exclude_parent_asins={"taste-1", "query-1", "collab-1", "attr-1"},
+        preference_vector_row={"embedding": [0.1, 0.2]},
+        exclude_parent_asins={"pref-1", "query-1", "collab-1", "attr-1"},
     )
 
-    assert all(candidate.parent_asin not in {"taste-1", "query-1", "collab-1", "attr-1"} for candidate in result.candidates)
-    assert vector_store.calls[0]["exclude_parent_asins"] == {"seen-1", "taste-1", "query-1", "collab-1", "attr-1"}
+    assert all(candidate.parent_asin not in {"pref-1", "query-1", "collab-1", "attr-1"} for candidate in result.candidates)
+    assert vector_store.calls[0]["exclude_parent_asins"] == {"seen-1", "pref-1", "query-1", "collab-1", "attr-1"}
     assert [candidate.parent_asin for candidate in result.candidates] == ["fallback-1"]
