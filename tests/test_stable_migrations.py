@@ -11,6 +11,7 @@ EXPECTED_ACTIVE_FILES = [
     "003_task_b_schema.sql",
     "004_pgvector_functions.sql",
     "005_indexes.sql",
+    "006_product_metadata_optional_fields.sql",
 ]
 ARCHIVED_FILES = [
     "001_initial_schema.sql",
@@ -68,6 +69,8 @@ def test_core_schema_contains_final_core_tables() -> None:
 
     assert "create extension if not exists pgcrypto" in sql
     assert "create table if not exists amazon_product_metadata" in sql
+    assert "images jsonb default '[]'::jsonb" in sql
+    assert "bought_together jsonb default '[]'::jsonb" in sql
     assert "create table if not exists amazon_reviews" in sql
     assert "task_split text default 'persona_train'" in sql
     assert "create table if not exists user_personas" in sql
@@ -139,3 +142,11 @@ def test_indexes_migration_contains_key_indexes() -> None:
     ]:
         assert phrase in sql
     assert "ivfflat indexes are best created after" in sql
+
+
+def test_product_metadata_optional_fields_migration_is_safe() -> None:
+    sql = read_sql("006_product_metadata_optional_fields.sql")
+
+    assert "alter table amazon_product_metadata" in sql
+    assert "add column if not exists images jsonb default '[]'::jsonb" in sql
+    assert "add column if not exists bought_together jsonb default '[]'::jsonb" in sql

@@ -42,7 +42,7 @@ def sparse_metadata(parent_asin: str) -> dict:
 
 
 class SelectColumnsDataset:
-    column_names = ["parent_asin", "title", "images", "details"]
+    column_names = ["parent_asin", "title", "images", "bought_together", "details"]
 
     def __init__(self) -> None:
         self.selected = None
@@ -53,7 +53,7 @@ class SelectColumnsDataset:
 
 
 class RemoveColumnsDataset:
-    column_names = ["parent_asin", "title", "images", "details"]
+    column_names = ["parent_asin", "title", "images", "bought_together", "details"]
 
     def __init__(self) -> None:
         self.removed = None
@@ -81,21 +81,22 @@ def test_metadata_pruning_prefers_select_columns() -> None:
     dataset = SelectColumnsDataset()
 
     assert ingest_amazon.prune_metadata_columns(dataset) is dataset
-    assert dataset.selected == ["parent_asin", "title", "details"]
+    assert dataset.selected == ["parent_asin", "title", "images", "bought_together", "details"]
 
 
 def test_metadata_pruning_falls_back_to_remove_columns() -> None:
     dataset = RemoveColumnsDataset()
 
     assert ingest_amazon.prune_metadata_columns(dataset) is dataset
-    assert dataset.removed == ["images"]
+    assert dataset.removed == ["variants"]
 
 
 def test_metadata_pruning_removes_known_problem_columns_without_column_names() -> None:
     dataset = ProblemColumnFallbackDataset()
 
     assert ingest_amazon.prune_metadata_columns(dataset) is dataset
-    assert "images" in dataset.removed
+    assert "images" not in dataset.removed
+    assert "bought_together" not in dataset.removed
     assert "variants" in dataset.removed
 
 
@@ -276,6 +277,54 @@ def test_normalize_metadata_converts_json_string_details_to_dict() -> None:
 
     assert normalized["details"] == {"Color": "As Shown", "Manufacturer": "Lurrose"}
     assert normalized["raw_metadata"]["details"] == '{"Color": "As Shown", "Manufacturer": "Lurrose"}'
+
+
+def test_optional_images_and_bought_together_are_not_required() -> None:
+    item = valid_metadata("p1")
+    item.pop("images", None)
+    item.pop("bought_together", None)
+
+    normalized = ingest_amazon.normalize_metadata(item, "All_Beauty")
+
+    assert ingest_amazon.is_valid_metadata(item, "All_Beauty") is True
+    assert normalized["images"] == []
+    assert normalized["bought_together"] == []
+
+
+def test_normalize_metadata_preserves_optional_image_and_related_fields() -> None:
+    item = valid_metadata("p1")
+    item["images"] = [
+        {"hi_res": "https://example.com/hi.jpg", "thumb": "https://example.com/thumb.jpg"},
+        "https://example.com/plain.jpg",
+    ]
+    item["bought_together"] = ["B001", {"parent_asin": "B002"}]
+
+    normalized = ingest_amazon.normalize_metadata(item, "All_Beauty")
+
+    assert normalized["images"] == item["images"]
+    assert normalized["bought_together"] == item["bought_together"]
+
+
+def test_optional_metadata_fields_accept_dict_and_json_strings() -> None:
+    item = valid_metadata("p1")
+    item["images"] = '{"thumb": "https://example.com/thumb.jpg"}'
+    item["bought_together"] = '["B001", {"parent_asin": "B002"}]'
+
+    normalized = ingest_amazon.normalize_metadata(item, "All_Beauty")
+
+    assert normalized["images"] == [{"thumb": "https://example.com/thumb.jpg"}]
+    assert normalized["bought_together"] == ["B001", {"parent_asin": "B002"}]
+
+
+def test_optional_metadata_fields_drop_invalid_values() -> None:
+    item = valid_metadata("p1")
+    item["images"] = '{"thumb": "missing close brace"'
+    item["bought_together"] = 123
+
+    normalized = ingest_amazon.normalize_metadata(item, "All_Beauty")
+
+    assert normalized["images"] == []
+    assert normalized["bought_together"] == []
 
 
 def test_product_missing_rating_number_is_valid_by_default() -> None:

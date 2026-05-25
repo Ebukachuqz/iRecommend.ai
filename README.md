@@ -80,7 +80,7 @@ python scripts/run_migrations.py
 Run a specific range:
 
 ```powershell
-python scripts/run_migrations.py --from 003 --to 005
+python scripts/run_migrations.py --from 003 --to 006
 ```
 
 The reset migration is destructive and skipped by default. To run only the reset, you must be explicit:
@@ -98,6 +98,7 @@ src/db/sql/002_task_a_schema.sql        review simulation storage
 src/db/sql/003_task_b_schema.sql        recommendation tables and vector columns
 src/db/sql/004_pgvector_functions.sql   pgvector RPC functions
 src/db/sql/005_indexes.sql              relational and vector indexes
+src/db/sql/006_product_metadata_optional_fields.sql   safe metadata image/related-product backfill columns
 ```
 
 Old development migrations are archived in `src/db/sql/archive/`. Reviewers should use the stable migrations above. If direct DB access is unavailable, run the same SQL files manually in Supabase SQL Editor, using `000_reset_database.sql` only for clean rebuilds.

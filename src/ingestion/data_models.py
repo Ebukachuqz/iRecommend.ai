@@ -29,6 +29,8 @@ class AmazonProductMetadata(BaseModel):
     categories: list[Any] = Field(default_factory=list)
     features: list[Any] = Field(default_factory=list)
     description: list[Any] = Field(default_factory=list)
+    images: list[Any] = Field(default_factory=list)
+    bought_together: list[Any] = Field(default_factory=list)
     price: float | None = None
     average_rating: float | None = None
     rating_number: int | None = None

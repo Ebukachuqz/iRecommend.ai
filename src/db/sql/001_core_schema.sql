@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS amazon_product_metadata (
     categories JSONB DEFAULT '[]'::jsonb,
     features JSONB DEFAULT '[]'::jsonb,
     description JSONB DEFAULT '[]'::jsonb,
+    images JSONB DEFAULT '[]'::jsonb,
+    bought_together JSONB DEFAULT '[]'::jsonb,
     price NUMERIC,
     average_rating NUMERIC,
     rating_number INTEGER,

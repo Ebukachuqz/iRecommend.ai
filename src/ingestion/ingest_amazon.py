@@ -25,6 +25,8 @@ METADATA_KEEP_COLUMNS = [
     "categories",
     "features",
     "description",
+    "images",
+    "bought_together",
     "price",
     "average_rating",
     "rating_number",
@@ -33,8 +35,6 @@ METADATA_KEEP_COLUMNS = [
 ]
 
 PROBLEMATIC_METADATA_COLUMNS = [
-    "images",
-    "image",
     "videos",
     "video",
     "variants",
@@ -180,6 +180,25 @@ def normalize_details_value(value: Any) -> dict[str, Any] | None:
     return None
 
 
+def normalize_optional_metadata_list(value: Any) -> list[Any]:
+    if value in (None, ""):
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, dict):
+        return [value]
+    if isinstance(value, str) and value.strip():
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return []
+        if isinstance(parsed, list):
+            return parsed
+        if isinstance(parsed, dict):
+            return [parsed]
+    return []
+
+
 def is_valid_review(review: dict[str, Any]) -> bool:
     parent_asin = review_parent_asin(review)
     return all(
@@ -234,6 +253,8 @@ def normalize_review(review: dict[str, Any]) -> dict[str, Any]:
 
 def normalize_metadata(item: dict[str, Any], category: str) -> dict[str, Any]:
     details = normalize_details_value(item.get("details")) or {}
+    images = normalize_optional_metadata_list(item.get("images") or item.get("image"))
+    bought_together = normalize_optional_metadata_list(item.get("bought_together"))
     normalized = AmazonProductMetadata(
         parent_asin=str(item["parent_asin"]),
         category=category,
@@ -242,6 +263,8 @@ def normalize_metadata(item: dict[str, Any], category: str) -> dict[str, Any]:
         categories=item.get("categories") or [],
         features=item.get("features") or [],
         description=item.get("description") or [],
+        images=images,
+        bought_together=bought_together,
         price=parse_price(item.get("price")),
         average_rating=item.get("average_rating"),
         rating_number=item.get("rating_number"),
