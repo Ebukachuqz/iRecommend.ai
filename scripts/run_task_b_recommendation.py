@@ -9,6 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.config import get_settings
 from src.task_b_recommendation.schema import RecommendationRequest
 from src.task_b_recommendation.service import recommend, recommend_for_user
 
@@ -20,9 +21,10 @@ def print_json(payload: object) -> None:
 
 
 def main() -> None:
+    settings = get_settings()
     parser = argparse.ArgumentParser(description="Run Task B persona-aware recommendations.")
     parser.add_argument("--user-id")
-    parser.add_argument("--category", default="All_Beauty")
+    parser.add_argument("--category", default=settings.default_category)
     parser.add_argument("--request")
     parser.add_argument("--limit", type=int, default=5)
     parser.add_argument("--session-id")

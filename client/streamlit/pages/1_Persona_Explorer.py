@@ -16,7 +16,7 @@ from ui_helpers import format_score, get_persona_average_rating, render_error, r
 st.set_page_config(page_title="Persona Explorer", page_icon="iR", layout="wide")
 st.title("Persona Explorer")
 
-category = st.text_input("Category", value=st.session_state.get("category", "All_Beauty"))
+category = st.text_input("Category", value=st.session_state.get("category", api_client.DEFAULT_CATEGORY))
 limit = st.number_input("User limit", min_value=1, max_value=100, value=20)
 
 if st.button("Load users", type="primary"):

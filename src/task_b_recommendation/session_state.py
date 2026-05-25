@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from supabase import Client
 
+from src.constants import DEFAULT_CATEGORY
 from src.db.supabase_client import get_supabase_client
 from src.task_b_recommendation.schema import RecommendationSessionState
 
@@ -19,7 +20,7 @@ def append_unique(values: list, additions: list) -> list:
 
 def create_session(
     user_id: str | None = None,
-    category: str = "All_Beauty",
+    category: str = DEFAULT_CATEGORY,
     persona: dict | None = None,
     session_id: str | None = None,
 ) -> RecommendationSessionState:

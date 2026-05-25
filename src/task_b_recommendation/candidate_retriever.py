@@ -291,9 +291,11 @@ def retrieve_candidates_with_sources(
     persona: dict[str, Any] | None = None,
     taste_vector_row: dict[str, Any] | None = None,
     exclude_parent_asins: set[str] | list[str] | None = None,
+    allow_reviewed_parent_asins: set[str] | list[str] | None = None,
 ) -> CandidateRetrievalResult:
     client = client or get_supabase_client()
     reviewed = fetch_reviewed_parent_asins(user_id, client=client) if user_id else set()
+    reviewed = reviewed - set(allow_reviewed_parent_asins or [])
     reviewed = set(reviewed) | set(exclude_parent_asins or [])
     vector_store = vector_store or SupabasePgVectorStore(client=client)
     category_filter = effective_category(category, intent)
@@ -401,6 +403,7 @@ def retrieve_candidates(
     persona: dict[str, Any] | None = None,
     taste_vector_row: dict[str, Any] | None = None,
     exclude_parent_asins: set[str] | list[str] | None = None,
+    allow_reviewed_parent_asins: set[str] | list[str] | None = None,
 ) -> list[RecommendationCandidate]:
     return retrieve_candidates_with_sources(
         user_id,
@@ -412,4 +415,5 @@ def retrieve_candidates(
         persona=persona,
         taste_vector_row=taste_vector_row,
         exclude_parent_asins=exclude_parent_asins,
+        allow_reviewed_parent_asins=allow_reviewed_parent_asins,
     ).candidates

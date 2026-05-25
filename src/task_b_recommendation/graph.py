@@ -75,7 +75,7 @@ def resolve_persona_for_recommendation(
 
 def build_or_get_user_taste_vector(
     user_id: str,
-    category: str = "All_Beauty",
+    category: str = DEFAULT_CATEGORY,
     client: Client | None = None,
 ) -> dict[str, Any] | None:
     client = client or get_supabase_client()
@@ -356,6 +356,7 @@ def build_task_b_graph(client=None, vector_store: VectorStore | None = None):
         constraints = session.active_constraints if session else {}
         excluded_parent_asins = set(session.shown_products if session else [])
         excluded_parent_asins.update(constraints.get("excluded_products") or [])
+        allow_reviewed_parent_asins = set(request.context.get("evaluation_allowed_parent_asins") or [])
         retrieval_result = retrieve_candidates_with_sources(
             request.user_id,
             request.category,
@@ -366,6 +367,7 @@ def build_task_b_graph(client=None, vector_store: VectorStore | None = None):
             persona=state.get("retrieval_persona") or state["persona"],
             taste_vector_row=state.get("taste_vector_row"),
             exclude_parent_asins=excluded_parent_asins,
+            allow_reviewed_parent_asins=allow_reviewed_parent_asins,
         )
         return {
             **state,

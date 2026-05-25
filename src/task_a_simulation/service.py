@@ -5,6 +5,7 @@ from typing import Any
 from supabase import Client
 
 from src.config import get_settings
+from src.constants import DEFAULT_CATEGORY
 from src.db import queries
 from src.db.supabase_client import get_supabase_client
 from src.personas.custom_persona_processor import process_custom_persona
@@ -167,7 +168,7 @@ def simulate_review(request: ReviewSimulationRequest, client: Client | None = No
 def simulate_review_for_product(
     user_id: str,
     parent_asin: str,
-    category: str = "All_Beauty",
+    category: str = DEFAULT_CATEGORY,
     nigerian_mode: bool = False,
     client: Client | None = None,
 ) -> ReviewSimulationOutput:
@@ -182,7 +183,7 @@ def simulate_review_for_product(
 
 def simulate_review_for_holdout(
     user_id: str,
-    category: str = "All_Beauty",
+    category: str = DEFAULT_CATEGORY,
     nigerian_mode: bool = False,
     client: Client | None = None,
 ) -> ReviewSimulationOutput:

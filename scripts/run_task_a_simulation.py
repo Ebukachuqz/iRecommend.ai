@@ -9,6 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.config import get_settings
 from src.task_a_simulation.service import (
     list_unseen_products,
     simulate_review_for_holdout,
@@ -28,9 +29,10 @@ def print_json(payload: object) -> None:
 
 
 def main() -> None:
+    settings = get_settings()
     parser = argparse.ArgumentParser(description="Run Task A review simulation.")
     parser.add_argument("--user-id", required=True)
-    parser.add_argument("--category", default="All_Beauty")
+    parser.add_argument("--category", default=settings.default_category)
     parser.add_argument("--parent-asin")
     parser.add_argument("--use-holdout", action="store_true")
     parser.add_argument("--nigerian-mode", action="store_true")

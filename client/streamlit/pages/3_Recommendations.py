@@ -28,7 +28,7 @@ st.set_page_config(page_title="Recommendations", page_icon="iR", layout="wide")
 st.title("Recommendations")
 
 mode = st.radio("Mode", ["Existing user", "Custom persona"], horizontal=True)
-category = st.text_input("Category", value=st.session_state.get("category", "All_Beauty"))
+category = st.text_input("Category", value=st.session_state.get("category", api_client.DEFAULT_CATEGORY))
 request_text = st.text_area("Request", value="I want something affordable and gentle")
 limit = st.slider("Limit", min_value=1, max_value=10, value=5)
 

@@ -4,6 +4,7 @@ from typing import Any
 
 from supabase import Client
 
+from src.constants import DEFAULT_CATEGORY
 from src.task_b_recommendation.candidate_retriever import retrieve_candidates
 from src.task_b_recommendation.graph import (
     build_intent_plan_payload,
@@ -48,7 +49,7 @@ def recommend(request: RecommendationRequest, client: Client | None = None, vect
 
 def recommend_for_user(
     user_id: str,
-    category: str = "All_Beauty",
+    category: str = DEFAULT_CATEGORY,
     request: str | None = None,
     limit: int = 5,
     session_id: str | None = None,

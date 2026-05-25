@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS amazon_product_metadata (
     parent_asin TEXT PRIMARY KEY,
-    category TEXT DEFAULT 'All_Beauty',
+    category TEXT,
     title TEXT,
     main_category TEXT,
     categories JSONB DEFAULT '[]'::jsonb,
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS amazon_reviews (
 
 CREATE TABLE IF NOT EXISTS user_personas (
     user_id TEXT NOT NULL,
-    category TEXT NOT NULL DEFAULT 'All_Beauty',
+    category TEXT NOT NULL,
     persona JSONB NOT NULL,
     persona_version TEXT DEFAULT 'v1',
     model_name TEXT,

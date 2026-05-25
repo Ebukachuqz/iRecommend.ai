@@ -248,6 +248,38 @@ Task B also stores an audit trail for evaluation and debugging. `intent_plans` r
 
 Task B also accepts a custom persona JSON through `POST /recommendations/generate`. This supports the direct persona -> recommendations flow. The normalizer supports common fields such as `likes`, `interests`, `preferred_products`, `dislikes`, `avoid`, `concerns`, `values`, `priorities`, `budget`, `tone`, `average_rating`, and category signals. It does not attempt to map every possible arbitrary schema.
 
+## Evaluation
+
+Evaluation uses the same runtime services as the app and writes paper-ready artifacts under `outputs/evaluation/`. Run the pipeline in this order:
+
+```text
+migrations -> ingestion -> create_holdout_split.py -> regenerate_personas.py -> embed_products.py -> build_user_taste_vectors.py -> evaluation
+```
+
+Task A evaluates review/rating simulation against `task_a_holdout` reviews. It reports MAE, RMSE, rounded exact-rating accuracy, within-1-star accuracy, predicted/true mean rating, optimistic bias, and a user-average-rating baseline from `persona_train` reviews.
+
+```powershell
+python scripts/evaluate_task_a.py --category Health_and_Household --limit 20
+python scripts/evaluate_task_a.py --category Electronics --limit 20
+python scripts/evaluate_task_a.py --category Beauty_and_Personal_Care --limit 20
+```
+
+Task B evaluates recommendations against positive `task_b_holdout` reviews (`rating >= 4`) as hidden liked products. It reports HitRate@K, NDCG@K, MRR@K, mean found rank, and a same-category popularity/quality baseline. During evaluation, the recommender still excludes `persona_train` products, but it can consider the hidden `task_b_holdout` product so Hit@K is measurable.
+
+```powershell
+python scripts/evaluate_task_b.py --category Health_and_Household --limit 20 --k 10
+python scripts/evaluate_task_b.py --category Electronics --limit 20 --k 10
+python scripts/evaluate_task_b.py --category Beauty_and_Personal_Care --limit 20 --k 10
+```
+
+Run all three working categories:
+
+```powershell
+python scripts/evaluate_all.py --categories Health_and_Household Electronics Beauty_and_Personal_Care --limit 20 --k 10
+```
+
+Metric meanings: HitRate@K is the fraction of examples where the hidden liked product appears in the top K; NDCG@K rewards hits more when they appear higher in the list; MRR@K averages reciprocal rank; MAE/RMSE measure rating error for Task A. CSV/JSON result files and JSON summaries/manifests in `outputs/evaluation/` are the reproducible artifacts to use in the solution paper.
+
 ## FastAPI Backend
 
 ```powershell

@@ -8,6 +8,7 @@ import requests
 
 
 DEFAULT_API_BASE_URL = "http://127.0.0.1:8000"
+DEFAULT_CATEGORY = os.getenv("DEFAULT_CATEGORY", "All_Beauty")
 
 
 class APIClientError(RuntimeError):
@@ -50,11 +51,11 @@ def get_ready() -> dict[str, Any]:
     return request_json("GET", "/ready")
 
 
-def list_users(category: str = "All_Beauty", limit: int = 20) -> list[dict[str, Any]]:
+def list_users(category: str = DEFAULT_CATEGORY, limit: int = 20) -> list[dict[str, Any]]:
     return request_json("GET", "/users", params={"category": category, "limit": limit})
 
 
-def get_persona(user_id: str, category: str = "All_Beauty") -> dict[str, Any]:
+def get_persona(user_id: str, category: str = DEFAULT_CATEGORY) -> dict[str, Any]:
     return request_json("GET", f"/users/{user_id}/persona", params={"category": category})
 
 

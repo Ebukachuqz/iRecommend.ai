@@ -9,6 +9,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.task_b_recommendation.embeddings import DEFAULT_EMBEDDING_MODEL
+from src.config import get_settings
 from src.db.supabase_client import get_supabase_client
 from src.task_b_recommendation.taste_vector import (
     build_and_store_user_taste_vector,
@@ -56,9 +57,10 @@ def build_one(user_id: str, category: str, embedding_model: str, client=None) ->
 
 
 def main() -> None:
+    settings = get_settings()
     parser = argparse.ArgumentParser(description="Build a user taste vector from persona_train liked reviews.")
     parser.add_argument("--user-id", default=None)
-    parser.add_argument("--category", default="All_Beauty")
+    parser.add_argument("--category", default=settings.default_category)
     parser.add_argument("--model", default=DEFAULT_EMBEDDING_MODEL)
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--force", action="store_true")
