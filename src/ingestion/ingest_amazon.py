@@ -129,6 +129,37 @@ def cache_metadata_path(category: str, cache_dir: str | Path = DEFAULT_CACHE_DIR
     return Path(cache_dir) / f"{category}_metadata.jsonl"
 
 
+def cache_complete_marker(path: str | Path) -> Path:
+    return Path(f"{Path(path)}.complete")
+
+
+def count_jsonl_lines(path: str | Path, limit: int | None = None) -> int:
+    count = 0
+    file_path = Path(path)
+    opener = gzip.open if file_path.suffix == ".gz" else open
+    with opener(file_path, "rt", encoding="utf-8") as file_obj:
+        for count, _line in enumerate(file_obj, start=1):
+            if limit is not None and count >= limit:
+                break
+    return count
+
+
+def cache_file_ready(path: str | Path, expected_min_lines: int | None = None) -> bool:
+    file_path = Path(path)
+    if not file_path.exists():
+        return False
+    if cache_complete_marker(file_path).exists():
+        return True
+    if expected_min_lines is not None and expected_min_lines > 0:
+        return count_jsonl_lines(file_path, limit=expected_min_lines) >= expected_min_lines
+    return False
+
+
+def write_cache_complete_marker(path: str | Path, count: int) -> None:
+    marker = cache_complete_marker(path)
+    marker.write_text(json.dumps({"rows": count}), encoding="utf-8")
+
+
 def write_jsonl_cache(
     rows: Iterable[dict[str, Any]],
     path: str | Path,
@@ -138,29 +169,60 @@ def write_jsonl_cache(
 ) -> int:
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    partial_path = Path(f"{output_path}.partial")
+    if partial_path.exists():
+        partial_path.unlink()
     count = 0
-    with output_path.open("w", encoding="utf-8", newline="\n") as file_obj:
+    with partial_path.open("w", encoding="utf-8", newline="\n") as file_obj:
         for row in limited(rows, limit):
             file_obj.write(json.dumps(row, ensure_ascii=False, default=str))
             file_obj.write("\n")
             count += 1
             if count % CACHE_PROGRESS_INTERVAL == 0:
                 log_ingestion(f"Cached {count:,} {label} to {output_path}")
+    partial_path.replace(output_path)
+    write_cache_complete_marker(output_path, count)
     log_ingestion(f"Cache write complete: {count:,} {label} -> {output_path}")
     return count
+
+
+def copy_downloaded_jsonl_to_cache(source_path: str | Path, output_path: str | Path, label: str) -> int:
+    return write_jsonl_cache(iter_jsonl_file(source_path), output_path, label=label)
+
+
+def download_metadata_cache_with_hub(category: str, output_path: str | Path) -> int:
+    from huggingface_hub import hf_hub_download
+
+    filename = f"raw/meta_categories/meta_{category}.jsonl"
+    log_ingestion(f"Downloading metadata via Hugging Face cache: {filename}")
+    downloaded_path = hf_hub_download(repo_id=DATASET_NAME, filename=filename, repo_type="dataset")
+    return copy_downloaded_jsonl_to_cache(downloaded_path, output_path, "metadata rows")
 
 
 def write_category_cache(
     category: str,
     cache_dir: str | Path = DEFAULT_CACHE_DIR,
     review_limit: int | None = None,
+    force_cache: bool = False,
 ) -> tuple[Path, Path]:
     review_path = cache_review_path(category, cache_dir)
     metadata_path = cache_metadata_path(category, cache_dir)
-    log_ingestion(f"Writing review cache from Hugging Face: {review_path}")
-    write_jsonl_cache(stream_reviews(category), review_path, limit=review_limit, label="reviews")
-    log_ingestion(f"Writing metadata cache from Hugging Face: {metadata_path}")
-    write_jsonl_cache(stream_metadata(category), metadata_path, label="metadata rows")
+    if not force_cache and cache_file_ready(review_path, expected_min_lines=review_limit):
+        log_ingestion(f"Review cache already exists; skipping: {review_path}")
+    else:
+        log_ingestion(f"Writing review cache from Hugging Face: {review_path}")
+        write_jsonl_cache(stream_reviews(category), review_path, limit=review_limit, label="reviews")
+
+    if not force_cache and cache_file_ready(metadata_path):
+        log_ingestion(f"Metadata cache already exists; skipping: {metadata_path}")
+    else:
+        log_ingestion(f"Writing metadata cache from Hugging Face: {metadata_path}")
+        try:
+            download_metadata_cache_with_hub(category, metadata_path)
+        except Exception as exc:  # noqa: BLE001 - keep the streaming fallback available
+            log_ingestion(f"Hugging Face cached metadata download failed: {exc}")
+            log_ingestion("Falling back to streaming metadata cache write.")
+            write_jsonl_cache(stream_metadata(category), metadata_path, label="metadata rows")
     return review_path, metadata_path
 
 
@@ -698,6 +760,7 @@ def ingest_category(
     from_cache: bool = False,
     cache_dir: str | Path = DEFAULT_CACHE_DIR,
     write_cache: bool = False,
+    force_cache: bool = False,
     reviews_file: str | Path | None = None,
     metadata_file: str | Path | None = None,
     dry_run: bool = False,
@@ -712,7 +775,12 @@ def ingest_category(
     effective_min_reviews = 15 if effective_min_reviews is None else effective_min_reviews
     effective_review_limit = review_limit if review_limit is not None else max_reviews
     if write_cache:
-        reviews_path, metadata_path = write_category_cache(category, cache_dir=cache_dir, review_limit=effective_review_limit)
+        reviews_path, metadata_path = write_category_cache(
+            category,
+            cache_dir=cache_dir,
+            review_limit=effective_review_limit,
+            force_cache=force_cache,
+        )
     else:
         reviews_path, metadata_path = resolve_ingestion_files(
             category,

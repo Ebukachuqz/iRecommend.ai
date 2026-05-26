@@ -124,7 +124,7 @@ Quick dry-run test:
 python scripts/ingest_amazon.py --category All_Beauty --min-reviews 15 --max-users 20 --extra-products 100 --dry-run
 ```
 
-If Hugging Face streaming is unreliable, cache the category JSONL files once and then ingest from cache. `--write-cache` streams from Hugging Face into `data/cache/amazon_reviews_2023/<category>_reviews.jsonl` and `<category>_metadata.jsonl`; metadata is cached fully, while `--review-limit` caps cached reviews.
+If Hugging Face streaming is unreliable, cache the category JSONL files once and then ingest from cache. `--write-cache` streams reviews from Hugging Face and downloads metadata through Hugging Face's local file cache into `data/cache/amazon_reviews_2023/<category>_reviews.jsonl` and `<category>_metadata.jsonl`; metadata is cached fully, while `--review-limit` caps cached reviews. Successful cache files are skipped on rerun; pass `--force-cache` only when you intentionally want to rebuild them.
 
 ```powershell
 python scripts/ingest_amazon.py --category Electronics --write-cache --cache-dir data/cache/amazon_reviews_2023 --review-limit 200000 --dry-run

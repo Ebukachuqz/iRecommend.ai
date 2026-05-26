@@ -22,6 +22,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--from-cache", action="store_true")
     parser.add_argument("--cache-dir", default="data/cache/amazon_reviews_2023")
     parser.add_argument("--write-cache", action="store_true")
+    parser.add_argument("--force-cache", action="store_true")
     parser.add_argument("--reviews-file", default=None)
     parser.add_argument("--metadata-file", default=None)
     parser.add_argument("--dry-run", action="store_true")
@@ -46,6 +47,7 @@ def main() -> None:
             from_cache=args.from_cache,
             cache_dir=args.cache_dir,
             write_cache=args.write_cache,
+            force_cache=args.force_cache,
             reviews_file=args.reviews_file,
             metadata_file=args.metadata_file,
             dry_run=args.dry_run,

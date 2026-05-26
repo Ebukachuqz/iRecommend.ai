@@ -173,6 +173,23 @@ def test_cache_paths_use_requested_category_and_dir(tmp_path) -> None:
     assert ingest_amazon.cache_metadata_path("Electronics", tmp_path) == tmp_path / "Electronics_metadata.jsonl"
 
 
+def test_cache_file_ready_uses_line_count_for_review_cache_without_marker(tmp_path) -> None:
+    review_file = tmp_path / "Electronics_reviews.jsonl"
+    review_file.write_text('{"a": 1}\n{"a": 2}\n', encoding="utf-8")
+
+    assert ingest_amazon.cache_file_ready(review_file, expected_min_lines=2) is True
+    assert ingest_amazon.cache_file_ready(review_file, expected_min_lines=3) is False
+
+
+def test_cache_file_ready_requires_marker_for_metadata_cache(tmp_path) -> None:
+    metadata_file = tmp_path / "Electronics_metadata.jsonl"
+    metadata_file.write_text('{"a": 1}\n', encoding="utf-8")
+
+    assert ingest_amazon.cache_file_ready(metadata_file) is False
+    ingest_amazon.write_cache_complete_marker(metadata_file, 1)
+    assert ingest_amazon.cache_file_ready(metadata_file) is True
+
+
 def test_resolve_ingestion_files_requires_both_explicit_files(tmp_path) -> None:
     review_file = tmp_path / "reviews.jsonl"
     review_file.write_text("", encoding="utf-8")
@@ -205,14 +222,68 @@ def test_write_category_cache_respects_review_limit_and_caches_all_metadata(tmp_
     )
     monkeypatch.setattr(
         ingest_amazon,
-        "stream_metadata",
-        lambda _category: [valid_metadata("p1"), valid_metadata("p2")],
+        "download_metadata_cache_with_hub",
+        lambda _category, output_path: ingest_amazon.write_jsonl_cache(
+            [valid_metadata("p1"), valid_metadata("p2")],
+            output_path,
+            label="metadata rows",
+        ),
     )
 
     review_file, metadata_file = ingest_amazon.write_category_cache("All_Beauty", cache_dir=tmp_path, review_limit=2)
 
     assert len(list(ingest_amazon.iter_jsonl_file(review_file))) == 2
     assert len(list(ingest_amazon.iter_jsonl_file(metadata_file))) == 2
+
+
+def test_write_category_cache_skips_ready_files(tmp_path, monkeypatch) -> None:
+    review_file = ingest_amazon.cache_review_path("All_Beauty", tmp_path)
+    metadata_file = ingest_amazon.cache_metadata_path("All_Beauty", tmp_path)
+    review_file.parent.mkdir(parents=True, exist_ok=True)
+    review_file.write_text('{"a": 1}\n{"a": 2}\n', encoding="utf-8")
+    metadata_file.write_text('{"parent_asin": "p1"}\n', encoding="utf-8")
+    ingest_amazon.write_cache_complete_marker(metadata_file, 1)
+    monkeypatch.setattr(
+        ingest_amazon,
+        "stream_reviews",
+        lambda _category: (_ for _ in ()).throw(AssertionError("ready review cache should be skipped")),
+    )
+    monkeypatch.setattr(
+        ingest_amazon,
+        "download_metadata_cache_with_hub",
+        lambda _category, _output_path: (_ for _ in ()).throw(
+            AssertionError("ready metadata cache should be skipped")
+        ),
+    )
+
+    assert ingest_amazon.write_category_cache("All_Beauty", cache_dir=tmp_path, review_limit=2) == (
+        review_file,
+        metadata_file,
+    )
+
+
+def test_write_category_cache_force_rebuilds_ready_files(tmp_path, monkeypatch) -> None:
+    review_file = ingest_amazon.cache_review_path("All_Beauty", tmp_path)
+    metadata_file = ingest_amazon.cache_metadata_path("All_Beauty", tmp_path)
+    review_file.parent.mkdir(parents=True, exist_ok=True)
+    review_file.write_text('{"a": 1}\n{"a": 2}\n', encoding="utf-8")
+    metadata_file.write_text('{"parent_asin": "old"}\n', encoding="utf-8")
+    ingest_amazon.write_cache_complete_marker(metadata_file, 1)
+    monkeypatch.setattr(ingest_amazon, "stream_reviews", lambda _category: [valid_review("u1", "p1")])
+    monkeypatch.setattr(
+        ingest_amazon,
+        "download_metadata_cache_with_hub",
+        lambda _category, output_path: ingest_amazon.write_jsonl_cache(
+            [valid_metadata("new")],
+            output_path,
+            label="metadata rows",
+        ),
+    )
+
+    ingest_amazon.write_category_cache("All_Beauty", cache_dir=tmp_path, review_limit=1, force_cache=True)
+
+    assert list(ingest_amazon.iter_jsonl_file(review_file))[0]["parent_asin"] == "p1"
+    assert list(ingest_amazon.iter_jsonl_file(metadata_file))[0]["parent_asin"] == "new"
 
 
 def test_cli_defaults_are_evaluation_friendly() -> None:
@@ -237,6 +308,7 @@ def test_cli_supports_cache_and_local_file_flags() -> None:
             "--cache-dir",
             "data/cache/test",
             "--write-cache",
+            "--force-cache",
             "--reviews-file",
             "reviews.jsonl",
             "--metadata-file",
@@ -247,6 +319,7 @@ def test_cli_supports_cache_and_local_file_flags() -> None:
     assert args.from_cache is True
     assert args.cache_dir == "data/cache/test"
     assert args.write_cache is True
+    assert args.force_cache is True
     assert args.reviews_file == "reviews.jsonl"
     assert args.metadata_file == "metadata.jsonl"
 
