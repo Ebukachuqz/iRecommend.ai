@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -70,6 +71,64 @@ def fetch_products_by_parent_asins(parent_asins: list[str], client: Client | Non
         .execute()
     )
     return {row["parent_asin"]: row for row in response.data or [] if row.get("parent_asin")}
+
+
+def normalize_bought_together_ids(value: Any) -> list[str]:
+    if value in (None, "", [], {}):
+        return []
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return []
+        if stripped.startswith("[") or stripped.startswith("{"):
+            try:
+                return normalize_bought_together_ids(json.loads(stripped))
+            except json.JSONDecodeError:
+                return []
+        return [stripped]
+    if isinstance(value, dict):
+        identifiers: list[str] = []
+        for key in ("parent_asin", "asin", "id"):
+            item = value.get(key)
+            if item:
+                identifiers.extend(normalize_bought_together_ids(item))
+        if identifiers:
+            return identifiers
+        values = value.get("bought_together") or value.get("also_bought") or value.get("items")
+        return normalize_bought_together_ids(values)
+    if isinstance(value, list):
+        identifiers = []
+        for item in value:
+            identifiers.extend(normalize_bought_together_ids(item))
+        return list(dict.fromkeys(identifiers))
+    return []
+
+
+def fetch_liked_persona_train_products(
+    user_id: str,
+    category: str,
+    reviewed: set[str],
+    client: Client,
+) -> list[dict[str, Any]]:
+    response = (
+        client.table("amazon_reviews")
+        .select("parent_asin,rating")
+        .eq("user_id", user_id)
+        .eq("task_split", PERSONA_TRAIN_SPLIT)
+        .gte("rating", 4)
+        .execute()
+    )
+    liked_asins = [
+        str(row["parent_asin"])
+        for row in response.data or []
+        if row.get("parent_asin") and str(row["parent_asin"]) in reviewed
+    ]
+    products = fetch_products_by_parent_asins(liked_asins, client=client)
+    return [
+        product
+        for product in products.values()
+        if product_matches_requested_category(product, category)
+    ]
 
 
 def merge_candidate(
@@ -244,6 +303,36 @@ def retrieve_collaborative_candidates(
     return results
 
 
+def retrieve_bought_together_candidates(
+    user_id: str,
+    category: str,
+    target_category: str | None,
+    reviewed: set[str],
+    limit: int,
+    client: Client,
+) -> list[tuple[dict[str, Any], list[str]]]:
+    liked_products = fetch_liked_persona_train_products(user_id, category, reviewed, client)
+    related_ids: list[str] = []
+    evidence_by_asin: dict[str, list[str]] = {}
+    for product in liked_products:
+        liked_asin = product.get("parent_asin")
+        for related_asin in normalize_bought_together_ids(product.get("bought_together")):
+            if not related_asin or related_asin in reviewed:
+                continue
+            related_ids.append(related_asin)
+            evidence_by_asin.setdefault(related_asin, []).append(f"bought together with liked product {liked_asin}")
+    products = fetch_products_by_parent_asins(list(dict.fromkeys(related_ids)), client=client)
+    results: list[tuple[dict[str, Any], list[str]]] = []
+    for related_asin in dict.fromkeys(related_ids):
+        product = products.get(related_asin)
+        if not product or not product_matches_requested_category(product, target_category):
+            continue
+        results.append((product, evidence_by_asin.get(related_asin, [])[:3]))
+        if len(results) >= limit:
+            break
+    return results
+
+
 def retrieve_attribute_match_candidates(
     persona: dict[str, Any] | None,
     intent: RecommendationIntent,
@@ -355,6 +444,28 @@ def retrieve_candidates_with_sources(
             )
             if added:
                 source_counts["collaborative"] = source_counts.get("collaborative", 0) + 1
+
+    if user_id:
+        try:
+            bought_together = retrieve_bought_together_candidates(
+                user_id,
+                category,
+                category_filter,
+                reviewed,
+                limit=max(10, limit // 2),
+                client=client,
+            )
+        except Exception:
+            bought_together = []
+        for product, evidence in bought_together:
+            added = merge_candidate(
+                candidates_by_asin,
+                product,
+                "bought_together",
+                evidence=evidence,
+            )
+            if added:
+                source_counts["bought_together"] = source_counts.get("bought_together", 0) + 1
 
     try:
         attribute_matches = retrieve_attribute_match_candidates(

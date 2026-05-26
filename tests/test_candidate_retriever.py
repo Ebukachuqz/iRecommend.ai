@@ -281,6 +281,14 @@ class MultiSourceClient:
         self.product_query = QueryRecorder(
             [
                 {
+                    "parent_asin": "seen-1",
+                    "title": "Already liked cleanser",
+                    "category": "All_Beauty",
+                    "average_rating": 4.4,
+                    "rating_number": 120,
+                    "bought_together": ["bt-1", "missing-bt", "other-category", "pref-1"],
+                },
+                {
                     "parent_asin": "pref-1",
                     "title": "Preference vector cleanser",
                     "category": "All_Beauty",
@@ -315,6 +323,20 @@ class MultiSourceClient:
                     "average_rating": 4.9,
                     "rating_number": 500,
                 },
+                {
+                    "parent_asin": "bt-1",
+                    "title": "Bought together cream",
+                    "category": "All_Beauty",
+                    "average_rating": 4.6,
+                    "rating_number": 100,
+                },
+                {
+                    "parent_asin": "other-category",
+                    "title": "Bought together in another category",
+                    "category": "Electronics",
+                    "average_rating": 4.6,
+                    "rating_number": 100,
+                },
             ]
         )
         self.embedding_query = QueryRecorder(
@@ -322,12 +344,15 @@ class MultiSourceClient:
                 {"parent_asin": "attr-1", "product_text": "Title: Fragrance free cream\nFeatures: gentle hydrating"},
             ]
         )
+        self.preference_vector_query = QueryRecorder([])
 
     def table(self, name):
         if name == "amazon_reviews":
             return self.review_query
         if name == "product_embeddings":
             return self.embedding_query
+        if name == "user_preference_vectors":
+            return self.preference_vector_query
         assert name == "amazon_product_metadata"
         return self.product_query
 
@@ -394,6 +419,46 @@ def test_attribute_match_retrieval_uses_persona_and_intent_signals(monkeypatch) 
     assert "fragrance free" in result.candidates[0].source_evidence
 
 
+def test_bought_together_retrieval_uses_liked_persona_train_products(monkeypatch) -> None:
+    client = MultiSourceClient()
+    vector_store = VectorStoreRecorder([])
+    monkeypatch.setattr("src.task_b_recommendation.candidate_retriever.embed_text", lambda text: [0.3, 0.4])
+
+    result = retrieve_candidates_with_sources(
+        user_id="user-1",
+        category="All_Beauty",
+        intent=RecommendationIntent(),
+        limit=1,
+        client=client,
+        vector_store=vector_store,
+    )
+
+    assert result.candidates[0].parent_asin == "bt-1"
+    assert result.candidates[0].retrieval_source == "bought_together"
+    assert result.candidates[0].retrieval_sources == ["bought_together"]
+    assert result.source_counts["bought_together"] == 2
+
+
+def test_bought_together_ignores_missing_other_category_and_excluded_products(monkeypatch) -> None:
+    client = MultiSourceClient()
+    client.product_query.rows[0]["bought_together"] = ["bt-1", "missing-bt", "other-category"]
+    vector_store = VectorStoreRecorder([])
+    monkeypatch.setattr("src.task_b_recommendation.candidate_retriever.embed_text", lambda text: [0.3, 0.4])
+
+    result = retrieve_candidates_with_sources(
+        user_id="user-1",
+        category="All_Beauty",
+        intent=RecommendationIntent(),
+        limit=2,
+        client=client,
+        vector_store=vector_store,
+        exclude_parent_asins={"bt-1"},
+    )
+
+    assert all(candidate.parent_asin not in {"bt-1", "missing-bt", "other-category"} for candidate in result.candidates)
+    assert "bought_together" not in result.source_counts
+
+
 def test_dedupe_preserves_multiple_retrieval_sources(monkeypatch) -> None:
     client = MultiSourceClient()
     vector_store = VectorStoreRecorder([{"parent_asin": "pref-1", "similarity": 0.75}])
@@ -410,9 +475,31 @@ def test_dedupe_preserves_multiple_retrieval_sources(monkeypatch) -> None:
     )
 
     assert result.candidates[0].parent_asin == "pref-1"
-    assert result.candidates[0].retrieval_sources == ["preference_vector", "request_query"]
+    assert result.candidates[0].retrieval_sources == ["preference_vector", "request_query", "bought_together"]
     assert result.source_counts["preference_vector"] == 1
     assert result.source_counts.get("request_query", 0) == 0
+
+
+def test_bought_together_duplicate_merges_retrieval_sources(monkeypatch) -> None:
+    client = MultiSourceClient()
+    client.product_query.rows[0]["bought_together"] = ["pref-1"]
+    vector_store = VectorStoreRecorder([{"parent_asin": "pref-1", "similarity": 0.75}])
+    monkeypatch.setattr("src.task_b_recommendation.candidate_retriever.embed_text", lambda text: [0.3, 0.4])
+
+    result = retrieve_candidates_with_sources(
+        user_id="user-1",
+        category="All_Beauty",
+        intent=RecommendationIntent(),
+        limit=1,
+        client=client,
+        vector_store=vector_store,
+        preference_vector_row={"embedding": [0.1, 0.2]},
+    )
+
+    assert result.candidates[0].parent_asin == "pref-1"
+    assert result.candidates[0].retrieval_sources == ["preference_vector", "bought_together"]
+    assert result.source_counts["preference_vector"] == 1
+    assert result.source_counts.get("bought_together", 0) == 0
 
 
 def test_reviewed_products_are_excluded_from_vector_sources(monkeypatch) -> None:
@@ -453,9 +540,9 @@ def test_explicit_excluded_parent_asins_are_removed_from_all_retrieval_sources(m
         vector_store=vector_store,
         persona={"preferences": {"liked_attributes": ["fragrance free"]}},
         preference_vector_row={"embedding": [0.1, 0.2]},
-        exclude_parent_asins={"pref-1", "query-1", "collab-1", "attr-1"},
+        exclude_parent_asins={"pref-1", "query-1", "collab-1", "attr-1", "bt-1"},
     )
 
     assert all(candidate.parent_asin not in {"pref-1", "query-1", "collab-1", "attr-1"} for candidate in result.candidates)
-    assert vector_store.calls[0]["exclude_parent_asins"] == {"seen-1", "pref-1", "query-1", "collab-1", "attr-1"}
+    assert vector_store.calls[0]["exclude_parent_asins"] == {"seen-1", "pref-1", "query-1", "collab-1", "attr-1", "bt-1"}
     assert [candidate.parent_asin for candidate in result.candidates] == ["fallback-1"]
