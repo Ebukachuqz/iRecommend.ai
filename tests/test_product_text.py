@@ -5,6 +5,8 @@ def test_product_text_includes_rich_metadata() -> None:
     text = build_product_text(
         {
             "title": "Gentle Face Cream",
+            "category": "Beauty_and_Personal_Care",
+            "main_category": "Skin Care",
             "categories": [["Beauty", "Skin Care", "Face Creams"]],
             "features": ["non greasy", "fragrance free"],
             "description": ["Good for daily use.", "Works under makeup.", "Third useful sentence.", "Extra noise."],
@@ -15,6 +17,8 @@ def test_product_text_includes_rich_metadata() -> None:
     )
 
     assert "Gentle Face Cream" in text
+    assert "Project category: Beauty_and_Personal_Care" in text
+    assert "Main category: Skin Care" in text
     assert "Beauty > Skin Care > Face Creams" in text
     assert "non greasy" in text
     assert "Good for daily use" in text
@@ -35,6 +39,14 @@ def test_category_path_uses_categories_then_fallbacks() -> None:
     assert get_category_path({"categories": [["Beauty", "Skin Care"]]}) == "Beauty > Skin Care"
     assert get_category_path({"main_category": "Books"}) == "Books"
     assert get_category_path({"category": "Electronics"}) == "Electronics"
+
+
+def test_product_text_falls_back_to_category_when_main_category_missing() -> None:
+    text = build_product_text({"title": "USB Cable", "category": "Electronics"})
+
+    assert "Project category: Electronics" in text
+    assert "Category path: Electronics" in text
+    assert "Main category:" not in text
 
 
 def test_is_embeddable_requires_title_and_category_signal() -> None:

@@ -103,6 +103,34 @@ def test_reviewed_products_are_excluded_from_fallback_candidates() -> None:
     assert [candidate.parent_asin for candidate in candidates] == ["new-1"]
 
 
+def test_quality_fallback_uses_project_category_not_main_category() -> None:
+    client = ClientRecorder()
+    client.product_query = QueryRecorder(
+        [
+            {
+                "parent_asin": "main-only",
+                "title": "Wrong broad bucket",
+                "category": "Beauty_and_Personal_Care",
+                "main_category": "Electronics",
+                "average_rating": 4.8,
+                "rating_number": 50,
+            },
+            {
+                "parent_asin": "category-match",
+                "title": "Right broad bucket",
+                "category": "Electronics",
+                "main_category": "Camera & Photo",
+                "average_rating": 4.7,
+                "rating_number": 50,
+            },
+        ]
+    )
+
+    candidates = fetch_quality_fallback_products(None, limit=5, client=client, category="Electronics")
+
+    assert [candidate.parent_asin for candidate in candidates] == ["category-match"]
+
+
 class VectorStoreRecorder:
     def __init__(self, matches):
         self.matches = matches
@@ -142,9 +170,24 @@ class ProductClientRecorder:
     def __init__(self):
         self.product_query = QueryRecorder(
             [
-                {"parent_asin": "skin-1", "title": "Affordable oily skin cleanser", "average_rating": 4.6},
-                {"parent_asin": "skin-2", "title": "Gentle oil control moisturizer", "average_rating": 4.5},
-                {"parent_asin": "fallback-1", "title": "Popular fallback product", "average_rating": 4.9},
+                {
+                    "parent_asin": "skin-1",
+                    "title": "Affordable oily skin cleanser",
+                    "category": "All_Beauty",
+                    "average_rating": 4.6,
+                },
+                {
+                    "parent_asin": "skin-2",
+                    "title": "Gentle oil control moisturizer",
+                    "category": "All_Beauty",
+                    "average_rating": 4.5,
+                },
+                {
+                    "parent_asin": "fallback-1",
+                    "title": "Popular fallback product",
+                    "category": "All_Beauty",
+                    "average_rating": 4.9,
+                },
             ]
         )
 

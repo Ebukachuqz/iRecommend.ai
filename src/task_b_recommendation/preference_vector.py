@@ -62,11 +62,7 @@ def product_matches_category(product: dict[str, Any] | None, category: str) -> b
     expected = normalize_category(category)
     if not expected:
         return True
-    category_values: list[str] = []
-    category_values.extend(flatten_category_values(product.get("category")))
-    category_values.extend(flatten_category_values(product.get("main_category")))
-    category_values.extend(flatten_category_values(product.get("categories")))
-    return any(normalize_category(value) == expected for value in category_values)
+    return normalize_category(product.get("category")) == expected
 
 
 def fetch_liked_training_reviews(user_id: str, client: Client | None = None) -> list[dict[str, Any]]:

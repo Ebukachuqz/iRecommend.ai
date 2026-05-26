@@ -23,12 +23,14 @@ class CandidateRetrievalResult:
 
 
 def has_category_signal(product: dict[str, Any]) -> bool:
-    return any(product.get(key) not in (None, "", [], {}) for key in ("category", "main_category", "categories"))
+    return product.get("category") not in (None, "", [], {})
 
 
 def product_matches_requested_category(product: dict[str, Any], category: str | None) -> bool:
-    if not category or not has_category_signal(product):
+    if not category:
         return True
+    if not has_category_signal(product):
+        return False
     return product_matches_category(product, category)
 
 
@@ -156,6 +158,8 @@ def fetch_quality_fallback_products(
     reviewed = reviewed if reviewed is not None else (fetch_reviewed_parent_asins(user_id, client=client) if user_id else set())
     reviewed = set(reviewed) | set(exclude_parent_asins or set())
     query = client.table("amazon_product_metadata").select("*")
+    if category and hasattr(query, "eq"):
+        query = query.eq("category", category)
     if intent and intent.price_max is not None and hasattr(query, "lte"):
         query = query.lte("price", intent.price_max)
     if hasattr(query, "gte"):

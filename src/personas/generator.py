@@ -15,6 +15,7 @@ from src.llm.logging import log_llm_response
 from src.llm.parsers import parse_json_from_llm_text
 from src.personas.prompts import PERSONA_PROMPT, PERSONA_SCHEMA_EXAMPLE, PERSONA_SYSTEM_INSTRUCTIONS
 from src.personas.validator import persona_to_storage_dict, validate_persona
+from src.task_b_recommendation.preference_vector import product_matches_category
 
 
 def log_persona_generation(message: str) -> None:
@@ -63,6 +64,19 @@ class PersonaGenerator:
             item["product"] = metadata_by_asin.get(review["parent_asin"], {})
             enriched.append(item)
         return enriched
+
+    def filter_enriched_reviews_by_category(
+        self,
+        reviews: list[dict[str, Any]],
+        category: str | None,
+    ) -> list[dict[str, Any]]:
+        if not category:
+            return reviews
+        return [
+            review
+            for review in reviews
+            if product_matches_category(review.get("product") or {}, category)
+        ]
 
     def compute_user_stats(self, reviews: list[dict[str, Any]]) -> dict[str, Any]:
         ratings = [float(review["rating"]) for review in reviews if review.get("rating") is not None]
@@ -153,6 +167,10 @@ class PersonaGenerator:
 
         log_persona_generation(f"Fetched {len(reviews):,} persona_train reviews for user_id={user_id}")
         enriched_reviews = self.enrich_reviews(reviews)
+        enriched_reviews = self.filter_enriched_reviews_by_category(enriched_reviews, category)
+        if not enriched_reviews:
+            raise ValueError(f"No persona_train reviews found for user_id={user_id!r}, category={category!r}.")
+        reviews = [{key: value for key, value in review.items() if key != "product"} for review in enriched_reviews]
         review_context, stats = self.build_prompt_stats(reviews, enriched_reviews, max_reviews)
         log_persona_generation(
             "Prepared LLM prompt context: "

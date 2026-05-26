@@ -69,7 +69,8 @@ def list_embedded_products(client: Any, category: str, limit: int) -> list[dict[
             {
                 "parent_asin": parent_asin,
                 "title": meta.get("title") or "",
-                "category": meta.get("category") or meta.get("main_category") or "",
+                "category": meta.get("category") or "",
+                "main_category": meta.get("main_category") or "",
                 "embedding_model": row.get("embedding_model"),
                 "created_at": row.get("created_at"),
             }
@@ -92,4 +93,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -38,7 +38,6 @@ def get_price_tier(price: Any) -> str | None:
 
 def get_category_path(product: dict[str, Any]) -> str:
     categories = product.get("categories") or []
-    main_category = product.get("main_category") or product.get("category") or ""
     if categories:
         if isinstance(categories, list) and categories and isinstance(categories[0], list):
             path_values = categories[0]
@@ -47,7 +46,7 @@ def get_category_path(product: dict[str, Any]) -> str:
         path = " > ".join(str(item).strip() for item in path_values if str(item).strip())
         if path:
             return path
-    return str(main_category).strip()
+    return str(product.get("main_category") or product.get("category") or "").strip()
 
 
 def description_excerpt(description: Any, max_parts: int = 3) -> str:
@@ -84,8 +83,14 @@ def build_product_text(product: dict[str, Any]) -> str:
         parts.append(f"Title: {title}")
 
     category_path = get_category_path(product)
+    project_category = str(product.get("category") or "").strip()
+    main_category = str(product.get("main_category") or "").strip()
+    if project_category:
+        parts.append(f"Project category: {project_category}")
+    if main_category and main_category != project_category:
+        parts.append(f"Main category: {main_category}")
     if category_path:
-        parts.append(f"Category: {category_path}")
+        parts.append(f"Category path: {category_path}")
 
     features = [stringify(item) for item in coerce_list(product.get("features"))[:5]]
     features = [item for item in features if item]

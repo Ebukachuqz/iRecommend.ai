@@ -78,18 +78,18 @@ def test_holdout_split_requires_overwrite_when_already_split() -> None:
         raise AssertionError("existing split should require --overwrite")
 
 
-def test_holdout_split_category_filter_uses_product_metadata_signals() -> None:
+def test_holdout_split_category_filter_uses_project_category_only() -> None:
     assert create_holdout_split.product_matches_category(
         {"parent_asin": "p1", "category": "All_Beauty"},
         "All_Beauty",
     )
-    assert create_holdout_split.product_matches_category(
+    assert not create_holdout_split.product_matches_category(
         {"parent_asin": "p2", "categories": [["Beauty", "Skin Care"]]},
         "Skin Care",
     )
     assert not create_holdout_split.product_matches_category(
         {"parent_asin": "p3", "main_category": "Electronics"},
-        "All_Beauty",
+        "Electronics",
     )
 
 

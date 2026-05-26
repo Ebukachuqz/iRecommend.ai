@@ -239,6 +239,7 @@ def test_list_embedded_products_outputs_expected_fields() -> None:
             "parent_asin": "p1",
             "title": "Product 1",
             "category": category,
+            "main_category": "",
             "embedding_model": "m1",
             "created_at": "2026-01-01T00:00:00Z",
         }

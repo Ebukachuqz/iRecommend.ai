@@ -20,14 +20,7 @@ IN_FILTER_CHUNK = 500
 
 
 def category_values(item: dict[str, Any]) -> set[str]:
-    values = {str(item.get("category") or "").strip(), str(item.get("main_category") or "").strip()}
-    categories = item.get("categories") or []
-    if isinstance(categories, list):
-        for value in categories:
-            if isinstance(value, list):
-                values.update(str(part).strip() for part in value)
-            else:
-                values.add(str(value).strip())
+    values = {str(item.get("category") or "").strip()}
     return {value for value in values if value}
 
 
@@ -46,7 +39,7 @@ def fetch_category_products(client: Any, category: str) -> list[dict[str, Any]]:
         end = start + PAGE_SIZE - 1
         response = (
             client.table("amazon_product_metadata")
-            .select("parent_asin,category,main_category,categories")
+            .select("parent_asin,category")
             .range(start, end)
             .execute()
         )

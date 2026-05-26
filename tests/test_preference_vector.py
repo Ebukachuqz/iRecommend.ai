@@ -69,10 +69,10 @@ def test_store_user_preference_vector_records_source_review_count() -> None:
     assert client.table_obj.payload["source_parent_asins"] == ["asin-1", "asin-2"]
 
 
-def test_product_matches_category_uses_category_then_fallbacks() -> None:
+def test_product_matches_category_uses_project_category_only() -> None:
     assert product_matches_category({"category": "All_Beauty"}, "All Beauty") is True
-    assert product_matches_category({"main_category": "Electronics"}, "Electronics") is True
-    assert product_matches_category({"categories": ["Books", "Fiction"]}, "Books") is True
+    assert product_matches_category({"main_category": "Electronics"}, "Electronics") is False
+    assert product_matches_category({"categories": ["Books", "Fiction"]}, "Books") is False
     assert product_matches_category({"category": "Books"}, "All_Beauty") is False
 
 

@@ -172,3 +172,21 @@ def test_prompt_review_selection_prefers_reviews_with_product_metadata() -> None
     selected = generator.select_prompt_reviews(reviews, max_reviews=10)
 
     assert [review["review_id"] for review in selected] == ["with-product"]
+
+
+def test_persona_review_filter_uses_project_category_not_main_category() -> None:
+    generator = PersonaGenerator(client=ClientRecorder())
+    reviews = [
+        {
+            "review_id": "project-category-match",
+            "product": {"category": "Electronics", "main_category": "Camera & Photo"},
+        },
+        {
+            "review_id": "main-category-only",
+            "product": {"main_category": "Electronics"},
+        },
+    ]
+
+    filtered = generator.filter_enriched_reviews_by_category(reviews, "Electronics")
+
+    assert [review["review_id"] for review in filtered] == ["project-category-match"]
