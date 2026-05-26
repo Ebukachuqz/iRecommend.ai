@@ -95,6 +95,11 @@ def patch_graph_pipeline(monkeypatch, session=None, intent=None, persona=PERSONA
     )
     monkeypatch.setattr(task_b_graph, "load_or_create_session", lambda request, persona, client: session)
     monkeypatch.setattr(task_b_graph, "plan_intent", lambda persona, request_text, session_state=None: intent)
+    monkeypatch.setattr(
+        task_b_graph,
+        "reviewed_parent_asins_for_request",
+        lambda request, client: {"reviewed-1"} if request.user_id else set(),
+    )
 
     def fake_retrieve(user_id, category, planned_intent, **kwargs):
         calls["retrieve"] = {
@@ -106,6 +111,7 @@ def patch_graph_pipeline(monkeypatch, session=None, intent=None, persona=PERSONA
             "persona": kwargs["persona"],
             "preference_vector_row": kwargs["preference_vector_row"],
             "exclude_parent_asins": kwargs["exclude_parent_asins"],
+            "reviewed_parent_asins": kwargs["reviewed_parent_asins"],
             "limit": kwargs["limit"],
         }
         return CandidateRetrievalResult(candidates=candidates, source_counts={"request_query": 1, "quality_fallback": 1})

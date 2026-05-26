@@ -12,7 +12,11 @@ from src.db.supabase_client import get_supabase_client
 from src.constants import DEFAULT_CATEGORY
 from src.personas.custom_persona_processor import process_custom_persona
 from src.personas.validator import validate_persona
-from src.task_b_recommendation.candidate_retriever import CandidateRetrievalResult, retrieve_candidates_with_sources
+from src.task_b_recommendation.candidate_retriever import (
+    CandidateRetrievalResult,
+    fetch_reviewed_parent_asins_for_category,
+    retrieve_candidates_with_sources,
+)
 from src.task_b_recommendation.cold_start import (
     build_cold_start_persona,
     build_cross_domain_retrieval_query,
@@ -160,6 +164,28 @@ def load_or_create_session(
     session = create_session(request.user_id, request.category, persona, session_id=request.session_id)
     store_session(session, client=client)
     return session
+
+
+def session_excluded_parent_asins(session: RecommendationSessionState | None) -> set[str]:
+    if not session:
+        return set()
+    constraints = session.active_constraints or {}
+    excluded = set(session.shown_products or [])
+    excluded.update(constraints.get("excluded_products") or [])
+    return excluded
+
+
+def reviewed_parent_asins_for_request(
+    request: RecommendationRequest,
+    client: Client,
+) -> set[str]:
+    if not request.user_id:
+        return set()
+    return fetch_reviewed_parent_asins_for_category(
+        request.user_id,
+        request.category,
+        client=client,
+    )
 
 
 def resolved_recommendation_category(request: RecommendationRequest, intent: Any) -> str:
@@ -353,9 +379,9 @@ def build_task_b_graph(client=None, vector_store: VectorStore | None = None):
     def retrieve_recommendation_candidates(state: TaskBGraphState) -> TaskBGraphState:
         request = state["request"]
         session = state.get("session")
-        constraints = session.active_constraints if session else {}
-        excluded_parent_asins = set(session.shown_products if session else [])
-        excluded_parent_asins.update(constraints.get("excluded_products") or [])
+        reviewed_parent_asins = reviewed_parent_asins_for_request(request, client)
+        session_exclusions = session_excluded_parent_asins(session)
+        excluded_parent_asins = set(reviewed_parent_asins) | set(session_exclusions)
         allow_reviewed_parent_asins = set(request.context.get("evaluation_allowed_parent_asins") or [])
         retrieval_result = retrieve_candidates_with_sources(
             request.user_id,
@@ -366,8 +392,9 @@ def build_task_b_graph(client=None, vector_store: VectorStore | None = None):
             vector_store=vector_store,
             persona=state.get("retrieval_persona") or state["persona"],
             preference_vector_row=state.get("preference_vector_row"),
-            exclude_parent_asins=excluded_parent_asins,
+            exclude_parent_asins=session_exclusions,
             allow_reviewed_parent_asins=allow_reviewed_parent_asins,
+            reviewed_parent_asins=reviewed_parent_asins,
         )
         return {
             **state,

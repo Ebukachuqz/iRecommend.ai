@@ -131,6 +131,34 @@ def fetch_liked_persona_train_products(
     ]
 
 
+def fetch_reviewed_parent_asins_for_category(
+    user_id: str,
+    category: str,
+    client: Client | None = None,
+    task_splits: set[str] | list[str] | None = None,
+) -> set[str]:
+    client = client or get_supabase_client()
+    query = client.table("amazon_reviews").select("parent_asin,task_split").eq("user_id", user_id)
+    if task_splits and len(set(task_splits)) == 1:
+        query = query.eq("task_split", next(iter(set(task_splits))))
+    response = query.execute()
+    allowed_splits = set(task_splits or [])
+    rows = [
+        row
+        for row in response.data or []
+        if row.get("parent_asin") and (not allowed_splits or row.get("task_split") in allowed_splits)
+    ]
+    parent_asins = [str(row["parent_asin"]) for row in rows]
+    if not category:
+        return set(parent_asins)
+    products = fetch_products_by_parent_asins(parent_asins, client=client)
+    return {
+        parent_asin
+        for parent_asin in parent_asins
+        if product_matches_requested_category(products.get(parent_asin) or {}, category)
+    }
+
+
 def merge_candidate(
     candidates_by_asin: dict[str, RecommendationCandidate],
     product: dict[str, Any],
@@ -385,9 +413,13 @@ def retrieve_candidates_with_sources(
     preference_vector_row: dict[str, Any] | None = None,
     exclude_parent_asins: set[str] | list[str] | None = None,
     allow_reviewed_parent_asins: set[str] | list[str] | None = None,
+    reviewed_parent_asins: set[str] | list[str] | None = None,
 ) -> CandidateRetrievalResult:
     client = client or get_supabase_client()
-    reviewed = fetch_reviewed_parent_asins(user_id, client=client) if user_id else set()
+    if reviewed_parent_asins is not None:
+        reviewed = set(reviewed_parent_asins)
+    else:
+        reviewed = fetch_reviewed_parent_asins(user_id, client=client) if user_id else set()
     reviewed = reviewed - set(allow_reviewed_parent_asins or [])
     reviewed = set(reviewed) | set(exclude_parent_asins or [])
     vector_store = vector_store or SupabasePgVectorStore(client=client)
@@ -519,6 +551,7 @@ def retrieve_candidates(
     preference_vector_row: dict[str, Any] | None = None,
     exclude_parent_asins: set[str] | list[str] | None = None,
     allow_reviewed_parent_asins: set[str] | list[str] | None = None,
+    reviewed_parent_asins: set[str] | list[str] | None = None,
 ) -> list[RecommendationCandidate]:
     return retrieve_candidates_with_sources(
         user_id,
@@ -531,4 +564,5 @@ def retrieve_candidates(
         preference_vector_row=preference_vector_row,
         exclude_parent_asins=exclude_parent_asins,
         allow_reviewed_parent_asins=allow_reviewed_parent_asins,
+        reviewed_parent_asins=reviewed_parent_asins,
     ).candidates
