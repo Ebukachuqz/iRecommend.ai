@@ -9,7 +9,7 @@ from supabase import Client
 from src.config import get_settings
 from src.db.queries import fetch_persona
 from src.db.supabase_client import get_supabase_client
-from src.constants import DEFAULT_CATEGORY
+from src.constants import DEFAULT_CATEGORY, PERSONA_TRAIN_SPLIT
 from src.personas.custom_persona_processor import process_custom_persona
 from src.personas.validator import validate_persona
 from src.task_b_recommendation.candidate_retriever import (
@@ -181,11 +181,37 @@ def reviewed_parent_asins_for_request(
 ) -> set[str]:
     if not request.user_id:
         return set()
+    evaluation_mode = bool(
+        request.evaluation_mode
+        or request.context.get("evaluation")
+        or request.context.get("evaluation_mode")
+        or request.context.get("is_evaluation_run")
+    )
     return fetch_reviewed_parent_asins_for_category(
         request.user_id,
         request.category,
         client=client,
+        task_splits={PERSONA_TRAIN_SPLIT} if evaluation_mode else None,
     )
+
+
+def evaluation_context(request: RecommendationRequest) -> dict[str, Any]:
+    is_evaluation_run = bool(
+        request.evaluation_mode
+        or request.context.get("evaluation")
+        or request.context.get("evaluation_mode")
+        or request.context.get("is_evaluation_run")
+    )
+    holdout_asin = (
+        request.holdout_asin
+        or request.context.get("holdout_asin")
+        or request.context.get("evaluation_holdout_parent_asin")
+    )
+    return {
+        "is_evaluation_run": is_evaluation_run,
+        "holdout_asin": holdout_asin,
+        "holdout_review_id": request.context.get("evaluation_holdout_review_id"),
+    }
 
 
 def resolved_recommendation_category(request: RecommendationRequest, intent: Any) -> str:
@@ -334,6 +360,14 @@ def store_recommendation_run(
         "prompt_version": output.prompt_version,
         "embedding_model": DEFAULT_EMBEDDING_MODEL,
     }
+    evaluation = context.get("evaluation_metadata") or {}
+    if evaluation.get("is_evaluation_run"):
+        payload["is_evaluation_run"] = True
+        payload["holdout_asin"] = evaluation.get("holdout_asin")
+        if context.get("hit_at_10") is not None:
+            payload["hit_at_10"] = context.get("hit_at_10")
+        if context.get("rank_of_holdout") is not None:
+            payload["rank_of_holdout"] = context.get("rank_of_holdout")
     response = client.table("recommendation_runs").insert(payload).execute()
     recommendation_run = response.data[0] if response.data else payload
     store_recommendation_traces_best_effort(
@@ -453,6 +487,7 @@ def build_task_b_graph(client=None, vector_store: VectorStore | None = None):
             context={
                 **request.context,
                 "resolved_category": resolved_category,
+                "evaluation_metadata": evaluation_context(request),
                 "intent": state["intent"].model_dump(mode="json"),
                 "cold_start_metadata": {
                     "cold_start": state["cold_start"],

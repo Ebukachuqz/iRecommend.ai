@@ -165,6 +165,26 @@ def test_recommendation_run_stores_output_category() -> None:
     assert payload["category"] == "Electronics"
 
 
+def test_recommendation_run_stores_evaluation_metadata_when_present() -> None:
+    client = RecordingClient()
+
+    payload = store_recommendation_run(
+        make_output(),
+        {
+            "evaluation_metadata": {"is_evaluation_run": True, "holdout_asin": "holdout-1"},
+            "hit_at_10": True,
+            "rank_of_holdout": 3,
+            "scored_candidates": make_scored_candidates(),
+        },
+        client=client,
+    )
+
+    assert payload["is_evaluation_run"] is True
+    assert payload["holdout_asin"] == "holdout-1"
+    assert payload["hit_at_10"] is True
+    assert payload["rank_of_holdout"] == 3
+
+
 def test_candidate_traces_are_inserted_in_one_batch_with_ranks() -> None:
     client = RecordingClient()
 

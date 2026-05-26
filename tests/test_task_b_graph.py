@@ -8,6 +8,7 @@ from src.task_b_recommendation.cold_start import (
     build_cross_domain_retrieval_query,
     categories_are_meaningfully_different,
 )
+from src.constants import PERSONA_TRAIN_SPLIT
 from src.task_b_recommendation.schema import (
     RecommendationCandidate,
     RecommendationIntent,
@@ -347,6 +348,54 @@ def test_cold_start_accepts_onboarding_answers_from_context() -> None:
     assert "books" in persona["preferences"]["liked_product_types"]
 
 
+def test_reviewed_exclusions_use_persona_train_only_in_evaluation_mode(monkeypatch) -> None:
+    captured = {}
+
+    def fake_fetch(user_id, category, client=None, task_splits=None):
+        captured["user_id"] = user_id
+        captured["category"] = category
+        captured["task_splits"] = task_splits
+        return {"train-asin"}
+
+    monkeypatch.setattr(task_b_graph, "fetch_reviewed_parent_asins_for_category", fake_fetch)
+
+    reviewed = task_b_graph.reviewed_parent_asins_for_request(
+        RecommendationRequest(
+            user_id="user-1",
+            category="Electronics",
+            request="recommend something",
+            evaluation_mode=True,
+            holdout_asin="holdout-asin",
+        ),
+        DummyClient(),
+    )
+
+    assert reviewed == {"train-asin"}
+    assert captured == {
+        "user_id": "user-1",
+        "category": "Electronics",
+        "task_splits": {PERSONA_TRAIN_SPLIT},
+    }
+
+
+def test_reviewed_exclusions_use_all_reviewed_products_in_normal_mode(monkeypatch) -> None:
+    captured = {}
+
+    def fake_fetch(user_id, category, client=None, task_splits=None):
+        captured["task_splits"] = task_splits
+        return {"reviewed-asin"}
+
+    monkeypatch.setattr(task_b_graph, "fetch_reviewed_parent_asins_for_category", fake_fetch)
+
+    reviewed = task_b_graph.reviewed_parent_asins_for_request(
+        RecommendationRequest(user_id="user-1", category="Electronics", request="recommend something"),
+        DummyClient(),
+    )
+
+    assert reviewed == {"reviewed-asin"}
+    assert captured["task_splits"] is None
+
+
 def test_cross_domain_detection_is_conservative() -> None:
     assert categories_are_meaningfully_different("All_Beauty", "Electronics") is True
     assert categories_are_meaningfully_different("All_Beauty", "Books") is True
@@ -416,3 +465,29 @@ def test_graph_applies_cross_domain_metadata_and_excludes_shown_products(monkeyp
     assert "shown-1" in context["excluded_parent_asins"]
     assert "shown-1" in calls["retrieve"]["exclude_parent_asins"]
     assert "fragrance free" not in calls["retrieve"]["persona"]["preferences"]["liked_attributes"]
+
+
+def test_graph_preserves_holdout_eligibility_in_evaluation_context(monkeypatch) -> None:
+    calls = patch_graph_pipeline(monkeypatch)
+    monkeypatch.setattr(task_b_graph, "reviewed_parent_asins_for_request", lambda request, client: {"train-1"})
+
+    task_b_service.recommend(
+        RecommendationRequest(
+            user_id="user-1",
+            category="Electronics",
+            request="recommend something",
+            limit=1,
+            evaluation_mode=True,
+            holdout_asin="holdout-1",
+        ),
+        client=DummyClient(),
+        vector_store=DummyVectorStore(),
+    )
+
+    assert calls["retrieve"]["reviewed_parent_asins"] == {"train-1"}
+    assert "holdout-1" not in calls["store"]["context"]["excluded_parent_asins"]
+    assert calls["store"]["context"]["evaluation_metadata"] == {
+        "is_evaluation_run": True,
+        "holdout_asin": "holdout-1",
+        "holdout_review_id": None,
+    }

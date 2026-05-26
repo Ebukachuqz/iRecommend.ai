@@ -39,6 +39,8 @@ class RecommendationRequest(BaseModel):
     limit: int = Field(default=5, ge=1, le=50)
     session_id: str | None = None
     cold_start: bool = False
+    evaluation_mode: bool = False
+    holdout_asin: str | None = None
     context: dict[str, Any] = Field(default_factory=dict)
 
 
