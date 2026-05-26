@@ -226,7 +226,7 @@ python scripts/embed_products.py --category All_Beauty --limit 100 --dry-run
 python scripts/embed_products.py --category All_Beauty --force-reembed
 ```
 
-Product embeddings are built from rich product metadata: title, category path, features, description, brand/store, price tier, and useful details. The exact raw price is not embedded; the script uses semantic tiers such as `budget`, `mid-range`, `premium`, and `luxury` because those meanings are more stable than a changing seller price. The text used for each embedding is stored in `product_embeddings.product_text` for debugging and reproducibility. Re-run with `--force-reembed` when the product text strategy changes.
+Product embeddings are built from rich product metadata: title, broad project `category`, Amazon `main_category`, Amazon `categories` hierarchy, features, description, brand/store, price tier, and useful details. The exact raw price is not embedded; the script uses semantic tiers such as `budget`, `mid-range`, `premium`, and `luxury` because those meanings are more stable than a changing seller price. The text used for each embedding is stored in `product_embeddings.product_text` for debugging and reproducibility. Re-run with `--force-reembed` when the product text strategy changes, especially after category hierarchy text changes.
 
 Build a user preference vector:
 
@@ -255,7 +255,7 @@ FastAPI and CLI callers use the Task B service layer, and `service.recommend()` 
 
 Successful recommendation calls are stored in `recommendation_runs`.
 
-Task B retrieves candidates from multiple sources before scoring: preference-vector semantic search, request-query semantic search, collaborative signals from similar users' preference vectors, persona/intent attribute matching, and a quality/popularity fallback. Collaborative filtering is only one signal; the system goes beyond it by grounding retrieval, scoring, and final reasons in the user's persona and request intent. Cold-start and custom-persona requests still work through request-query retrieval and quality fallback when no stored preference vector exists.
+Task B retrieves candidates from multiple sources before scoring: preference-vector semantic search, request-query semantic search, collaborative signals from similar users' preference vectors, bought-together related products from liked `persona_train` items, persona/intent attribute matching, and a quality/popularity fallback. Collaborative filtering is only one signal; the system goes beyond it by grounding retrieval, scoring, and final reasons in the user's persona and request intent. Cold-start and custom-persona requests still work through request-query retrieval and quality fallback when no stored preference vector exists.
 
 Cold-start requests build a low-confidence starter persona from request/context signals and do not require preference vectors. Cross-domain recommendations are conservative: close beauty/skincare categories stay in-domain, while meaningfully different domains such as beauty -> electronics use transferable values like price sensitivity, quality, reliability, simplicity, durability, and value for money. Multi-turn sessions refine active constraints and exclude products already shown in the same session.
 

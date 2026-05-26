@@ -21,21 +21,22 @@ Task B can run from a stored user persona or from a caller-provided custom perso
 
 ## Retrieval
 
-Candidate retrieval builds a broad pool before scoring and LLM reranking. It now combines five sources:
+Candidate retrieval builds a broad pool before scoring and LLM reranking. It now combines six sources:
 
 - `preference_vector`: pgvector nearest-neighbour search from the user's category-specific preference vector.
 - `request_query`: semantic search from the intent planner's retrieval query. This is the main cold-start and custom-persona path.
 - `collaborative`: similar users are found through `user_preference_vectors`, then their highly rated `persona_train` products are considered.
+- `bought_together`: products listed in `amazon_product_metadata.bought_together` for the user's liked `persona_train` products are considered as related-product candidates.
 - `attribute_match`: product text is matched against persona liked attributes, product types, values, and intent-required attributes.
 - `quality_fallback`: highly rated/popular products fill the pool when other sources are sparse.
 
 Collaborative filtering is deliberately only one source among several. The recommender goes beyond "users like you liked this" by using persona values, request intent, metadata semantics, transparent scoring, and LLM reranking together.
 
-Preference vectors are built only from `amazon_reviews.task_split='persona_train'` liked reviews with rating >= 4, and products already reviewed by the user are always excluded. If no preference vector exists, request-query retrieval and quality fallback still work, which keeps cold-start and custom persona flows useful.
+Preference vectors are built only from `amazon_reviews.task_split='persona_train'` liked reviews with rating >= 4, and excluded products are removed before retrieval. Normal recommendation runs exclude already reviewed products in the requested project category plus products already shown in the current session. Evaluation-mode runs exclude `persona_train` products while keeping `task_b_holdout` products eligible so Hit@K, NDCG@K, and MRR@K can be computed. If no preference vector exists, request-query retrieval and quality fallback still work, which keeps cold-start and custom persona flows useful.
 
-Preference vectors are category-aware. Reviews are filtered through `amazon_product_metadata` by `parent_asin`, using `category` first and falling back to `main_category`/`categories`, before product embeddings are averaged. This prevents a beauty preference vector from being polluted by books, electronics, or other category histories.
+Preference vectors are category-aware. Reviews are filtered through `amazon_product_metadata` by `parent_asin`, using the project-controlled `category` column before product embeddings are averaged. `main_category` and `categories` are kept as semantic product signals, not broad operational filters. This prevents a beauty preference vector from being polluted by books, electronics, or other category histories.
 
-Session state now contributes an additional exclusion set. Products already shown in the active session are combined with already reviewed products and passed into every retrieval source as excluded parent ASINs. Retrieval is extended rather than rewritten: preference-vector search, request-query search, collaborative retrieval, attribute matching, and quality fallback all keep their existing source labels and provenance.
+Session state now contributes an additional exclusion set. Products already shown in the active session are combined with reviewed products and passed into every retrieval source as excluded parent ASINs. Retrieval is extended rather than rewritten: preference-vector search, request-query search, collaborative retrieval, bought-together retrieval, attribute matching, and quality fallback all keep their existing source labels and provenance.
 
 Every retrieval run records source counts such as `{"preference_vector": 40, "request_query": 30, "attribute_match": 12}` in `recommendation_runs.retrieval_sources`. These counts describe unique candidates added by each source after dedupe, not only the final top recommendations. If a product appears from multiple sources, its `retrieval_sources` list preserves all sources, but only the first source that added the unique candidate increments the run-level count.
 
@@ -55,7 +56,7 @@ Intent and candidate trace writes are best-effort. If trace persistence fails, r
 
 ## Product Embeddings
 
-Product embeddings are built from rich metadata rather than title-only text. `product_embeddings.product_text` includes the title, full category path, top product features, the first description entries/sentences, brand/store, a semantic price tier, and useful details. The stored `product_text` is intentionally kept for debugging and reproducibility: it shows exactly what text was embedded for a product.
+Product embeddings are built from rich metadata rather than title-only text. `product_embeddings.product_text` includes the title, broad project `category`, Amazon `main_category`, Amazon `categories` hierarchy, top product features, the first description entries/sentences, brand/store, a semantic price tier, and useful details. `category` remains the broad filtering/evaluation bucket, while `main_category` and `categories` enrich semantic matching, refined scoring, and explanations. The stored `product_text` is intentionally kept for debugging and reproducibility: it shows exactly what text was embedded for a product.
 
 The embedding text uses price tiers (`budget`, `mid-range`, `premium`, `luxury`) instead of exact prices such as `$18.99`. Exact prices change over time and add little semantic value; price tiers preserve the stable consumer meaning. When the product text strategy changes, run `scripts/embed_products.py --force-reembed` for the affected category or product set so existing vectors match the new text representation.
 
