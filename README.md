@@ -115,7 +115,7 @@ Validation is practical but evaluation-focused. Reviews must include `user_id`, 
 Preferred rebuild order:
 
 ```text
-migrations -> ingestion -> create_holdout_split.py -> regenerate personas
+migrations -> ingestion -> create_holdout_split.py -> generate personas
 ```
 
 Quick dry-run test:
@@ -160,12 +160,12 @@ Holdout splitting is deterministic and per user. For each category, reviews are 
 ## Persona Generation
 
 ```powershell
-python scripts/regenerate_personas.py --category All_Beauty --limit 10
-python scripts/regenerate_personas.py --category All_Beauty --limit 20
-python scripts/regenerate_personas.py --category All_Beauty --limit 20 --max-reviews-per-user 10
+python scripts/generate_personas.py --category All_Beauty --limit 10
+python scripts/generate_personas.py --category All_Beauty --limit 20
+python scripts/generate_personas.py --category All_Beauty --limit 20 --max-reviews-per-user 10
 ```
 
-Persona generation uses only `task_split='persona_train'` reviews. It sends at most 10 reviews per user to the LLM by default to keep prompt length manageable; use `--max-reviews-per-user` to override this for experiments. The selected review IDs are stored in `user_personas.source_review_ids` and included in the persona run summary. `task_a_holdout` and `task_b_holdout` reviews are reserved for evaluation and should not be used to build personas. `amazon_reviews` does not have or require a `category` column.
+Persona generation is category-aware and uses only `task_split='persona_train'` reviews that belong to the requested `amazon_product_metadata.category`. It skips users who already have personas in that category by default; pass `--force` to intentionally regenerate existing personas. It sends at most 10 reviews per user to the LLM by default to keep prompt length manageable; use `--max-reviews-per-user` to override this for experiments. The selected review IDs are stored in `user_personas.source_review_ids` and included in the persona run summary. `task_a_holdout` and `task_b_holdout` reviews are reserved for evaluation and should not be used to build personas. `amazon_reviews` does not have or require a `category` column.
 
 ## Finding Test IDs
 
@@ -268,7 +268,7 @@ Task B also accepts a custom persona JSON through `POST /recommendations/generat
 Evaluation uses the same runtime services as the app and writes paper-ready artifacts under `outputs/evaluation/`. Run the pipeline in this order:
 
 ```text
-migrations -> ingestion -> create_holdout_split.py -> regenerate_personas.py -> embed_products.py -> build_user_preference_vectors.py -> evaluation
+migrations -> ingestion -> create_holdout_split.py -> generate_personas.py -> embed_products.py -> build_user_preference_vectors.py -> evaluation
 ```
 
 Task A evaluates review/rating simulation against `task_a_holdout` reviews. It reports MAE, RMSE, rounded exact-rating accuracy, within-1-star accuracy, predicted/true mean rating, optimistic bias, and a user-average-rating baseline from `persona_train` reviews.

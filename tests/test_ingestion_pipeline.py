@@ -5,8 +5,8 @@ from src.ingestion import ingest_amazon
 def test_readme_documents_holdout_as_separate_step_and_persona_limit() -> None:
     readme = open("README.md", encoding="utf-8").read()
 
-    assert "migrations -> ingestion -> create_holdout_split.py -> regenerate personas" in readme
-    assert "python scripts/regenerate_personas.py --category All_Beauty --limit 20" in readme
+    assert "migrations -> ingestion -> create_holdout_split.py -> generate personas" in readme
+    assert "python scripts/generate_personas.py --category All_Beauty --limit 20" in readme
 
 
 def valid_review(user_id: str, parent_asin: str, index: int = 1) -> dict:

@@ -5,8 +5,8 @@ from scripts import embed_products
 from scripts import ingest_amazon as ingest_amazon_script
 from scripts import build_user_preference_vectors as build_user_preference_vectors_script
 from scripts import run_task_b_recommendation as run_task_b_script
-from scripts import regenerate_personas as regenerate_personas_script
-from scripts import regenerate_personas
+from scripts import generate_personas as generate_personas_script
+from scripts import generate_personas
 
 build_holdout_updates = create_holdout_split.build_holdout_updates
 
@@ -105,6 +105,10 @@ class QueryRecorder:
         self.filters.append((column, value))
         return self
 
+    def in_(self, column, values):
+        self.filters.append((column, list(values)))
+        return self
+
     def range(self, _start, _end):
         return self
 
@@ -122,12 +126,13 @@ class ClientRecorder:
         return self.query
 
 
-def test_regenerate_user_lookup_does_not_filter_by_category(monkeypatch) -> None:
+def test_generate_user_lookup_filters_by_category(monkeypatch) -> None:
     client = ClientRecorder()
-    monkeypatch.setattr(regenerate_personas, "get_supabase_client", lambda: client)
+    monkeypatch.setattr(generate_personas, "get_supabase_client", lambda: client)
+    monkeypatch.setattr(generate_personas, "fetch_category_parent_asins", lambda _category, _client: ["asin-1"])
 
-    assert regenerate_personas.fetch_user_ids() == ["u1"]
-    assert not any(column == "category" for column, _value in client.query.filters)
+    assert generate_personas.fetch_user_ids("All_Beauty") == ["u1"]
+    assert any(column == "task_split" and value == "persona_train" for column, value in client.query.filters)
 
 
 class PersonaGeneratorRecorder:
@@ -149,24 +154,26 @@ class PersonaGeneratorRecorder:
         return {"source_review_ids": ["r1", "r2"], "review_count_available": 15, "review_count_used": max_reviews}
 
 
-def test_regenerate_personas_script_logs_progress_and_failures(monkeypatch, capsys, tmp_path) -> None:
+def test_generate_personas_script_logs_progress_and_failures(monkeypatch, capsys, tmp_path) -> None:
     recorder = PersonaGeneratorRecorder()
-    monkeypatch.setattr(regenerate_personas_script, "fetch_user_ids", lambda: ["good", "bad"])
-    monkeypatch.setattr(regenerate_personas_script, "PersonaGenerator", lambda: recorder)
+    monkeypatch.setattr(generate_personas_script, "fetch_user_ids", lambda _category, client=None: ["good", "bad"])
+    monkeypatch.setattr(generate_personas_script, "fetch_existing_persona_user_ids", lambda _category, client=None: set())
+    monkeypatch.setattr(generate_personas_script, "get_supabase_client", lambda: object())
+    monkeypatch.setattr(generate_personas_script, "PersonaGenerator", lambda: recorder)
     monkeypatch.setattr(
         "sys.argv",
-        ["regenerate_personas.py", "--category", "All_Beauty", "--output-dir", str(tmp_path)],
+        ["generate_personas.py", "--category", "All_Beauty", "--output-dir", str(tmp_path)],
     )
 
-    regenerate_personas_script.main()
+    generate_personas_script.main()
 
     assert recorder.calls == [("good", "All_Beauty", 10, True), ("bad", "All_Beauty", 10, True)]
     output = capsys.readouterr().out
-    assert "[persona] Starting persona regeneration: category=All_Beauty, users=2" in output
+    assert "[persona] Starting persona generation: category=All_Beauty, candidates=2, to_process=2" in output
     assert "[persona] Processing user 1/2: user_id=good" in output
-    assert "[persona] Persona generation succeeded:" in output
+    assert "[persona] Persona generated:" in output
     assert "[persona] Persona generation failed: user_id=bad, error=boom" in output
-    assert "[persona] Persona regeneration complete: succeeded=1, failed=1, total=2" in output
+    assert "[persona] Persona generation complete: succeeded=1, failed=1, skipped_existing=0, total_candidates=2, processed=2" in output
     assert "[persona] Run summary saved:" in output
     summary_files = list(tmp_path.glob("All_Beauty_upsert_*.json"))
     assert len(summary_files) == 1
@@ -182,14 +189,16 @@ def test_regenerate_personas_script_logs_progress_and_failures(monkeypatch, caps
     assert summary["result"]["failure_reasons"] == [{"user_id": "bad", "error": "boom"}]
 
 
-def test_regenerate_personas_script_max_reviews_override(monkeypatch, tmp_path) -> None:
+def test_generate_personas_script_max_reviews_override(monkeypatch, tmp_path) -> None:
     recorder = PersonaGeneratorRecorder()
-    monkeypatch.setattr(regenerate_personas_script, "fetch_user_ids", lambda: ["good"])
-    monkeypatch.setattr(regenerate_personas_script, "PersonaGenerator", lambda: recorder)
+    monkeypatch.setattr(generate_personas_script, "fetch_user_ids", lambda _category, client=None: ["good"])
+    monkeypatch.setattr(generate_personas_script, "fetch_existing_persona_user_ids", lambda _category, client=None: set())
+    monkeypatch.setattr(generate_personas_script, "get_supabase_client", lambda: object())
+    monkeypatch.setattr(generate_personas_script, "PersonaGenerator", lambda: recorder)
     monkeypatch.setattr(
         "sys.argv",
         [
-            "regenerate_personas.py",
+            "generate_personas.py",
             "--category",
             "All_Beauty",
             "--max-reviews-per-user",
@@ -199,9 +208,43 @@ def test_regenerate_personas_script_max_reviews_override(monkeypatch, tmp_path) 
         ],
     )
 
-    regenerate_personas_script.main()
+    generate_personas_script.main()
 
     assert recorder.calls == [("good", "All_Beauty", 6, True)]
+
+
+def test_generate_personas_skips_existing_by_default(monkeypatch, capsys, tmp_path) -> None:
+    recorder = PersonaGeneratorRecorder()
+    monkeypatch.setattr(generate_personas_script, "fetch_user_ids", lambda _category, client=None: ["u1", "u2", "u3"])
+    monkeypatch.setattr(generate_personas_script, "fetch_existing_persona_user_ids", lambda _category, client=None: {"u1", "u3"})
+    monkeypatch.setattr(generate_personas_script, "get_supabase_client", lambda: object())
+    monkeypatch.setattr(generate_personas_script, "PersonaGenerator", lambda: recorder)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["generate_personas.py", "--category", "Electronics", "--output-dir", str(tmp_path)],
+    )
+
+    generate_personas_script.main()
+
+    assert recorder.calls == [("u2", "Electronics", 10, True)]
+    output = capsys.readouterr().out
+    assert "existing_skipped=2" in output
+
+
+def test_generate_personas_force_rebuilds_existing(monkeypatch, tmp_path) -> None:
+    recorder = PersonaGeneratorRecorder()
+    monkeypatch.setattr(generate_personas_script, "fetch_user_ids", lambda _category, client=None: ["u1"])
+    monkeypatch.setattr(generate_personas_script, "fetch_existing_persona_user_ids", lambda _category, client=None: {"u1"})
+    monkeypatch.setattr(generate_personas_script, "get_supabase_client", lambda: object())
+    monkeypatch.setattr(generate_personas_script, "PersonaGenerator", lambda: recorder)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["generate_personas.py", "--category", "Electronics", "--force", "--output-dir", str(tmp_path)],
+    )
+
+    generate_personas_script.main()
+
+    assert recorder.calls == [("u1", "Electronics", 10, True)]
 
 
 def test_ingest_script_writes_run_summary(monkeypatch, capsys, tmp_path) -> None:
