@@ -11,6 +11,8 @@ logs/*.jsonl
 logs/*.log
 outputs/
 data/
+data/cache/
+data/raw/
 dist/
 build/
 *.egg-info/

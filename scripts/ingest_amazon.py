@@ -19,6 +19,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--review-limit", "--max-reviews", dest="review_limit", type=int, default=None)
     parser.add_argument("--batch-size", type=int, default=500)
     parser.add_argument("--require-rating-number", action="store_true")
+    parser.add_argument("--from-cache", action="store_true")
+    parser.add_argument("--cache-dir", default="data/cache/amazon_reviews_2023")
+    parser.add_argument("--write-cache", action="store_true")
+    parser.add_argument("--reviews-file", default=None)
+    parser.add_argument("--metadata-file", default=None)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--verify", action="store_true")
     parser.add_argument("--output-dir", default="outputs/ingestion")
@@ -38,9 +43,16 @@ def main() -> None:
             review_limit=args.review_limit,
             batch_size=args.batch_size,
             require_rating_number=args.require_rating_number,
+            from_cache=args.from_cache,
+            cache_dir=args.cache_dir,
+            write_cache=args.write_cache,
+            reviews_file=args.reviews_file,
+            metadata_file=args.metadata_file,
             dry_run=args.dry_run,
             verify=args.verify,
         )
+    except (FileNotFoundError, ValueError) as exc:
+        parser.exit(1, f"[ingestion] Dataset source error: {exc}\n")
     except IngestionUploadError as exc:
         parser.exit(1, f"[ingestion] Upload failed: {exc}\n")
     mode = "dry_run" if args.dry_run else "ingest"

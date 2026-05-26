@@ -7,6 +7,7 @@ import re
 from collections import Counter
 from collections.abc import Callable, Iterable, Iterator
 from itertools import islice
+from pathlib import Path
 from typing import Any
 
 from datasets import load_dataset
@@ -18,6 +19,8 @@ from src.ingestion.data_models import AmazonProductMetadata, AmazonReview, parse
 
 
 DATASET_NAME = "McAuley-Lab/Amazon-Reviews-2023"
+DEFAULT_CACHE_DIR = Path("data/cache/amazon_reviews_2023")
+CACHE_PROGRESS_INTERVAL = 50_000
 
 METADATA_KEEP_COLUMNS = [
     "parent_asin",
@@ -103,6 +106,100 @@ def stream_reviews(category: str) -> Iterable[dict[str, Any]]:
         streaming=True,
         trust_remote_code=True,
     )
+
+
+def iter_jsonl_file(path: str | Path) -> Iterator[dict[str, Any]]:
+    file_path = Path(path)
+    opener = gzip.open if file_path.suffix == ".gz" else open
+    with opener(file_path, "rt", encoding="utf-8") as file_obj:
+        for line in file_obj:
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(row, dict):
+                yield row
+
+
+def cache_review_path(category: str, cache_dir: str | Path = DEFAULT_CACHE_DIR) -> Path:
+    return Path(cache_dir) / f"{category}_reviews.jsonl"
+
+
+def cache_metadata_path(category: str, cache_dir: str | Path = DEFAULT_CACHE_DIR) -> Path:
+    return Path(cache_dir) / f"{category}_metadata.jsonl"
+
+
+def write_jsonl_cache(
+    rows: Iterable[dict[str, Any]],
+    path: str | Path,
+    *,
+    limit: int | None = None,
+    label: str = "rows",
+) -> int:
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    count = 0
+    with output_path.open("w", encoding="utf-8", newline="\n") as file_obj:
+        for row in limited(rows, limit):
+            file_obj.write(json.dumps(row, ensure_ascii=False, default=str))
+            file_obj.write("\n")
+            count += 1
+            if count % CACHE_PROGRESS_INTERVAL == 0:
+                log_ingestion(f"Cached {count:,} {label} to {output_path}")
+    log_ingestion(f"Cache write complete: {count:,} {label} -> {output_path}")
+    return count
+
+
+def write_category_cache(
+    category: str,
+    cache_dir: str | Path = DEFAULT_CACHE_DIR,
+    review_limit: int | None = None,
+) -> tuple[Path, Path]:
+    review_path = cache_review_path(category, cache_dir)
+    metadata_path = cache_metadata_path(category, cache_dir)
+    log_ingestion(f"Writing review cache from Hugging Face: {review_path}")
+    write_jsonl_cache(stream_reviews(category), review_path, limit=review_limit, label="reviews")
+    log_ingestion(f"Writing metadata cache from Hugging Face: {metadata_path}")
+    write_jsonl_cache(stream_metadata(category), metadata_path, label="metadata rows")
+    return review_path, metadata_path
+
+
+def validate_local_jsonl_file(path: str | Path, label: str) -> Path:
+    resolved = Path(path)
+    if not resolved.exists():
+        raise FileNotFoundError(f"{label} file does not exist: {resolved}")
+    if not resolved.is_file():
+        raise FileNotFoundError(f"{label} path is not a file: {resolved}")
+    return resolved
+
+
+def resolve_ingestion_files(
+    category: str,
+    *,
+    from_cache: bool = False,
+    cache_dir: str | Path = DEFAULT_CACHE_DIR,
+    reviews_file: str | Path | None = None,
+    metadata_file: str | Path | None = None,
+) -> tuple[Path | None, Path | None]:
+    if bool(reviews_file) != bool(metadata_file):
+        raise ValueError("--reviews-file and --metadata-file must be provided together.")
+    if reviews_file and metadata_file:
+        return (
+            validate_local_jsonl_file(reviews_file, "Reviews"),
+            validate_local_jsonl_file(metadata_file, "Metadata"),
+        )
+    if from_cache:
+        return (
+            validate_local_jsonl_file(cache_review_path(category, cache_dir), "Cached reviews"),
+            validate_local_jsonl_file(cache_metadata_path(category, cache_dir), "Cached metadata"),
+        )
+    return None, None
+
+
+def stream_reviews_from_source(category: str, reviews_file: str | Path | None = None) -> Iterable[dict[str, Any]]:
+    if reviews_file:
+        return iter_jsonl_file(reviews_file)
+    return stream_reviews(category)
 
 
 def prune_metadata_columns(dataset: Any) -> Any:
@@ -192,6 +289,12 @@ def stream_metadata(category: str) -> Iterable[dict[str, Any]]:
     return stream_metadata_jsonl_fallback(category)
 
 
+def stream_metadata_from_source(category: str, metadata_file: str | Path | None = None) -> Iterable[dict[str, Any]]:
+    if metadata_file:
+        return iter_jsonl_file(metadata_file)
+    return stream_metadata(category)
+
+
 def stream_metadata_via_datasets(category: str) -> Iterable[dict[str, Any]]:
     dataset = load_dataset(
         DATASET_NAME,
@@ -204,6 +307,7 @@ def stream_metadata_via_datasets(category: str) -> Iterable[dict[str, Any]]:
         prune_metadata_columns(dataset),
         fallback_factory=lambda: stream_metadata_jsonl_fallback(category),
     )
+
 
 def count_users(reviews: Iterable[dict[str, Any]], max_reviews: int | None = None) -> Counter[str]:
     counts: Counter[str] = Counter()
@@ -591,6 +695,11 @@ def ingest_category(
     extra_products: int = 1000,
     review_limit: int | None = None,
     require_rating_number: bool = False,
+    from_cache: bool = False,
+    cache_dir: str | Path = DEFAULT_CACHE_DIR,
+    write_cache: bool = False,
+    reviews_file: str | Path | None = None,
+    metadata_file: str | Path | None = None,
     dry_run: bool = False,
     verify: bool = False,
     client: Client | None = None,
@@ -602,10 +711,23 @@ def ingest_category(
     effective_min_reviews = min_reviews if min_reviews is not None else min_user_reviews
     effective_min_reviews = 15 if effective_min_reviews is None else effective_min_reviews
     effective_review_limit = review_limit if review_limit is not None else max_reviews
+    if write_cache:
+        reviews_path, metadata_path = write_category_cache(category, cache_dir=cache_dir, review_limit=effective_review_limit)
+    else:
+        reviews_path, metadata_path = resolve_ingestion_files(
+            category,
+            from_cache=from_cache,
+            cache_dir=cache_dir,
+            reviews_file=reviews_file,
+            metadata_file=metadata_file,
+        )
+
+    if reviews_path and metadata_path:
+        log_ingestion(f"Using local dataset files: reviews={reviews_path}, metadata={metadata_path}")
 
     plan = build_ingestion_plan(
-        lambda: stream_reviews(category),
-        stream_metadata(category),
+        lambda: stream_reviews_from_source(category, reviews_path),
+        stream_metadata_from_source(category, metadata_path),
         category=category,
         min_reviews=effective_min_reviews,
         max_users=max_users,

@@ -155,6 +155,66 @@ def test_iter_jsonl_metadata_file_preserves_nested_optional_fields() -> None:
     ]
 
 
+def test_iter_jsonl_file_reads_plain_and_gzipped_jsonl(tmp_path) -> None:
+    import gzip
+
+    plain = tmp_path / "reviews.jsonl"
+    gzipped = tmp_path / "metadata.jsonl.gz"
+    plain.write_text('{"user_id": "u1"}\nnot json\n{"user_id": "u2"}\n', encoding="utf-8")
+    with gzip.open(gzipped, "wt", encoding="utf-8") as file_obj:
+        file_obj.write('{"parent_asin": "p1"}\n')
+
+    assert list(ingest_amazon.iter_jsonl_file(plain)) == [{"user_id": "u1"}, {"user_id": "u2"}]
+    assert list(ingest_amazon.iter_jsonl_file(gzipped)) == [{"parent_asin": "p1"}]
+
+
+def test_cache_paths_use_requested_category_and_dir(tmp_path) -> None:
+    assert ingest_amazon.cache_review_path("Electronics", tmp_path) == tmp_path / "Electronics_reviews.jsonl"
+    assert ingest_amazon.cache_metadata_path("Electronics", tmp_path) == tmp_path / "Electronics_metadata.jsonl"
+
+
+def test_resolve_ingestion_files_requires_both_explicit_files(tmp_path) -> None:
+    review_file = tmp_path / "reviews.jsonl"
+    review_file.write_text("", encoding="utf-8")
+
+    try:
+        ingest_amazon.resolve_ingestion_files("Electronics", reviews_file=review_file)
+    except ValueError as exc:
+        assert "--reviews-file and --metadata-file" in str(exc)
+    else:
+        raise AssertionError("expected paired local files to be required")
+
+
+def test_resolve_ingestion_files_reads_cache_paths(tmp_path) -> None:
+    review_file = tmp_path / "Electronics_reviews.jsonl"
+    metadata_file = tmp_path / "Electronics_metadata.jsonl"
+    review_file.write_text("", encoding="utf-8")
+    metadata_file.write_text("", encoding="utf-8")
+
+    assert ingest_amazon.resolve_ingestion_files("Electronics", from_cache=True, cache_dir=tmp_path) == (
+        review_file,
+        metadata_file,
+    )
+
+
+def test_write_category_cache_respects_review_limit_and_caches_all_metadata(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        ingest_amazon,
+        "stream_reviews",
+        lambda _category: [valid_review("u1", f"p{i}", i) for i in range(3)],
+    )
+    monkeypatch.setattr(
+        ingest_amazon,
+        "stream_metadata",
+        lambda _category: [valid_metadata("p1"), valid_metadata("p2")],
+    )
+
+    review_file, metadata_file = ingest_amazon.write_category_cache("All_Beauty", cache_dir=tmp_path, review_limit=2)
+
+    assert len(list(ingest_amazon.iter_jsonl_file(review_file))) == 2
+    assert len(list(ingest_amazon.iter_jsonl_file(metadata_file))) == 2
+
+
 def test_cli_defaults_are_evaluation_friendly() -> None:
     args = ingest_script.build_parser().parse_args([])
 
@@ -168,6 +228,27 @@ def test_cli_supports_require_rating_number() -> None:
     args = ingest_script.build_parser().parse_args(["--require-rating-number"])
 
     assert args.require_rating_number is True
+
+
+def test_cli_supports_cache_and_local_file_flags() -> None:
+    args = ingest_script.build_parser().parse_args(
+        [
+            "--from-cache",
+            "--cache-dir",
+            "data/cache/test",
+            "--write-cache",
+            "--reviews-file",
+            "reviews.jsonl",
+            "--metadata-file",
+            "metadata.jsonl",
+        ]
+    )
+
+    assert args.from_cache is True
+    assert args.cache_dir == "data/cache/test"
+    assert args.write_cache is True
+    assert args.reviews_file == "reviews.jsonl"
+    assert args.metadata_file == "metadata.jsonl"
 
 
 def test_cli_keeps_backward_compatible_aliases() -> None:
@@ -609,6 +690,56 @@ def test_dry_run_performs_no_upload(monkeypatch, capsys) -> None:
     assert "[ingestion] Prepared upload:" in output
     assert "[ingestion] Dry run enabled; no Supabase upserts will be performed." in output
     assert "[ingestion] Final result:" in output
+
+
+def test_ingest_category_reads_from_cache_without_hugging_face(tmp_path, monkeypatch) -> None:
+    review_file = ingest_amazon.cache_review_path("All_Beauty", tmp_path)
+    metadata_file = ingest_amazon.cache_metadata_path("All_Beauty", tmp_path)
+    review_file.write_text(
+        "\n".join(
+            [
+                '{"user_id": "u1", "parent_asin": "p1", "rating": 5, "title": "Great", "text": "Useful"}',
+                '{"user_id": "u1", "parent_asin": "p2", "rating": 5, "title": "Great", "text": "Useful"}',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    metadata_file.write_text(
+        "\n".join(
+            [
+                '{"parent_asin": "p1", "title": "P1", "main_category": "Beauty", "features": ["a"], '
+                '"description": ["d"], "price": 1.0, "average_rating": 4.5, "store": "S", "details": {"k": "v"}}',
+                '{"parent_asin": "p2", "title": "P2", "main_category": "Beauty", "features": ["a"], '
+                '"description": ["d"], "price": 1.0, "average_rating": 4.5, "store": "S", "details": {"k": "v"}}',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        ingest_amazon,
+        "stream_reviews",
+        lambda _category: (_ for _ in ()).throw(AssertionError("should not stream reviews from Hugging Face")),
+    )
+    monkeypatch.setattr(
+        ingest_amazon,
+        "stream_metadata",
+        lambda _category: (_ for _ in ()).throw(AssertionError("should not stream metadata from Hugging Face")),
+    )
+
+    result = ingest_amazon.ingest_category(
+        category="All_Beauty",
+        min_reviews=2,
+        max_users=100,
+        extra_products=0,
+        from_cache=True,
+        cache_dir=tmp_path,
+        dry_run=True,
+    )
+
+    assert result["selected_eligible_users"] == 1
+    assert result["valid_review_product_pairs"] == 2
 
 
 class UpsertQuery:
