@@ -5,9 +5,13 @@ import json
 import logging
 import sys
 import time
+from pathlib import Path
+
+# Ensure project root is on sys.path when run directly as a script.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from collections import Counter
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from src.evaluation.task_a_eval import run_task_a_eval
