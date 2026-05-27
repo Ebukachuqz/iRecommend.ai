@@ -9,10 +9,13 @@ __pycache__/
 .ipynb_checkpoints/
 logs/*.jsonl
 logs/*.log
-outputs/
 data/
 data/cache/
 data/raw/
 dist/
 build/
 *.egg-info/
+PROJECT_WALKTHROUGH.md
+outputs/*
+!outputs/evaluation/
+!outputs/evaluation/**
