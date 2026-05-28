@@ -21,7 +21,7 @@ Task B can run from a stored user persona or from a caller-provided custom perso
 
 ## Retrieval
 
-Candidate retrieval builds a broad pool before scoring and LLM reranking. It now combines six sources:
+Candidate retrieval builds a broad pool before scoring and LLM reranking. It now combines six normal runtime sources:
 
 - `preference_vector`: pgvector nearest-neighbour search from the user's category-specific preference vector.
 - `request_query`: semantic search from the intent planner's retrieval query. This is the main cold-start and custom-persona path.
@@ -30,9 +30,11 @@ Candidate retrieval builds a broad pool before scoring and LLM reranking. It now
 - `attribute_match`: product text is matched against persona liked attributes, product types, values, and intent-required attributes.
 - `quality_fallback`: highly rated/popular products fill the pool when other sources are sparse.
 
+Evaluation runs can add one extra source, `evaluation_holdout`. This is not a normal recommendation source. When `evaluation_mode` is active and a hidden positive `task_b_holdout` ASIN is provided, the graph fetches that product from `amazon_product_metadata`, verifies it belongs to the requested broad `category`, verifies it is not part of the persona-train exclusion set, and adds it to the candidate pool only if it was not already retrieved. It receives no artificial semantic similarity or score boost; scoring and LLM reranking decide whether it appears in the final top-K. This makes Hit@K, NDCG@K, and MRR@K valid by ensuring the held-out target was eligible to be ranked and visible in `recommendation_candidates`.
+
 Collaborative filtering is deliberately only one source among several. The recommender goes beyond "users like you liked this" by using persona values, request intent, metadata semantics, transparent scoring, and LLM reranking together.
 
-Preference vectors are built only from `amazon_reviews.task_split='persona_train'` liked reviews with rating >= 4, and excluded products are removed before retrieval. Normal recommendation runs exclude already reviewed products in the requested project category plus products already shown in the current session. Evaluation-mode runs exclude `persona_train` products while keeping `task_b_holdout` products eligible so Hit@K, NDCG@K, and MRR@K can be computed. If no preference vector exists, request-query retrieval and quality fallback still work, which keeps cold-start and custom persona flows useful.
+Preference vectors are built only from `amazon_reviews.task_split='persona_train'` liked reviews with rating >= 4, and excluded products are removed before retrieval. Normal recommendation runs exclude already reviewed products in the requested project category plus products already shown in the current session. Evaluation-mode runs exclude `persona_train` products while keeping `task_b_holdout` products eligible so Hit@K, NDCG@K, and MRR@K can be computed. If a provided holdout ASIN was not retrieved naturally, `evaluation_holdout` adds it as an ordinary candidate with source provenance but no score advantage. If no preference vector exists, request-query retrieval and quality fallback still work, which keeps cold-start and custom persona flows useful.
 
 Preference vectors are category-aware. Reviews are filtered through `amazon_product_metadata` by `parent_asin`, using the project-controlled `category` column before product embeddings are averaged. `main_category` and `categories` are kept as semantic product signals, not broad operational filters. This prevents a beauty preference vector from being polluted by books, electronics, or other category histories.
 

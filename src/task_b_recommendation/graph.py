@@ -14,7 +14,9 @@ from src.personas.custom_persona_processor import process_custom_persona
 from src.personas.validator import validate_persona
 from src.task_b_recommendation.candidate_retriever import (
     CandidateRetrievalResult,
+    fetch_products_by_parent_asins,
     fetch_reviewed_parent_asins_for_category,
+    product_matches_requested_category,
     retrieve_candidates_with_sources,
 )
 from src.task_b_recommendation.cold_start import (
@@ -27,6 +29,7 @@ from src.task_b_recommendation.embeddings import DEFAULT_EMBEDDING_MODEL
 from src.task_b_recommendation.intent_planner import INTENT_PROMPT_VERSION, plan_intent
 from src.task_b_recommendation.reranker import RERANKER_PROMPT_VERSION, rerank_recommendations
 from src.task_b_recommendation.schema import (
+    RecommendationCandidate,
     RecommendationOutput,
     RecommendationRequest,
     RecommendationSessionState,
@@ -379,6 +382,60 @@ def store_recommendation_run(
     return recommendation_run
 
 
+def inject_evaluation_holdout(
+    request: RecommendationRequest,
+    candidates: list[RecommendationCandidate],
+    source_counts: dict[str, int],
+    reviewed_parent_asins: set[str],
+    client: Client,
+) -> tuple[list[RecommendationCandidate], dict[str, int]]:
+    eval_ctx = evaluation_context(request)
+    if not eval_ctx.get("is_evaluation_run"):
+        return candidates, source_counts
+    holdout_asin = eval_ctx.get("holdout_asin")
+    if not holdout_asin:
+        return candidates, source_counts
+
+    existing_asins = {c.parent_asin for c in candidates}
+    if holdout_asin in existing_asins:
+        for c in candidates:
+            if c.parent_asin == holdout_asin and "evaluation_holdout" not in c.retrieval_sources:
+                c.retrieval_sources.append("evaluation_holdout")
+        logger.info("Holdout %s already in candidates, tagged evaluation_holdout", holdout_asin)
+        return candidates, source_counts
+
+    if holdout_asin in reviewed_parent_asins:
+        logger.warning("Holdout %s is in persona_train exclusion set, not injecting", holdout_asin)
+        return candidates, source_counts
+
+    products = fetch_products_by_parent_asins([holdout_asin], client=client)
+    product = products.get(holdout_asin)
+    if not product:
+        logger.warning("Holdout %s not found in amazon_product_metadata, not injecting", holdout_asin)
+        return candidates, source_counts
+
+    if not product_matches_requested_category(product, request.category):
+        logger.warning(
+            "Holdout %s category %s does not match requested %s, not injecting",
+            holdout_asin, product.get("category"), request.category,
+        )
+        return candidates, source_counts
+
+    holdout_candidate = RecommendationCandidate(
+        parent_asin=holdout_asin,
+        title=product.get("title"),
+        product=product,
+        semantic_similarity=0.0,
+        retrieval_source="evaluation_holdout",
+        retrieval_sources=["evaluation_holdout"],
+        source_evidence=["injected for evaluation; no artificial score advantage"],
+    )
+    candidates.append(holdout_candidate)
+    source_counts["evaluation_holdout"] = source_counts.get("evaluation_holdout", 0) + 1
+    logger.info("Injected holdout %s as evaluation_holdout candidate", holdout_asin)
+    return candidates, source_counts
+
+
 def build_task_b_graph(client=None, vector_store: VectorStore | None = None):
     client = client or get_supabase_client()
     settings = get_settings()
@@ -429,6 +486,14 @@ def build_task_b_graph(client=None, vector_store: VectorStore | None = None):
             exclude_parent_asins=session_exclusions,
             allow_reviewed_parent_asins=allow_reviewed_parent_asins,
             reviewed_parent_asins=reviewed_parent_asins,
+        )
+        candidates = list(retrieval_result.candidates)
+        source_counts = dict(retrieval_result.source_counts)
+        candidates, source_counts = inject_evaluation_holdout(
+            request, candidates, source_counts, reviewed_parent_asins, client,
+        )
+        retrieval_result = CandidateRetrievalResult(
+            candidates=candidates, source_counts=source_counts,
         )
         return {
             **state,

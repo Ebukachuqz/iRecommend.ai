@@ -470,6 +470,11 @@ def test_graph_applies_cross_domain_metadata_and_excludes_shown_products(monkeyp
 def test_graph_preserves_holdout_eligibility_in_evaluation_context(monkeypatch) -> None:
     calls = patch_graph_pipeline(monkeypatch)
     monkeypatch.setattr(task_b_graph, "reviewed_parent_asins_for_request", lambda request, client: {"train-1"})
+    monkeypatch.setattr(
+        task_b_graph,
+        "fetch_products_by_parent_asins",
+        lambda parent_asins, client: {"holdout-1": {"parent_asin": "holdout-1", "category": "Electronics"}}
+    )
 
     task_b_service.recommend(
         RecommendationRequest(

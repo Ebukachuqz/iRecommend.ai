@@ -120,7 +120,7 @@ def test_summary_counts_are_correct(
     mock_candidates.return_value = [REVIEWS[0], REVIEWS[1], REVIEWS[3]]
     mock_existing.return_value = {"R1"}
     mock_personas.return_value = {"U1", "U4"}
-    mock_simulate.side_effect = [None, Exception("LLM error")]
+    mock_simulate.side_effect = Exception("LLM error")
 
     stats = run_batch(_make_args())
     assert stats["candidates_found"] == 3

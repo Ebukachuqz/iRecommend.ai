@@ -20,7 +20,7 @@ amazon_reviews
   IMPORTANT:
     - amazon_reviews does NOT have a category column.
       Category must always be resolved by joining to amazon_product_metadata.
-    - amazon_reviews does NOT have a used_for_persona column.
+    - amazon_reviews does NOT have a legacy persona-source boolean column.
       Review split is controlled by task_split only.
     - Persona source evidence is in user_personas.source_review_ids.
 

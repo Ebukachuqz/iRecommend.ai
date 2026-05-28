@@ -99,7 +99,7 @@ def main() -> None:
     args = parser.parse_args()
 
     client = get_supabase_client()
-    user_ids = sorted(set(args.user_ids or fetch_user_ids(args.category, client=client)))
+    user_ids = args.user_ids or fetch_user_ids(args.category, client=client)
     existing_user_ids = set() if args.force else fetch_existing_persona_user_ids(args.category, client=client)
     users_to_process = [user_id for user_id in user_ids if user_id not in existing_user_ids]
     if args.limit:
