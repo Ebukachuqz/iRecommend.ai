@@ -298,6 +298,8 @@ python scripts/run_evaluation.py --task both --k 10 --skip-bertscore
 python scripts/run_evaluation.py --task a --categories Health_and_Household --skip-bertscore
 python scripts/run_evaluation.py --task b --categories Electronics --force-rerun
 python scripts/run_evaluation.py --task both --categories Health_and_Household Electronics --task-a-limit 50 --task-b-limit 50 --skip-bertscore
+python scripts/run_evaluation.py --task b --categories Health_and_Household --task-b-limit 10 --max-holdouts-per-user 2 --k 10 --force-rerun
+python scripts/run_evaluation.py --task both --categories Health_and_Household Electronics Beauty_and_Personal_Care --task-a-limit 50 --task-b-limit 50 --max-holdouts-per-user 2 --k 10 --skip-bertscore --force-rerun
 ```
 
 Metric meanings: HitRate@K is the fraction of examples where the hidden liked product appears in the top K; NDCG@K rewards hits more when they appear higher in the list; MRR@K averages reciprocal rank; MAE/RMSE measure rating error for Task A. CSV/JSON result files and JSON summaries/manifests in `outputs/evaluation/` are the reproducible artifacts to use in the solution paper.

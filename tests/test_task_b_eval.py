@@ -185,3 +185,60 @@ def test_task_b_eval_category_mismatch(
     assert summary["total_evaluated"] == 0
     assert summary["total_skipped"] == 1
     assert summary["skipped_category_mismatch"] == 1
+
+
+@patch("src.evaluation.task_b_eval.evaluate_task_b_row")
+@patch("src.evaluation.task_b_eval._fetch_persona_train_asins")
+@patch("src.evaluation.task_b_eval._fetch_personas_batch")
+@patch("src.evaluation.task_b_eval._fetch_products_batch")
+@patch("src.evaluation.task_b_eval.fetch_task_b_holdout_reviews")
+def test_task_b_eval_max_holdouts_per_user_cap(
+    mock_fetch_reviews, mock_fetch_products, mock_fetch_personas,
+    mock_fetch_train, mock_evaluate, mock_supabase
+):
+    mock_fetch_reviews.return_value = [
+        {"user_id": "U1", "parent_asin": "A1", "category": "Electronics", "review_id": "R1", "rating": 5},
+        {"user_id": "U1", "parent_asin": "A2", "category": "Electronics", "review_id": "R2", "rating": 5},
+        {"user_id": "U1", "parent_asin": "A3", "category": "Electronics", "review_id": "R3", "rating": 5},
+        {"user_id": "U2", "parent_asin": "A4", "category": "Electronics", "review_id": "R4", "rating": 5},
+    ]
+
+    mock_fetch_products.return_value = {
+        "A1": {"parent_asin": "A1", "category": "Electronics", "title": "P1"},
+        "A2": {"parent_asin": "A2", "category": "Electronics", "title": "P2"},
+        "A3": {"parent_asin": "A3", "category": "Electronics", "title": "P3"},
+        "A4": {"parent_asin": "A4", "category": "Electronics", "title": "P4"},
+    }
+
+    mock_fetch_personas.return_value = {
+        ("U1", "Electronics"): {"persona": "P1"},
+        ("U2", "Electronics"): {"persona": "P2"},
+    }
+    mock_fetch_train.return_value = {}
+
+    mock_evaluate.return_value = {
+        "status": "success", 
+        "recommendation_run_id": "run_123",
+        "candidate_count": 100,
+        "holdout_in_candidate_pool": True,
+        "hit_at_10": 1, 
+        "rank_of_holdout": 1, 
+        "ndcg_score": 1, 
+        "reciprocal_rank": 1
+    }
+
+    # Set max_holdouts_per_user to 2
+    rows, summary = run_task_b_eval(["Electronics"], limit=3, max_holdouts_per_user=2, supabase_client=mock_supabase)
+
+    assert summary["total_evaluated"] == 3
+    assert summary["total_skipped"] == 1
+    assert summary["skipped_max_holdouts_per_user"] == 1
+    assert summary["total_scanned"] == 4
+
+    # R3 should be skipped due to cap
+    assert rows[0]["status"] == "success"
+    assert rows[1]["status"] == "success"
+    assert rows[2]["status"] == "skipped"
+    assert rows[2]["error_message"] == "max holdouts per user reached"
+    assert rows[3]["status"] == "success"
+    assert mock_evaluate.call_count == 3

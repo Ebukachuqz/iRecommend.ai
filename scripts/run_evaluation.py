@@ -160,6 +160,7 @@ def run(args: argparse.Namespace) -> None:
                 categories=args.categories,
                 k=args.k,
                 limit=args.task_b_limit,
+                max_holdouts_per_user=args.max_holdouts_per_user,
                 force_rerun=args.force_rerun,
                 supabase_client=supabase,
             )
@@ -203,6 +204,7 @@ def run(args: argparse.Namespace) -> None:
         "task_a": _task_section(rows_a, args.task_a_limit),
         "task_b": _task_section(rows_b, args.task_b_limit),
         "k": args.k,
+        "max_holdouts_per_user": args.max_holdouts_per_user,
         "skip_bertscore": args.skip_bertscore,
         "force_rerun": args.force_rerun,
         "model_name": _most_frequent(all_rows, "model_name"),
@@ -244,6 +246,7 @@ def main() -> None:
     parser.add_argument("--categories", nargs="+", default=list(VALID_CATEGORIES))
     parser.add_argument("--task-a-limit", type=int, default=None)
     parser.add_argument("--task-b-limit", type=int, default=None)
+    parser.add_argument("--max-holdouts-per-user", type=int, default=2)
     parser.add_argument("--k", type=int, default=10)
     parser.add_argument("--skip-bertscore", action="store_true", default=False)
     parser.add_argument("--force-rerun", action="store_true", default=False)

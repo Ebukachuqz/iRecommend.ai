@@ -418,6 +418,7 @@ def compute_task_b_summary(rows: list[dict]) -> dict:
         "skipped_holdout_in_persona_train": sum(1 for r in rows if r.get("error_message") == "holdout product already appears in persona_train"),
         "skipped_holdout_not_in_candidate_pool": sum(1 for r in rows if r.get("error_message") == "holdout product not in candidate pool"),
         "skipped_recommendation_failed": sum(1 for r in rows if r.get("error_message") == "recommendation failed"),
+        "skipped_max_holdouts_per_user": sum(1 for r in rows if r.get("error_message") == "max holdouts per user reached"),
         "total_scanned": len(rows),
         "total_errors": sum(1 for r in rows if r.get("status") == "error"),
     }
@@ -427,6 +428,7 @@ def run_task_b_eval(
     categories: list[str],
     k: int = 10,
     limit: int | None = None,
+    max_holdouts_per_user: int | None = 2,
     force_rerun: bool = False,
     supabase_client: Any = None,
 ) -> tuple[list[dict], dict]:
@@ -438,6 +440,7 @@ def run_task_b_eval(
     rows = []
     valid_count = 0
     chunk_size = 50
+    successful_by_user: dict[str, int] = {}
     
     for start in range(0, len(candidate_reviews), chunk_size):
         chunk = candidate_reviews[start : start + chunk_size]
@@ -462,8 +465,13 @@ def run_task_b_eval(
             cat = review.get("category")
             asin = review["parent_asin"]
 
-            persona_row = persona_lookup.get((uid, cat), {})
             product = product_lookup.get(asin, {})
+            
+            if max_holdouts_per_user is not None and successful_by_user.get(uid, 0) >= max_holdouts_per_user:
+                rows.append(_build_empty_row(review, product, "skipped", "max holdouts per user reached"))
+                continue
+
+            persona_row = persona_lookup.get((uid, cat), {})
             train_asins = train_lookup.get(uid, [])
 
             if not persona_row:
@@ -498,6 +506,7 @@ def run_task_b_eval(
             rows.append(row)
             if row.get("status") == "success":
                 valid_count += 1
+                successful_by_user[uid] = successful_by_user.get(uid, 0) + 1
 
         if limit is not None and valid_count >= limit:
             break
