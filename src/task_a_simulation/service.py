@@ -196,6 +196,63 @@ def simulate_review_for_holdout(
     return simulate_review(request, client=client)
 
 
+def simulate_review_for_specific_holdout(
+    user_id: str,
+    holdout_review: dict[str, Any],
+    category: str = DEFAULT_CATEGORY,
+    nigerian_mode: bool = False,
+    client: Client | None = None,
+) -> ReviewSimulationOutput:
+    settings = get_settings()
+    client = client or get_supabase_client()
+    parent_asin = holdout_review["parent_asin"]
+
+    request = ReviewSimulationRequest(
+        user_id=user_id,
+        category=category,
+        parent_asin=parent_asin,
+        nigerian_mode=nigerian_mode,
+    )
+    persona, persona_version = resolve_persona(user_id, category, None, client)
+    product = resolve_product(parent_asin, None, client)
+    statistical_prediction = predict_statistical_rating(persona, product)
+    llm_output = generate_llm_review_and_rating(
+        persona,
+        product,
+        statistical_prediction,
+        nigerian_mode=nigerian_mode,
+    )
+    rating_breakdown = calibrate_rating(
+        persona,
+        statistical_prediction,
+        llm_output.llm_predicted_rating,
+    )
+    output = ReviewSimulationOutput(
+        user_id=user_id,
+        category=category,
+        parent_asin=product.parent_asin,
+        product_title=product.title,
+        llm_predicted_rating=llm_output.llm_predicted_rating,
+        statistical_predicted_rating=rating_breakdown.statistical_predicted_rating,
+        final_predicted_rating=rating_breakdown.final_predicted_rating or rating_breakdown.statistical_predicted_rating,
+        simulated_review_title=llm_output.simulated_review_title,
+        simulated_review_text=llm_output.simulated_review_text,
+        confidence=llm_output.confidence,
+        reasoning_summary=llm_output.reasoning_summary,
+        evidence_used=llm_output.evidence_used,
+        rating_breakdown=rating_breakdown,
+        nigerian_mode=nigerian_mode,
+        model_name=settings.groq_model,
+        prompt_version=TASK_A_PROMPT_VERSION,
+    )
+    queries.store_simulation_result(
+        build_simulation_payload(request, persona, product, output, persona_version, holdout_review),
+        client=client,
+    )
+    return output
+
+
 def list_unseen_products(user_id: str, limit: int = 20, client: Client | None = None) -> list[ProductSnapshot]:
     rows = queries.fetch_unseen_products(user_id, limit=limit, client=client)
     return [ProductSnapshot.model_validate(row) for row in rows]
+
