@@ -304,6 +304,8 @@ python scripts/run_evaluation.py --task both --categories Health_and_Household E
 
 Metric meanings: HitRate@K is the fraction of examples where the hidden liked product appears in the top K; NDCG@K rewards hits more when they appear higher in the list; MRR@K averages reciprocal rank; MAE/RMSE measure rating error for Task A. CSV/JSON result files and JSON summaries/manifests in `outputs/evaluation/` are the reproducible artifacts to use in the solution paper.
 
+See [EVALUATION.md](EVALUATION.md) for the full evaluation methodology, metrics, DCR-inspired diagnostics, interpretation, and limitations.
+
 
 ## FastAPI Backend
 
