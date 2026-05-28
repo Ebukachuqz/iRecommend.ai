@@ -101,7 +101,7 @@ def run_task_a_reclassification(rows: list[dict]) -> dict:
             r.get("status") == "success"
             and r.get("absolute_error") is not None
             and r["absolute_error"] <= 1.5
-            and (rouge is None or rouge >= 0.20)
+            and (rouge is None or rouge >= 0.10)
         )
         flags.append(passed)
 

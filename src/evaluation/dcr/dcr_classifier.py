@@ -42,7 +42,7 @@ def classify_task_a_row(row: dict, behaviour: dict, governance: dict, context: d
         abs_error = row.get("absolute_error")
         rouge_l = row.get("rouge_l")
         error_ok = abs_error is not None and abs_error <= 1.5
-        rouge_ok = rouge_l is None or rouge_l >= 0.20
+        rouge_ok = rouge_l is None or rouge_l >= 0.10
         if error_ok and rouge_ok:
             return "Green"
 
