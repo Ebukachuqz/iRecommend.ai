@@ -60,6 +60,32 @@ def _invoke_llm(prompt_input: dict[str, str], model_name: str) -> str:
     return getattr(raw_message, "content", str(raw_message))
 
 
+def _local_repair(parsed: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(parsed, dict):
+        return parsed
+    
+    repaired = dict(parsed)
+    
+    if "simulated_review_text" not in repaired:
+        for alt_key in ["review_text", "review", "simulated_review", "body", "generated_review"]:
+            if alt_key in repaired:
+                repaired["simulated_review_text"] = repaired[alt_key]
+                break
+
+    if "reasoning_summary" not in repaired or not repaired["reasoning_summary"]:
+        repaired["reasoning_summary"] = "Generated from the user's persona, rating behavior, and product metadata."
+        
+    return repaired
+
+
+def _invoke_repair_llm(raw_invalid_text: str, model_name: str) -> str:
+    from src.task_a_simulation.prompts import TASK_A_REPAIR_PROMPT
+    llm = get_groq_chat(model_name)
+    chain = TASK_A_REPAIR_PROMPT | llm
+    raw_message = chain.invoke({"raw_text": raw_invalid_text})
+    return getattr(raw_message, "content", str(raw_message))
+
+
 def generate_llm_review_and_rating(
     persona: dict[str, Any],
     product: ProductSnapshot,
@@ -89,18 +115,26 @@ def generate_llm_review_and_rating(
 
     try:
         parsed, cleaned_json_text = parse_json_from_llm_text(raw_text)
-        output = LLMReviewSimulationOutput.model_validate(parsed)
+        repaired = _local_repair(parsed)
+        output = LLMReviewSimulationOutput.model_validate(repaired)
     except Exception as exc:
-        log_llm_response(
-            "task_a_simulation_parse_failure",
-            {
-                "model_name": settings.groq_model,
-                "prompt_version": TASK_A_PROMPT_VERSION,
-                "raw_text": raw_text,
-                "error": str(exc),
-            },
-        )
-        raise ReviewSimulationLLMError(f"Unable to parse Task A LLM output: {exc}") from exc
+        logger.warning("Task A output validation failed, attempting LLM repair. Error: %s", exc)
+        raw_text = _invoke_repair_llm(raw_text, settings.groq_model)
+        try:
+            parsed, cleaned_json_text = parse_json_from_llm_text(raw_text)
+            repaired = _local_repair(parsed)
+            output = LLMReviewSimulationOutput.model_validate(repaired)
+        except Exception as retry_exc:
+            log_llm_response(
+                "task_a_simulation_parse_failure",
+                {
+                    "model_name": settings.groq_model,
+                    "prompt_version": TASK_A_PROMPT_VERSION,
+                    "raw_text": raw_text,
+                    "error": str(retry_exc),
+                },
+            )
+            raise ReviewSimulationLLMError(f"Unable to parse Task A LLM output: {retry_exc}") from retry_exc
 
     log_llm_response(
         "task_a_simulation",

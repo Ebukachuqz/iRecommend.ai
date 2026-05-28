@@ -51,3 +51,22 @@ Output contract:
 }}
 """
 )
+
+TASK_A_REPAIR_PROMPT = PromptTemplate.from_template(
+    """The following JSON is invalid or missing required fields according to the strict schema.
+
+Required Schema:
+{{
+  "llm_predicted_rating": number,
+  "simulated_review_title": string,
+  "simulated_review_text": string,
+  "confidence": number,
+  "reasoning_summary": string,
+  "evidence_used": [string]
+}}
+
+Raw Output to Repair:
+{raw_text}
+
+Return the repaired JSON exactly matching the schema. No markdown, no explanations."""
+)
