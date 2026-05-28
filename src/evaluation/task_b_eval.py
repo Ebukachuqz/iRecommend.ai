@@ -15,11 +15,10 @@ from src.task_b_recommendation.schema import RecommendationRequest
 logger = logging.getLogger(__name__)
 
 
-def fetch_task_b_holdout_data(
+def fetch_task_b_holdout_reviews(
     categories: list[str],
-    limit: int | None = None,
     supabase_client: Any = None,
-) -> dict:
+) -> list[dict]:
     if supabase_client is None:
         supabase_client = get_supabase_client()
 
@@ -43,27 +42,7 @@ def fetch_task_b_holdout_data(
         if cat in categories:
             filtered.append(r)
 
-    if limit is not None:
-        filtered = filtered[:limit]
-
-    asin_set = set()
-    user_cat_keys = set()
-    user_ids = set()
-    for r in filtered:
-        asin_set.add(r["parent_asin"])
-        user_cat_keys.add((r["user_id"], r["category"]))
-        user_ids.add(r["user_id"])
-
-    product_lookup = _fetch_products_batch(list(asin_set), supabase_client)
-    persona_lookup = _fetch_personas_batch(user_cat_keys, supabase_client)
-    persona_train_asins_lookup = _fetch_persona_train_asins(list(user_ids), supabase_client)
-
-    return {
-        "reviews": filtered,
-        "product_lookup": product_lookup,
-        "persona_lookup": persona_lookup,
-        "persona_train_asins_lookup": persona_train_asins_lookup,
-    }
+    return filtered
 
 
 def _fetch_products_batch(asins: list[str], supabase_client: Any) -> dict[str, dict]:
@@ -433,6 +412,13 @@ def compute_task_b_summary(rows: list[dict]) -> dict:
         "holdout_pool_unknown_count": sum(1 for r in success if r.get("holdout_in_candidate_pool") is None),
         "total_evaluated": len(success),
         "total_skipped": sum(1 for r in rows if r.get("status") == "skipped"),
+        "skipped_no_persona": sum(1 for r in rows if r.get("error_message") == "no persona found"),
+        "skipped_missing_product_metadata": sum(1 for r in rows if r.get("error_message") == "missing holdout product metadata"),
+        "skipped_category_mismatch": sum(1 for r in rows if r.get("error_message") == "category mismatch"),
+        "skipped_holdout_in_persona_train": sum(1 for r in rows if r.get("error_message") == "holdout product already appears in persona_train"),
+        "skipped_holdout_not_in_candidate_pool": sum(1 for r in rows if r.get("error_message") == "holdout product not in candidate pool"),
+        "skipped_recommendation_failed": sum(1 for r in rows if r.get("error_message") == "recommendation failed"),
+        "total_scanned": len(rows),
         "total_errors": sum(1 for r in rows if r.get("status") == "error"),
     }
 
@@ -447,36 +433,74 @@ def run_task_b_eval(
     if supabase_client is None:
         supabase_client = get_supabase_client()
 
-    data = fetch_task_b_holdout_data(categories, limit=limit, supabase_client=supabase_client)
-
-    reviews = data["reviews"]
-    product_lookup = data["product_lookup"]
-    persona_lookup = data["persona_lookup"]
-    train_lookup = data["persona_train_asins_lookup"]
+    candidate_reviews = fetch_task_b_holdout_reviews(categories, supabase_client=supabase_client)
 
     rows = []
-    for review in reviews:
-        uid = review["user_id"]
-        cat = review.get("category")
-        asin = review["parent_asin"]
+    valid_count = 0
+    chunk_size = 50
+    
+    for start in range(0, len(candidate_reviews), chunk_size):
+        chunk = candidate_reviews[start : start + chunk_size]
 
-        persona_row = persona_lookup.get((uid, cat), {})
-        product = product_lookup.get(asin, {})
-        train_asins = train_lookup.get(uid, [])
+        asin_set = set()
+        user_cat_keys = set()
+        user_ids = set()
+        for r in chunk:
+            asin_set.add(r["parent_asin"])
+            user_cat_keys.add((r["user_id"], r["category"]))
+            user_ids.add(r["user_id"])
 
-        if not product:
-            rows.append(_build_empty_row(review, {}, "skipped", "missing holdout product metadata"))
-            continue
+        product_lookup = _fetch_products_batch(list(asin_set), supabase_client)
+        persona_lookup = _fetch_personas_batch(user_cat_keys, supabase_client)
+        train_lookup = _fetch_persona_train_asins(list(user_ids), supabase_client)
 
-        if not persona_row:
-            rows.append(_build_empty_row(review, product, "skipped", "no persona found"))
-            continue
+        for review in chunk:
+            if limit is not None and valid_count >= limit:
+                break
 
-        row = evaluate_task_b_row(
-            review, persona_row, product, train_asins,
-            k=k, force_rerun=force_rerun, supabase_client=supabase_client,
-        )
-        rows.append(row)
+            uid = review["user_id"]
+            cat = review.get("category")
+            asin = review["parent_asin"]
+
+            persona_row = persona_lookup.get((uid, cat), {})
+            product = product_lookup.get(asin, {})
+            train_asins = train_lookup.get(uid, [])
+
+            if not persona_row:
+                rows.append(_build_empty_row(review, product, "skipped", "no persona found"))
+                continue
+
+            if not product:
+                rows.append(_build_empty_row(review, {}, "skipped", "missing holdout product metadata"))
+                continue
+                
+            if product.get("category") not in categories:
+                rows.append(_build_empty_row(review, product, "skipped", "category mismatch"))
+                continue
+
+            if asin in train_asins:
+                rows.append(_build_empty_row(review, product, "skipped", "holdout product already appears in persona_train"))
+                continue
+
+            row = evaluate_task_b_row(
+                review, persona_row, product, train_asins,
+                k=k, force_rerun=force_rerun, supabase_client=supabase_client,
+            )
+            
+            if row.get("status") == "success":
+                if not row.get("recommendation_run_id") or not row.get("candidate_count"):
+                    row["status"] = "skipped"
+                    row["error_message"] = "recommendation failed"
+                elif row.get("holdout_in_candidate_pool") is not True:
+                    row["status"] = "skipped"
+                    row["error_message"] = "holdout product not in candidate pool"
+
+            rows.append(row)
+            if row.get("status") == "success":
+                valid_count += 1
+
+        if limit is not None and valid_count >= limit:
+            break
 
     summary = compute_task_b_summary(rows)
     return rows, summary

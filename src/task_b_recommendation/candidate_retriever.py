@@ -374,13 +374,18 @@ def retrieve_attribute_match_candidates(
         return []
     matched_embeddings: dict[str, dict[str, Any]] = {}
     for term in positive_terms[:6]:
-        response = (
-            client.table("product_embeddings")
-            .select("parent_asin,product_text")
-            .ilike("product_text", f"%{term}%")
-            .limit(limit * 2)
-            .execute()
-        )
+        try:
+            response = (
+                client.table("product_embeddings")
+                .select("parent_asin,product_text")
+                .ilike("product_text", f"%{term}%")
+                .limit(limit * 2)
+                .execute()
+            )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning(f"ILIKE text match failed for term '{term}': {exc}")
+            continue
         for row in response.data or []:
             parent_asin = row.get("parent_asin")
             if not parent_asin or parent_asin in reviewed:
@@ -449,7 +454,9 @@ def retrieve_candidates_with_sources(
                 limit=limit,
                 exclude_parent_asins=reviewed,
             )
-        except Exception:
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning(f"Vector search failed for request_query '{retrieval_query}': {exc}")
             matches = []
         add_vector_matches(candidates_by_asin, matches, "request_query", reviewed, client, category_filter, source_counts)
 
