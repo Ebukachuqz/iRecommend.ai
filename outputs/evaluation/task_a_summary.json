@@ -1,0 +1,27 @@
+{
+  "MAE": 0.64826,
+  "RMSE": 0.8919055667502025,
+  "exact_rating_accuracy": 0.38,
+  "within_1_star_accuracy": 0.9,
+  "optimistic_bias": -0.11469999999999998,
+  "baseline_MAE": 0.60566,
+  "avg_rouge_l": 0.10705970191697527,
+  "avg_bertscore_f1": 0.750695345401764,
+  "avg_review_length_delta": 29.22,
+  "avg_user_typical_length_delta": -43.6,
+  "total_evaluated": 50,
+  "total_skipped": 0,
+  "total_errors": 0,
+  "reclassification_analysis": {
+    "total_rows": 50,
+    "standard_pass": 27,
+    "standard_fail": 23,
+    "green": 27,
+    "yellow": 23,
+    "red": 0,
+    "not_classified": 0,
+    "downgraded_count": 0,
+    "downgrade_percentage": 0.0,
+    "most_common_downgrade_reasons": []
+  }
+}

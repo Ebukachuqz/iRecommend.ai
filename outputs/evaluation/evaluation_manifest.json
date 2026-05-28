@@ -1,0 +1,52 @@
+{
+  "timestamp": "2026-05-28T20:15:59.296995+00:00",
+  "categories_evaluated": [
+    "Health_and_Household",
+    "Electronics",
+    "Beauty_and_Personal_Care"
+  ],
+  "task_a": {
+    "users_evaluated": 7,
+    "holdout_reviews_used": 50,
+    "limit_applied": 50,
+    "skipped": 0,
+    "errors": 0
+  },
+  "task_b": {
+    "users_evaluated": 51,
+    "holdout_reviews_used": 100,
+    "limit_applied": 100,
+    "skipped": 613,
+    "errors": 0
+  },
+  "k": 10,
+  "max_holdouts_per_user": 2,
+  "skip_bertscore": false,
+  "force_rerun": true,
+  "task_a_model_name": "qwen/qwen3-32b",
+  "task_b_model_name": "qwen/qwen3-32b",
+  "task_a_prompt_version": "task_a_simulation_v1",
+  "task_b_prompt_version": "task_b_intent_v1+task_b_reranker_v1",
+  "persona_version": "v1",
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "evaluation_command": "scripts/run_evaluation.py --task both --categories Health_and_Household Electronics Beauty_and_Personal_Care --task-a-limit 50 --task-b-limit 100 --max-holdouts-per-user 2 --k 10 --force-rerun",
+  "output_files": {
+    "task_a_results_csv": "outputs/evaluation/task_a_results.csv",
+    "task_a_results_json": "outputs/evaluation/task_a_results.json",
+    "task_a_summary_json": "outputs/evaluation/task_a_summary.json",
+    "task_b_results_csv": "outputs/evaluation/task_b_results.csv",
+    "task_b_results_json": "outputs/evaluation/task_b_results.json",
+    "task_b_summary_json": "outputs/evaluation/task_b_summary.json",
+    "manifest": "outputs/evaluation/evaluation_manifest.json"
+  },
+  "failure_counts": {
+    "task_a_green": 27,
+    "task_a_yellow": 23,
+    "task_a_red": 0,
+    "task_a_unclassified": 0,
+    "task_b_green": 7,
+    "task_b_yellow": 93,
+    "task_b_red": 0,
+    "task_b_unclassified": 613
+  }
+}
