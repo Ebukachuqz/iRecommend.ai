@@ -46,7 +46,7 @@ def handle_response(response: requests.Response) -> Any:
 
 
 def request_json(method: str, path: str, **kwargs: Any) -> Any:
-    response = requests.request(method, build_url(path), timeout=60, **kwargs)
+    response = requests.request(method, build_url(path), timeout=120, **kwargs)
     return handle_response(response)
 
 
@@ -84,3 +84,12 @@ def cold_start_recommendations(payload: dict[str, Any]) -> dict[str, Any]:
 
 def session_message(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     return request_json("POST", f"/sessions/{session_id}/message", json=payload)
+
+
+def generate_with_session(payload: dict[str, Any]) -> dict[str, Any]:
+    """Call /recommendations/generate with optional session_id.
+
+    Used for multi-turn chat with custom personas since
+    /sessions/{id}/message does not accept a persona field.
+    """
+    return request_json("POST", "/recommendations/generate", json=payload)

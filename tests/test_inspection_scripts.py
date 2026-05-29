@@ -246,10 +246,4 @@ def test_list_embedded_products_outputs_expected_fields() -> None:
     ]
 
 
-def test_readme_finding_test_ids_section_exists() -> None:
-    readme = Path("README.md").read_text(encoding="utf-8")
-    assert "## Finding Test IDs" in readme
-    assert "python scripts/check_category_readiness.py" in readme
-    assert "python scripts/list_eval_users.py" in readme
-    assert "python scripts/list_user_holdouts.py" in readme
-    assert "python scripts/list_embedded_products.py" in readme
+

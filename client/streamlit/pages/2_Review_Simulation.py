@@ -11,117 +11,159 @@ if str(STREAMLIT_ROOT) not in sys.path:
     sys.path.insert(0, str(STREAMLIT_ROOT))
 
 import api_client
-from ui_helpers import parse_json_or_text_input, render_error, render_rating_breakdown, safe_json_view
+from ui_helpers import (
+    parse_json_or_text_input,
+    render_error,
+    render_simulation_result,
+    render_user_selector,
+)
 
+st.set_page_config(page_title="Review Simulation", page_icon="📝", layout="wide")
 
-PERSONA_SAMPLE = {
-    "likes": ["hydrating skincare", "gentle products"],
-    "dislikes": ["strong fragrance", "greasy texture"],
-    "budget": "medium",
-    "tone": "casual",
-    "average_rating": 4.2,
-    "concerns": ["dry skin", "sensitivity"],
-}
-
-PRODUCT_SAMPLE = {
-    "name": "Gentle Hydrating Face Cream",
-    "category": "Skincare",
-    "price": 18.99,
-    "rating": 4.5,
-    "reviews_count": 120,
-    "features": ["fragrance-free", "hydrating", "for dry sensitive skin"],
-    "description": "A lightweight moisturizing cream for dry and sensitive skin.",
-}
-
-
-st.set_page_config(page_title="Review Simulation", page_icon="iR", layout="wide")
 st.title("Review Simulation")
+st.caption("Task A: Simulate a realistic review and rating for a user-product pair.")
 
-mode = st.radio("Mode", ["Existing user", "Custom input"], horizontal=True)
+SAMPLE_PERSONA = json.dumps(
+    {
+        "likes": ["hydrating skincare", "gentle products"],
+        "dislikes": ["strong fragrance", "greasy texture"],
+        "budget": "medium",
+        "tone": "casual",
+        "average_rating": 4.2,
+        "concerns": ["dry skin", "sensitivity"],
+    },
+    indent=4,
+)
 
-if mode == "Existing user":
-    user_id = st.text_input("User ID", value=st.session_state.get("selected_user_id", ""))
-    category = st.selectbox(
-        "Category",
-        api_client.CATEGORIES,
-        index=api_client.CATEGORIES.index(st.session_state.get("category", api_client.DEFAULT_CATEGORY))
-        if st.session_state.get("category") in api_client.CATEGORIES
-        else 0,
+SAMPLE_PRODUCT = json.dumps(
+    {
+        "name": "Gentle Hydrating Face Cream",
+        "category": "Skincare",
+        "price": 18.99,
+        "rating": 4.5,
+        "reviews_count": 120,
+        "features": ["fragrance-free", "hydrating", "for dry sensitive skin"],
+        "description": "A lightweight moisturizing cream for dry and sensitive skin.",
+    },
+    indent=4,
+)
+
+# ---------------------------------------------------------------------------
+# Mode selector
+# ---------------------------------------------------------------------------
+mode = st.radio(
+    "Input mode",
+    ["Select from Database", "Custom Input"],
+    horizontal=True,
+)
+
+# ---------------------------------------------------------------------------
+# Mode 1 -- Select from Database
+# ---------------------------------------------------------------------------
+if mode == "Select from Database":
+    user_id, category, persona_row = render_user_selector(page_key="sim")
+
+    st.subheader("Product")
+    limit = st.number_input(
+        "Max products to load",
+        min_value=1,
+        max_value=200,
+        value=20,
+        step=5,
+        key="sim_product_limit",
     )
-    product_limit = st.number_input("Unseen product limit", min_value=1, max_value=100, value=20)
 
-    if st.button("Load unseen products"):
+    if st.button("Load unseen products", key="sim_load_products"):
         if not user_id:
-            st.warning("Enter or select a user first.")
+            render_error("Please select a user first.")
         else:
-            try:
-                products = api_client.get_unseen_products(user_id, limit=int(product_limit))
-                st.session_state["unseen_products"] = products
-            except Exception as exc:
-                render_error(exc)
+            with st.spinner("Fetching unseen products..."):
+                try:
+                    products = api_client.get_unseen_products(user_id, limit)
+                    st.session_state["sim_products"] = products
+                except Exception as exc:
+                    render_error(f"Failed to load products: {exc}")
 
-    products = st.session_state.get("unseen_products", [])
-    product_map = {
-        f"{product.get('title') or 'Untitled'} ({product.get('parent_asin')})": product
-        for product in products
-    }
-    selected_label = st.selectbox("Product", list(product_map.keys())) if product_map else None
+    products = st.session_state.get("sim_products", [])
+    selected_product = None
 
-    if st.button("Run simulation", type="primary"):
+    if products:
+        product_options = {
+            f"{p.get('title', 'Untitled')} ({p.get('parent_asin', 'N/A')})": p
+            for p in products
+        }
+        chosen_label = st.selectbox(
+            "Choose a product",
+            list(product_options.keys()),
+            key="sim_product_select",
+        )
+        selected_product = product_options.get(chosen_label)
+    else:
+        st.info("Click 'Load unseen products' to populate the product list.")
+
+    if st.button("Run Simulation", type="primary", key="sim_run_db"):
         if not user_id:
-            st.warning("User ID is required.")
-        elif not selected_label:
-            st.warning("Load and select an unseen product first.")
+            render_error("Please select a user first.")
+        elif not selected_product:
+            render_error("Please load and select a product first.")
         else:
-            product = product_map[selected_label]
             payload = {
                 "user_id": user_id,
                 "category": category,
-                "parent_asin": product["parent_asin"],
+                "parent_asin": selected_product.get("parent_asin", ""),
                 "context": {},
             }
-            try:
-                st.session_state["latest_simulation"] = api_client.simulate_review(payload)
-            except Exception as exc:
-                render_error(exc)
+            with st.spinner("Running simulation..."):
+                try:
+                    result = api_client.simulate_review(payload)
+                    st.session_state["sim_result"] = result
+                except Exception as exc:
+                    render_error(f"Simulation failed: {exc}")
+
+# ---------------------------------------------------------------------------
+# Mode 2 -- Custom Input
+# ---------------------------------------------------------------------------
 else:
     st.caption(
-        "Custom persona/product input can be JSON or plain text. It will be validated by an LLM before use. "
-        "Inputs like 'nothing', 'unknown', or 'hello world' will be rejected."
+        "Paste any persona and product in JSON or text format. "
+        "The backend normalises it."
     )
-    persona_text = st.text_area("Persona JSON or text", value=json.dumps(PERSONA_SAMPLE, indent=2), height=220)
-    product_text = st.text_area("Product JSON or text", value=json.dumps(PRODUCT_SAMPLE, indent=2), height=240)
 
-    if st.button("Run custom simulation", type="primary"):
+    persona_text = st.text_area(
+        "Persona JSON",
+        value=SAMPLE_PERSONA,
+        height=220,
+        key="sim_persona_text",
+    )
+
+    product_text = st.text_area(
+        "Product JSON",
+        value=SAMPLE_PRODUCT,
+        height=220,
+        key="sim_product_text",
+    )
+
+    if st.button("Run Simulation", type="primary", key="sim_run_custom"):
         try:
-            persona = parse_json_or_text_input("Persona input", persona_text)
-            product = parse_json_or_text_input("Product input", product_text)
-            parent_asin = product.get("parent_asin") if isinstance(product, dict) else None
+            persona = parse_json_or_text_input("Persona", persona_text)
+            product = parse_json_or_text_input("Product", product_text)
             payload = {
-                "user_id": None,
-                "category": "Custom",
                 "persona": persona,
                 "product": product,
-                "parent_asin": parent_asin or "custom_product",
+                "parent_asin": "custom_product",
+                "category": "Custom",
                 "context": {},
             }
-            st.session_state["latest_simulation"] = api_client.simulate_review(payload)
+            with st.spinner("Running simulation..."):
+                result = api_client.simulate_review(payload)
+                st.session_state["sim_result"] = result
         except Exception as exc:
             render_error(exc)
 
-result = st.session_state.get("latest_simulation")
-if result:
-    st.subheader(result.get("product_title") or result.get("parent_asin"))
-    cols = st.columns(3)
-    cols[0].metric("Final rating", result.get("final_predicted_rating"))
-    cols[1].metric("LLM rating", result.get("llm_predicted_rating"))
-    cols[2].metric("Statistical rating", result.get("statistical_predicted_rating"))
-
-    st.markdown(f"### {result.get('simulated_review_title') or 'Simulated review'}")
-    st.write(result.get("simulated_review_text"))
-    st.write("Reasoning:", result.get("reasoning_summary") or "n/a")
-    evidence = result.get("evidence_used") or []
-    if evidence:
-        st.write("Evidence: " + ", ".join(str(item) for item in evidence))
-    render_rating_breakdown(result.get("rating_breakdown"))
-    safe_json_view("Raw simulation output", result)
+# ---------------------------------------------------------------------------
+# Display result (shared by both modes)
+# ---------------------------------------------------------------------------
+sim_result = st.session_state.get("sim_result")
+if sim_result:
+    st.divider()
+    render_simulation_result(sim_result)
