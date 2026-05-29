@@ -278,6 +278,75 @@ def render_simulation_result(result: dict[str, Any]) -> None:
 # Recommendation card rendering
 # ---------------------------------------------------------------------------
 
+def render_score_breakdown_ui(score_breakdown: dict[str, Any]) -> None:
+    if not score_breakdown:
+        return
+    with st.expander("Score Breakdown", expanded=False):
+        metrics = [
+            ("Semantic Similarity", "semantic_similarity"),
+            ("Preference Match", "preference_match"),
+            ("Product Quality", "product_quality"),
+            ("Price Fit", "price_fit"),
+            ("Popularity", "popularity_reliability"),
+            ("Final Score", "final_score"),
+        ]
+        cols = st.columns(3)
+        for i, (label, key) in enumerate(metrics):
+            val = score_breakdown.get(key)
+            if val is not None:
+                cols[i % 3].metric(label, format_score(val))
+        
+        signals = score_breakdown.get("matched_persona_signals", [])
+        if signals:
+            st.markdown("**Matched Persona Signals:** " + ", ".join(signals))
+            
+        warnings = score_breakdown.get("warnings", [])
+        if warnings:
+            for w in warnings:
+                st.warning(w)
+
+def render_intent_analysis_ui(intent: dict[str, Any]) -> None:
+    if not intent:
+        return
+    with st.expander("Intent Analysis", expanded=False):
+        need = intent.get("interpreted_need")
+        if need:
+            st.markdown(f"**Interpreted Need:** {need}")
+            
+        query = intent.get("retrieval_query")
+        if query:
+            st.markdown(f"**Retrieval Query:** `{query}`")
+            
+        cols = st.columns(2)
+        with cols[0]:
+            req = intent.get("required_attributes", [])
+            if req:
+                st.markdown("**Required Attributes:** " + ", ".join(req))
+            exc = intent.get("excluded_attributes", [])
+            if exc:
+                st.markdown("**Excluded Attributes:** " + ", ".join(exc))
+            avoid = intent.get("avoid", [])
+            if avoid:
+                st.markdown("**Avoid:** " + ", ".join(avoid))
+                
+        with cols[1]:
+            cat = intent.get("category_filter")
+            if cat:
+                st.markdown(f"**Category Filter:** {cat}")
+            price = intent.get("price_max")
+            if price is not None:
+                st.markdown(f"**Max Price:** ${float(price):.2f}")
+                
+        implicit = intent.get("implicit_constraints_from_persona")
+        if implicit:
+            st.markdown("**Implicit Constraints (Persona):**")
+            st.json(implicit)
+            
+        explicit = intent.get("explicit_constraints")
+        if explicit:
+            st.markdown("**Explicit Constraints:**")
+            st.json(explicit)
+
 def render_recommendation_card(item: dict[str, Any]) -> None:
     if st is None:
         return
@@ -311,7 +380,8 @@ def render_recommendation_card(item: dict[str, Any]) -> None:
         evidence = item.get("evidence") or []
         if evidence:
             st.caption("Evidence: " + ", ".join(str(term) for term in evidence))
-        safe_json_view("Score breakdown", score_breakdown)
+        if score_breakdown:
+            render_score_breakdown_ui(score_breakdown)
 
 
 def render_recommendation_results(result: dict[str, Any]) -> None:
@@ -320,8 +390,7 @@ def render_recommendation_results(result: dict[str, Any]) -> None:
         return
     intent = result.get("intent")
     if intent:
-        with st.expander("Intent analysis", expanded=False):
-            st.json(intent)
+        render_intent_analysis_ui(intent)
     recommendations = result.get("recommendations") or []
     if recommendations:
         for item in recommendations:
