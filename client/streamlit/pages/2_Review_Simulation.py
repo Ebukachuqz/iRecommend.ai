@@ -12,6 +12,7 @@ if str(STREAMLIT_ROOT) not in sys.path:
 
 import api_client
 from ui_helpers import (
+    ensure_backend_ready,
     parse_json_or_text_input,
     render_error,
     render_simulation_result,
@@ -21,6 +22,7 @@ from ui_helpers import (
 st.set_page_config(page_title="Review Simulation", page_icon="📝", layout="wide")
 
 st.title("Review Simulation")
+ensure_backend_ready()
 st.caption("Task A: Simulate a realistic review and rating for a user-product pair.")
 
 SAMPLE_PERSONA = json.dumps(

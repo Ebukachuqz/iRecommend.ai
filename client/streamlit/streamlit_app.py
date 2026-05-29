@@ -5,10 +5,11 @@ import os
 import streamlit as st
 
 import api_client
-from ui_helpers import render_error, render_status_badge, safe_json_view
+from ui_helpers import ensure_backend_ready, render_error, render_status_badge, safe_json_view
 
 
 st.set_page_config(page_title="iRecommend.ai", page_icon="iR", layout="wide")
+ensure_backend_ready()
 
 # ---- Sidebar: API configuration ----
 with st.sidebar:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 try:
@@ -72,6 +73,51 @@ def parse_json_or_text_input(label: str, text: str) -> dict[str, Any] | str:
 # ---------------------------------------------------------------------------
 # Basic rendering helpers
 # ---------------------------------------------------------------------------
+
+def ensure_backend_ready() -> None:
+    if st is None:
+        return
+    if st.session_state.get("backend_ready"):
+        return
+
+    import api_client  # Deferred import to avoid circular dependency
+    
+    # Do a quick check first without showing the spinner
+    try:
+        health = api_client.get_health()
+        ready = api_client.get_ready()
+        if health.get("status") == "ok" and ready.get("status") == "ready":
+            st.session_state["backend_ready"] = True
+            return
+    except Exception:
+        pass
+
+    with st.status("Connecting to backend...", expanded=True) as status:
+        st.write(
+            "The backend is hosted on Render's free tier. If it has spun down due to inactivity, "
+            "it may take up to **10 minutes** to restart. Please leave this page open while we wait."
+        )
+        
+        max_retries = 60
+        for i in range(max_retries):
+            try:
+                health = api_client.get_health()
+                if health.get("status") == "ok":
+                    ready = api_client.get_ready()
+                    if ready.get("status") == "ready":
+                        status.update(label="Backend is ready!", state="complete", expanded=False)
+                        st.session_state["backend_ready"] = True
+                        return
+                    else:
+                        st.write(f"Backend is starting... (Attempt {i+1}/{max_retries})")
+                else:
+                    st.write(f"Backend is unhealthy... (Attempt {i+1}/{max_retries})")
+            except Exception:
+                st.write(f"Waiting for backend to spin up... (Attempt {i+1}/{max_retries})")
+            
+            time.sleep(10)
+            
+        status.update(label="Backend failed to start after 10 minutes.", state="error")
 
 def render_status_badge(label: str, ok: bool | None) -> None:
     if st is None:

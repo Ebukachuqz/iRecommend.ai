@@ -12,6 +12,7 @@ if str(STREAMLIT_ROOT) not in sys.path:
 
 import api_client
 from ui_helpers import (
+    ensure_backend_ready,
     render_error,
     render_persona_preview_card,
     render_persona_tabs,
@@ -26,6 +27,7 @@ st.set_page_config(
 )
 
 st.title("🔍 Persona Explorer")
+ensure_backend_ready()
 st.markdown("Browse and inspect user personas generated from review history.")
 
 st.divider()

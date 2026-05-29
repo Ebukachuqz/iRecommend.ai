@@ -13,6 +13,7 @@ if str(STREAMLIT_ROOT) not in sys.path:
 
 import api_client
 from ui_helpers import (
+    ensure_backend_ready,
     parse_json_or_text_input,
     render_error,
     render_recommendation_results,
@@ -33,6 +34,7 @@ PERSONA_SAMPLE = {
 
 st.set_page_config(page_title="Recommendations", page_icon="iR", layout="wide")
 st.title("Recommendations")
+ensure_backend_ready()
 
 # ── Mode selector ──────────────────────────────────────────────────────────
 mode = st.radio(
