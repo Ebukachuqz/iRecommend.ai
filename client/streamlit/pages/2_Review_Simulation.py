@@ -38,7 +38,6 @@ st.set_page_config(page_title="Review Simulation", page_icon="iR", layout="wide"
 st.title("Review Simulation")
 
 mode = st.radio("Mode", ["Existing user", "Custom input"], horizontal=True)
-nigerian_mode = st.toggle("Nigerian shopping context", value=False)
 
 if mode == "Existing user":
     user_id = st.text_input("User ID", value=st.session_state.get("selected_user_id", ""))
@@ -79,7 +78,6 @@ if mode == "Existing user":
                 "user_id": user_id,
                 "category": category,
                 "parent_asin": product["parent_asin"],
-                "nigerian_mode": nigerian_mode,
                 "context": {},
             }
             try:
@@ -105,7 +103,6 @@ else:
                 "persona": persona,
                 "product": product,
                 "parent_asin": parent_asin or "custom_product",
-                "nigerian_mode": nigerian_mode,
                 "context": {},
             }
             st.session_state["latest_simulation"] = api_client.simulate_review(payload)
