@@ -286,6 +286,21 @@ def render_recommendation_card(item: dict[str, Any]) -> None:
         rank = item.get("rank", "?")
         st.markdown(f"#### #{rank} {title}")
         st.caption(item.get("parent_asin", ""))
+        
+        images = item.get("images")
+        if images and isinstance(images, list) and len(images) > 0:
+            # Prefer the MAIN variant, fallback to the first image
+            target_img = next((img for img in images if isinstance(img, dict) and img.get("variant") == "MAIN"), images[0])
+            
+            img_url = None
+            if isinstance(target_img, dict):
+                img_url = target_img.get("large") or target_img.get("hi_res") or target_img.get("thumb")
+            elif isinstance(target_img, str):
+                img_url = target_img
+                
+            if img_url:
+                st.image(img_url, width=150)
+
         st.write(item.get("reason", "No reason returned."))
         cols = st.columns(2)
         cols[0].metric("Confidence", format_score(item.get("confidence")))
