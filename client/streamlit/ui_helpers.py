@@ -346,6 +346,10 @@ def render_intent_analysis_ui(intent: dict[str, Any]) -> None:
         if explicit:
             st.markdown("**Explicit Constraints:**")
             st.json(explicit)
+            
+        st.divider()
+        st.caption("Raw Intent Analysis JSON")
+        st.json(intent)
 
 def render_recommendation_card(item: dict[str, Any]) -> None:
     if st is None:
