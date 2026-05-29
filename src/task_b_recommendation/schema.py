@@ -92,6 +92,7 @@ class RerankedRecommendation(BaseModel):
     is_discovery_candidate: bool = False
     evidence: list[str] = Field(default_factory=list)
     score_breakdown: dict[str, Any] = Field(default_factory=dict)
+    images: list[Any] = Field(default_factory=list)
 
 
 class RerankerOutput(BaseModel):

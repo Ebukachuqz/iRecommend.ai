@@ -133,6 +133,7 @@ def build_fallback_recommendation(
         is_discovery_candidate=candidate.score_breakdown.is_discovery_candidate,
         evidence=evidence,
         score_breakdown=candidate.score_breakdown.model_dump(mode="json"),
+        images=candidate.product.get("images", []),
     )
 
 
@@ -185,6 +186,7 @@ def dedupe_and_backfill_recommendations(
                     else recommendation.is_discovery_candidate,
                     "evidence": evidence,
                     "score_breakdown": score_breakdown,
+                    "images": candidate.product.get("images", []) if candidate else recommendation.images,
                 }
             )
         )
@@ -272,6 +274,7 @@ def rerank_recommendations(
                             **(recommendation.score_breakdown or candidate.score_breakdown.model_dump(mode="json")),
                             "is_discovery_candidate": candidate.score_breakdown.is_discovery_candidate,
                         },
+                        "images": candidate.product.get("images", []),
                     }
                 )
             )
