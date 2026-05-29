@@ -40,8 +40,14 @@ def handle_response(response: requests.Response) -> Any:
     except ValueError:
         payload = response.text
     if response.status_code >= 400:
-        detail = payload.get("detail") if isinstance(payload, dict) else payload
-        raise APIClientError(str(detail or "API request failed."), response.status_code, payload)
+        if isinstance(payload, dict):
+            detail = payload.get("detail", "API request failed.")
+        else:
+            if "<html" in str(payload).lower():
+                detail = f"Server Error ({response.status_code}): The backend may be down, spinning up, or a request timed out."
+            else:
+                detail = str(payload)[:200] + ("..." if len(str(payload)) > 200 else "")
+        raise APIClientError(str(detail), response.status_code, payload)
     return payload
 
 
