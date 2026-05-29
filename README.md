@@ -1,8 +1,38 @@
-# iRecommend
+# iRecommend.ai
 
-Behaviour-aware LLM agents for review simulation and personalised recommendation.
+**Behaviour-aware LLM agents for review simulation and personalised recommendation.**
 
-iRecommend learns structured personas from Amazon review history, uses those personas to simulate future reviews, and generates personalised recommendations with transparent scoring and evidence.
+iRecommend is a behaviour-aware LLM agent system that does two things:
+
+- **Task A — Review Simulation:** Given a user persona and a product, predict what rating the user would give and generate a realistic simulated review.
+- **Task B — Personalised Recommendation:** Given a user persona and a free-text request, retrieve, score, and rerank products into a personalised recommendation list with transparent scoring and evidence.
+
+The core insight is that structured user personas, extracted from Amazon review history via LLM, can drive both tasks. The system learns how a user writes, what they value, how strictly they rate, and what they avoid, then uses that understanding to simulate behaviour or generate recommendations.
+
+**Key design principles:**
+
+- Persona-grounded: every decision traces back to the user's persona.
+- Transparent scoring: all recommendation scores are broken down (semantic similarity, preference match, product quality, price fit, popularity).
+- Hybrid statistical + LLM: ratings blend statistical prediction with LLM prediction via calibrated weighting.
+- Multi-source retrieval: Task B combines six retrieval sources (preference vectors, query vectors, collaborative filtering, bought-together, attribute matching, quality fallback).
+- Evaluation-first: built-in holdout splitting, metrics computation, and baseline comparisons.
+
+---
+
+## Contents
+
+- [Architecture](#architecture)
+- [Quick Setup](#quick-setup)
+- [Environment Variables](#environment-variables)
+- [Pipeline Overview](#pipeline-overview)
+- [Command Cheat Sheet](#command-cheat-sheet)
+- [API and Client](#api-and-client)
+- [Evaluation](#evaluation)
+- [MVP Demo Flow](#mvp-demo-flow)
+- [Known Limitations](#known-limitations)
+- [Documentation](#documentation)
+
+---
 
 ## Architecture
 
@@ -11,6 +41,7 @@ Amazon Reviews 2023
 -> Supabase reviews + product metadata
 -> holdout split
 -> persona generation
+-> product embeddings + preference vectors
 -> Task A review simulation
 -> Task B recommendation
 -> FastAPI backend
@@ -19,30 +50,9 @@ Amazon Reviews 2023
 
 Supabase is the hosted system of record. Product embeddings use pgvector in Supabase. The Streamlit client talks to FastAPI over HTTP only.
 
-## Environment
+---
 
-Backend variables:
-
-```text
-SUPABASE_URL=
-SUPABASE_PUBLIC_KEY=
-SUPABASE_SECRET_KEY=
-SUPABASE_DB_URL=
-GROQ_API_KEY=
-HF_TOKEN=
-```
-
-Client variable:
-
-```text
-STREAMLIT_API_BASE_URL=http://127.0.0.1:8000
-```
-
-`SUPABASE_SECRET_KEY` is for backend scripts, services, and the API only. Do not expose it in frontend/client deployments.
-
-`SUPABASE_URL` is the Supabase API URL used by the application. `SUPABASE_DB_URL` is the Postgres connection string used only by migration scripts. Copy it from Supabase Dashboard -> Connect. If Supabase marks the direct connection string as not IPv4 compatible, use the Session Pooler URI instead. A connection timeout from `scripts/check_db_connection.py` usually means the direct IPv6-only database host is unreachable from your current network. Do not expose or commit real database credentials.
-
-## Local Setup
+## Quick Setup
 
 ```powershell
 python -m venv .venv
@@ -53,447 +63,170 @@ Copy-Item .env.example .env
 
 Edit `.env` with your own keys. Do not commit `.env`.
 
-Root backend dependencies live in `requirements.txt`. The detachable Streamlit client has its own minimal dependencies in `client/streamlit/requirements.txt`.
+See [docs/SETUP.md](docs/SETUP.md) for full environment variable reference and Supabase connection guidance.
 
-## Supabase SQL Migrations
+---
 
-The preferred migration path is the Python runner. Add `SUPABASE_DB_URL` to `.env`, then check connectivity:
+## Environment Variables
 
-```powershell
-python scripts/check_db_connection.py
-```
-
-If this command times out and Supabase says the direct connection string is not IPv4 compatible, replace `SUPABASE_DB_URL` with the Session Pooler connection string from Supabase Dashboard -> Connect.
-
-Preview the active migration order without connecting or changing schema:
-
-```powershell
-python scripts/run_migrations.py --dry-run
-```
-
-Run active stable migrations:
-
-```powershell
-python scripts/run_migrations.py
-```
-
-Run a specific range:
-
-```powershell
-python scripts/run_migrations.py --from 003 --to 007
-```
-
-The reset migration is destructive and skipped by default. To run only the reset, you must be explicit:
-
-```powershell
-python scripts/run_migrations.py --include-reset --confirm-reset --from 000 --to 000
-```
-
-Active stable migrations:
-
-```text
-src/db/sql/000_reset_database.sql       optional destructive reset
-src/db/sql/001_core_schema.sql          product metadata, reviews, personas
-src/db/sql/002_task_a_schema.sql        review simulation storage
-src/db/sql/003_task_b_schema.sql        recommendation tables and vector columns
-src/db/sql/004_pgvector_functions.sql   pgvector RPC functions
-src/db/sql/005_indexes.sql              relational and vector indexes
-src/db/sql/006_product_metadata_optional_fields.sql   safe metadata image/related-product backfill columns
-src/db/sql/007_rename_user_preference_vectors.sql     safe preference-vector table/function rename
-```
-
-Old development migrations are archived in `src/db/sql/archive/`. Reviewers should use the stable migrations above. If direct DB access is unavailable, run the same SQL files manually in Supabase SQL Editor, using `000_reset_database.sql` only for clean rebuilds.
-
-Supabase remains hosted externally; Docker Compose does not start a local database.
-
-## Data Ingestion
-
-Note: the Hugging Face dataset `McAuley-Lab/Amazon-Reviews-2023` currently uses a dataset loading script. Hugging Face `datasets>=4.0.0` removed loading-script support, so ingestion currently requires `datasets<4.0.0` (see `requirements.txt`).
-
-Validation is practical but evaluation-focused. Reviews must include `user_id`, `parent_asin` or `asin`, `rating`, `title`, and `text`; timestamp, verified purchase, and helpful votes are kept when available but are not required. Product metadata must include `parent_asin`, `title`, a category signal, `description`, `features`, `price`, `average_rating`, `store`, and `details`. `rating_number` is optional by default; pass `--require-rating-number` to drop metadata rows without it.
-
-Preferred rebuild order:
-
-```text
-migrations -> ingestion -> create_holdout_split.py -> generate personas
-```
-
-Quick dry-run test:
-
-```powershell
-python scripts/ingest_amazon.py --category All_Beauty --min-reviews 15 --max-users 20 --extra-products 100 --dry-run
-```
-
-If Hugging Face streaming is unreliable, cache the category JSONL files once and then ingest from cache. `--write-cache` streams reviews from Hugging Face and downloads metadata through Hugging Face's local file cache into `data/cache/amazon_reviews_2023/<category>_reviews.jsonl` and `<category>_metadata.jsonl`; metadata is cached fully, while `--review-limit` caps cached reviews. Successful cache files are skipped on rerun; pass `--force-cache` only when you intentionally want to rebuild them.
-
-```powershell
-python scripts/ingest_amazon.py --category Electronics --write-cache --cache-dir data/cache/amazon_reviews_2023 --review-limit 200000 --dry-run
-python scripts/ingest_amazon.py --category Electronics --from-cache --cache-dir data/cache/amazon_reviews_2023 --min-reviews 15 --max-users 200 --extra-products 150 --review-limit 200000 --verify
-```
-
-You can also provide explicit local JSONL files:
-
-```powershell
-python scripts/ingest_amazon.py --category Electronics --reviews-file data/cache/amazon_reviews_2023/Electronics_reviews.jsonl --metadata-file data/cache/amazon_reviews_2023/Electronics_metadata.jsonl --min-reviews 15 --max-users 200 --extra-products 150 --review-limit 200000 --verify
-```
-
-Normal evaluation rebuild:
-
-```powershell
-python scripts/ingest_amazon.py --category All_Beauty --min-reviews 15 --max-users 100 --extra-products 1000 --verify
-```
-
-Larger final rebuild:
-
-```powershell
-python scripts/ingest_amazon.py --category All_Beauty --min-reviews 15 --max-users 300 --extra-products 5000 --verify
-```
-
-Create holdout splits:
-
-```powershell
-python scripts/create_holdout_split.py --category All_Beauty
-```
-
-Holdout splitting is deterministic and per user. For each category, reviews are filtered through matching `amazon_product_metadata` rows because `amazon_reviews` intentionally has no category column. Each user's reviews are split into approximately 70% `persona_train`, 15% `task_a_holdout`, and 15% `task_b_holdout`; for example, 12 reviews become 8 persona reviews, 2 Task A holdout reviews, and 2 Task B holdout reviews. If a category has already been split, pass `--overwrite` to intentionally re-split it.
-
-## Persona Generation
-
-```powershell
-python scripts/generate_personas.py --category All_Beauty --limit 10
-python scripts/generate_personas.py --category All_Beauty --limit 20
-python scripts/generate_personas.py --category All_Beauty --limit 20 --max-reviews-per-user 10
-```
-
-Persona generation is category-aware and uses only `task_split='persona_train'` reviews that belong to the requested `amazon_product_metadata.category`. It skips users who already have personas in that category by default; pass `--force` to intentionally regenerate existing personas. It sends at most 10 reviews per user to the LLM by default to keep prompt length manageable; use `--max-reviews-per-user` to override this for experiments. The selected review IDs are stored in `user_personas.source_review_ids` and included in the persona run summary. `task_a_holdout` and `task_b_holdout` reviews are reserved for evaluation and should not be used to build personas. `amazon_reviews` does not have or require a `category` column.
-
-## Finding Test IDs
-
-Check whether a category is ready for Task A / Task B smoke tests:
-
-```powershell
-python scripts/check_category_readiness.py --category Health_and_Household
-```
-
-List evaluation-friendly users:
-
-```powershell
-python scripts/list_eval_users.py --category Health_and_Household --limit 10
-python scripts/list_eval_users.py --category Health_and_Household --task task_a --require-persona --limit 10
-python scripts/list_eval_users.py --category Health_and_Household --task task_b --require-persona --require-preference-vector --limit 10
-```
-
-Pick a user for Task A:
-
-1. Choose a row where `has_persona=true` and `task_a_holdout_count>0`.
-2. List their holdout reviews and copy a `review_id` / `parent_asin`:
-
-```powershell
-python scripts/list_user_holdouts.py --user-id <USER_ID> --category Health_and_Household
-```
-
-Pick a user for Task B:
-
-1. Choose a row where `has_persona=true`, `has_preference_vector=true`, and `task_b_holdout_count>0`.
-
-List embedded products (useful for checking whether semantic retrieval has any catalog):
-
-```powershell
-python scripts/list_embedded_products.py --category Health_and_Household --limit 10
-```
-
-## Task A
-
-Run review simulation:
-
-```powershell
-python scripts/run_task_a_simulation.py --user-id <USER_ID> --parent-asin <PARENT_ASIN>
-python scripts/run_task_a_simulation.py --user-id <USER_ID> --use-holdout
-python scripts/run_task_a_simulation.py --user-id <USER_ID> --parent-asin <PARENT_ASIN> --nigerian-mode
-```
-
-Successful simulations are stored in `simulation_results`.
-
-Task A also accepts custom persona and product JSON through `POST /reviews/simulate`. This satisfies the direct persona + product -> review/rating flow. The backend normalizes common field variants, preserves unknown persona fields under `extra_persona_signals.unmapped_fields`, preserves unknown product fields under `details.custom_fields`, and rejects only inputs that are too empty to support the task.
-
-## Task B
-
-Embed products:
-
-```powershell
-python scripts/embed_products.py --limit 100
-python scripts/embed_products.py --category All_Beauty --limit 100 --dry-run
-python scripts/embed_products.py --category All_Beauty --force-reembed
-```
-
-Product embeddings are built from rich product metadata: title, broad project `category`, Amazon `main_category`, Amazon `categories` hierarchy, features, description, brand/store, price tier, and useful details. The exact raw price is not embedded; the script uses semantic tiers such as `budget`, `mid-range`, `premium`, and `luxury` because those meanings are more stable than a changing seller price. The text used for each embedding is stored in `product_embeddings.product_text` for debugging and reproducibility. Re-run with `--force-reembed` when the product text strategy changes, especially after category hierarchy text changes.
-
-Build a user preference vector:
-
-```powershell
-python scripts/build_user_preference_vectors.py --user-id <USER_ID> --category All_Beauty
-```
-
-Build preference vectors for a batch of users in a category (from `user_personas`):
-
-```powershell
-python scripts/build_user_preference_vectors.py --category Health_and_Household --limit 20
-python scripts/build_user_preference_vectors.py --category Electronics --limit 20
-python scripts/build_user_preference_vectors.py --category Beauty_and_Personal_Care --limit 20
-```
-
-Preference vectors are category-specific and unit-normalized after averaging liked product embeddings. They are built from rating >= 4 `persona_train` reviews whose products match the requested metadata category.
-
-Run recommendations:
-
-```powershell
-python scripts/run_task_b_recommendation.py --user-id <USER_ID> --request "I want something affordable and gentle"
-python scripts/run_task_b_recommendation.py --cold-start --request "I need affordable skincare for oily skin"
-```
-
-FastAPI and CLI callers use the Task B service layer, and `service.recommend()` now wraps the explicit LangGraph workflow for intent planning, retrieval, scoring, reranking, session update, and storage.
-
-Successful recommendation calls are stored in `recommendation_runs`.
-
-Task B retrieves candidates from multiple sources before scoring: preference-vector semantic search, request-query semantic search, collaborative signals from similar users' preference vectors, bought-together related products from liked `persona_train` items, persona/intent attribute matching, and a quality/popularity fallback. Collaborative filtering is only one signal; the system goes beyond it by grounding retrieval, scoring, and final reasons in the user's persona and request intent. Cold-start and custom-persona requests still work through request-query retrieval and quality fallback when no stored preference vector exists.
-
-Cold-start requests build a low-confidence starter persona from request/context signals and do not require preference vectors. Cross-domain recommendations are conservative: close beauty/skincare categories stay in-domain, while meaningfully different domains such as beauty -> electronics use transferable values like price sensitivity, quality, reliability, simplicity, durability, and value for money. Multi-turn sessions refine active constraints and exclude products already shown in the same session.
-
-Task B also stores an audit trail for evaluation and debugging. `intent_plans` records the structured reasoning brief produced by the intent planner, `recommendation_candidates` records the retrieved/scored candidate pool with before/after rerank ranks, and `recommendation_runs` stores the final output. Intent and candidate traces are best-effort; a trace insert failure should not block recommendation generation.
-
-Task B also accepts a custom persona JSON through `POST /recommendations/generate`. This supports the direct persona -> recommendations flow. The normalizer supports common fields such as `likes`, `interests`, `preferred_products`, `dislikes`, `avoid`, `concerns`, `values`, `priorities`, `budget`, `tone`, `average_rating`, and category signals. It does not attempt to map every possible arbitrary schema.
-
-## Batch Task A Simulation (Evaluation Prep)
-
-Before running Task A evaluation, generate simulation results for holdout reviews. The batch script targets only `task_a_holdout` rows for one category, skips reviews already simulated, skips users without personas, and continues on individual failures:
-
-```powershell
-python scripts/run_task_a_batch.py --category Health_and_Household --limit 50
-python scripts/run_task_a_batch.py --category Electronics --limit 50
-python scripts/run_task_a_batch.py --category Beauty_and_Personal_Care --limit 50
-```
-
-Preview without calling the LLM:
-
-```powershell
-python scripts/run_task_a_batch.py --category Health_and_Household --limit 50 --dry-run
-```
-
-## Evaluation
-
-Evaluation uses the same runtime services as the app and writes paper-ready artifacts under `outputs/evaluation/`. Run the pipeline in this order:
-
-```text
-migrations -> ingestion -> create_holdout_split.py -> generate_personas.py -> embed_products.py -> build_user_preference_vectors.py -> run_task_a_batch.py -> evaluation
-```
-
-Task A evaluates review/rating simulation against `task_a_holdout` reviews. It reports MAE, RMSE, rounded exact-rating accuracy, within-1-star accuracy, predicted/true mean rating, optimistic bias, and a user-average-rating baseline from `persona_train` reviews.
-
-Task B evaluates recommendations against positive `task_b_holdout` reviews (`rating >= 4`) as hidden liked products. It reports HitRate@K, NDCG@K, MRR@K, mean found rank, and a same-category popularity/quality baseline. During evaluation, the recommender still excludes `persona_train` products, but it can consider the hidden `task_b_holdout` product so Hit@K is measurable.
-
-Run the unified evaluation pipeline:
-
-```powershell
-python scripts/run_evaluation.py --task both --k 10 --skip-bertscore
-python scripts/run_evaluation.py --task a --categories Health_and_Household --skip-bertscore
-python scripts/run_evaluation.py --task b --categories Electronics --force-rerun
-python scripts/run_evaluation.py --task both --categories Health_and_Household Electronics --task-a-limit 50 --task-b-limit 50 --skip-bertscore
-python scripts/run_evaluation.py --task b --categories Health_and_Household --task-b-limit 10 --max-holdouts-per-user 2 --k 10 --force-rerun
-python scripts/run_evaluation.py --task both --categories Health_and_Household Electronics Beauty_and_Personal_Care --task-a-limit 50 --task-b-limit 50 --max-holdouts-per-user 2 --k 10 --skip-bertscore --force-rerun
-```
-
-Metric meanings: HitRate@K is the fraction of examples where the hidden liked product appears in the top K; NDCG@K rewards hits more when they appear higher in the list; MRR@K averages reciprocal rank; MAE/RMSE measure rating error for Task A. CSV/JSON result files and JSON summaries/manifests in `outputs/evaluation/` are the reproducible artifacts to use in the solution paper.
-
-See [EVALUATION.md](EVALUATION.md) for the full evaluation methodology, metrics, DCR-inspired diagnostics, interpretation, and limitations.
-
-
-## FastAPI Backend
-
-```powershell
-uvicorn app.api.main:app --reload
-```
-
-API docs:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-Core endpoints:
-
-```text
-GET  /health
-GET  /ready
-GET  /users
-GET  /users/{user_id}/persona
-GET  /users/{user_id}/unseen-products
-POST /reviews/simulate
-POST /recommendations/generate
-POST /recommendations/cold-start
-POST /sessions/{session_id}/message
-```
-
-## Streamlit Client
-
-Run from the root environment:
-
-```powershell
-streamlit run client/streamlit/streamlit_app.py
-```
-
-Run independently:
-
-```powershell
-cd client/streamlit
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-Copy-Item .env.example .env
-streamlit run streamlit_app.py
-```
-
-Open:
-
-```text
-http://localhost:8501
-```
-
-The Streamlit client only needs `STREAMLIT_API_BASE_URL`. It does not need Supabase, Groq, or Hugging Face secrets.
-
-`client/nextjs` is reserved for a later polished frontend. It is not implemented yet.
-
-## Docker
-
-Build the two service images directly:
-
-```powershell
-docker build -t irecommend-api -f Dockerfile .
-docker build -t irecommend-streamlit -f client/streamlit/Dockerfile client/streamlit
-```
-
-Build images:
-
-```powershell
-docker compose build
-```
-
-Run API and Streamlit:
-
-```powershell
-docker compose up
-```
-
-Open:
-
-```text
-FastAPI:   http://127.0.0.1:8000/docs
-Streamlit: http://127.0.0.1:8501
-```
-
-Stop:
-
-```powershell
-docker compose down
-```
-
-Docker uses `.env` for the API service. The Streamlit service receives only:
-
-```text
-STREAMLIT_API_BASE_URL=http://api:8000
-```
-
-The Docker entrypoints respect Render's `PORT` environment variable while keeping local defaults of `8000` for FastAPI and `8501` for Streamlit.
-
-## Render Deployment
-
-iRecommend deploys to Render as two separate Docker web services: one FastAPI backend and one Streamlit frontend. Supabase stays external and must already be migrated, populated, and have product embeddings/personas prepared before demo use.
-
-1. Push the repository to GitHub.
-2. Create the FastAPI backend service on Render.
-   - Runtime: Docker.
-   - Dockerfile path: `./Dockerfile`.
-   - Docker context: `.`.
-   - Health check path: `/health`.
-3. Add backend environment variables:
+**Backend:**
 
 ```text
 SUPABASE_URL
 SUPABASE_PUBLIC_KEY
 SUPABASE_SECRET_KEY
+SUPABASE_DB_URL
 GROQ_API_KEY
 HF_TOKEN
-GROQ_MODEL
 ```
 
-`GROQ_MODEL` can use the default `qwen/qwen3-32b` unless you intentionally changed models. `SUPABASE_DB_URL` is not needed by the web service unless you plan to run migration scripts manually from that environment, which is not recommended.
-
-4. Test the deployed API:
+**Client:**
 
 ```text
-https://<your-api-service>.onrender.com/health
-https://<your-api-service>.onrender.com/ready
-https://<your-api-service>.onrender.com/docs
+STREAMLIT_API_BASE_URL=http://127.0.0.1:8000
 ```
 
-5. Create the Streamlit frontend service on Render.
-   - Runtime: Docker.
-   - Dockerfile path: `./client/streamlit/Dockerfile`.
-   - Docker context: `./client/streamlit`.
-6. Set the frontend environment variable:
+> **Warning:** Never expose `SUPABASE_SECRET_KEY` or commit real credentials to version control.
 
-```text
-STREAMLIT_API_BASE_URL=https://<your-api-service>.onrender.com
+---
+
+## Pipeline Overview
+
+Run steps in this order for a full rebuild:
+
+| Step | Script | Docs |
+|---|---|---|
+| 1. Migrations | `run_migrations.py` | [docs/DATABASE_MIGRATIONS.md](docs/DATABASE_MIGRATIONS.md) |
+| 2. Ingestion | `ingest_amazon.py` | [docs/INGESTION.md](docs/INGESTION.md) |
+| 3. Holdout split | `create_holdout_split.py` | [docs/INGESTION.md](docs/INGESTION.md) |
+| 4. Personas | `generate_personas.py` | [docs/PERSONAS.md](docs/PERSONAS.md) |
+| 5. Product embeddings | `embed_products.py` | [docs/TASK_B.md](docs/TASK_B.md) |
+| 6. Preference vectors | `build_user_preference_vectors.py` | [docs/TASK_B.md](docs/TASK_B.md) |
+| 7. Task A batch | `run_task_a_batch.py` | [docs/TASK_A.md](docs/TASK_A.md) |
+| 8. Evaluation | `run_evaluation.py` | [EVALUATION.md](EVALUATION.md) |
+
+---
+
+## Command Cheat Sheet
+
+**Migrations:**
+```powershell
+python scripts/run_migrations.py --dry-run
+python scripts/run_migrations.py
 ```
 
-7. Open the Streamlit service URL and check the health/readiness cards. Streamlit calls to `/health` or `/ready` can also wake the API after Render Free spin-down.
+**Ingestion:**
+```powershell
+python scripts/ingest_amazon.py --category Health_and_Household --min-reviews 15 --max-users 200 --extra-products 150 --verify
+```
 
-Render Free services sleep after inactivity. The first request after sleep can be slow while the API or Streamlit container wakes up.
+**Holdout split:**
+```powershell
+python scripts/create_holdout_split.py --category Health_and_Household
+```
 
-The included `render.yaml` is a convenience blueprint for creating the two Docker web services. You still need to provide real secret values in Render.
+**Personas:**
+```powershell
+python scripts/generate_personas.py --category Health_and_Household --limit 20
+```
 
-Long-running ingestion, embedding, persona generation, preference-vector builds, migration runs, and evaluation scripts should be run locally or in a dedicated job environment, not as Render web services.
+**Product embeddings:**
+```powershell
+python scripts/embed_products.py --category Health_and_Household --limit 100
+```
 
-## Makefile
+**Preference vectors:**
+```powershell
+python scripts/build_user_preference_vectors.py --category Health_and_Household --limit 20
+```
+
+**Task A batch:**
+```powershell
+python scripts/run_task_a_batch.py --category Health_and_Household --limit 50
+```
+
+**Evaluation:**
+```powershell
+python scripts/run_evaluation.py --task both --categories Health_and_Household Electronics Beauty_and_Personal_Care --task-a-limit 50 --task-b-limit 100 --max-holdouts-per-user 2 --k 10 --force-rerun
+```
+
+**API:**
+```powershell
+uvicorn app.api.main:app --reload
+```
+
+**Streamlit:**
+```powershell
+streamlit run client/streamlit/streamlit_app.py
+```
+
+---
+
+## API and Client
+
+Start the FastAPI backend:
 
 ```powershell
-make install
-make test
-make run-api
-make run-streamlit
-make docker-build
-make docker-up
-make docker-down
-make embed-products LIMIT=100
-make build-preference-vector USER_ID=<USER_ID> CATEGORY=All_Beauty
-make check-db
-make migrate-dry-run
-make migrate
+uvicorn app.api.main:app --reload
 ```
 
-On Windows without `make`, run the equivalent commands shown in the sections above.
+Interactive docs: `http://127.0.0.1:8000/docs`
+
+Start the Streamlit client:
+
+```powershell
+streamlit run client/streamlit/streamlit_app.py
+```
+
+Open: `http://localhost:8501`
+
+The Streamlit client only needs `STREAMLIT_API_BASE_URL`. It does not need Supabase, Groq, or Hugging Face credentials.
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for Docker and Render deployment instructions.
+
+---
+
+## Evaluation
+
+Evaluation is fully implemented and writes paper-ready artifacts to `outputs/evaluation/`.
+
+- Task A evaluates review and rating simulation against `task_a_holdout` reviews, reporting MAE, RMSE, exact accuracy, within-1-star accuracy, and a user-average baseline.
+- Task B evaluates recommendation against positive `task_b_holdout` reviews, reporting HitRate@K, NDCG@K, MRR@K, and a popularity baseline.
+
+See [EVALUATION.md](EVALUATION.md) for the full evaluation methodology, metrics, DCR-inspired diagnostics, interpretation, and limitations.
+
+---
 
 ## MVP Demo Flow
 
-1. Start the API.
+1. Start FastAPI.
 2. Start Streamlit.
 3. Load a user persona.
 4. Simulate a review for an unseen product.
 5. Generate personalised recommendations.
 6. Try cold-start recommendations.
-7. Try custom JSON mode in Review Simulation with a persona and product.
+7. Try custom JSON mode in Review Simulation.
 8. Try custom persona mode in Recommendations.
+
+---
 
 ## Known Limitations
 
-- Supabase must already be configured and migrated.
-- Product embeddings must be built before semantic Task B retrieval is useful.
-- Cross-platform user history agents are postponed.
-- Baselines, ablations, and evaluation reports are planned later.
-- Docker Compose does not provide a local Supabase/Postgres instance.
+- Supabase must already be configured and migrated before the app is usable.
+- Product embeddings and personas must be prepared before meaningful recommendations are possible.
+- Broader baselines and ablations are future work.
+- Evaluation has been implemented; see [EVALUATION.md](EVALUATION.md).
+- The Next.js frontend under `client/nextjs` is reserved for future work.
 
-## Next Planned Work
+---
 
-- Docker/reproducibility polish follow-ups if needed.
-- Research baselines and ablations.
-- Evaluation scripts and reporting.
-- Optional Next.js frontend under `client/nextjs`.
+## Documentation
+
+- [Setup](docs/SETUP.md)
+- [Database migrations](docs/DATABASE_MIGRATIONS.md)
+- [Data ingestion](docs/INGESTION.md)
+- [Persona generation](docs/PERSONAS.md)
+- [Task A review simulation](docs/TASK_A.md)
+- [Task B recommendation](docs/TASK_B.md)
+- [Evaluation report](EVALUATION.md)
+- [Deployment](docs/DEPLOYMENT.md)
