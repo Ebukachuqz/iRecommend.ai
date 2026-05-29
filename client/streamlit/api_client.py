@@ -8,7 +8,14 @@ import requests
 
 
 DEFAULT_API_BASE_URL = "http://127.0.0.1:8000"
-DEFAULT_CATEGORY = os.getenv("DEFAULT_CATEGORY", "All_Beauty")
+
+CATEGORIES = [
+    "Health_and_Household",
+    "Electronics",
+    "Beauty_and_Personal_Care",
+]
+
+DEFAULT_CATEGORY = os.getenv("DEFAULT_CATEGORY", CATEGORIES[0])
 
 
 class APIClientError(RuntimeError):

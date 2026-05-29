@@ -16,7 +16,13 @@ from ui_helpers import format_score, get_persona_average_rating, render_error, r
 st.set_page_config(page_title="Persona Explorer", page_icon="iR", layout="wide")
 st.title("Persona Explorer")
 
-category = st.text_input("Category", value=st.session_state.get("category", api_client.DEFAULT_CATEGORY))
+category = st.selectbox(
+    "Category",
+    api_client.CATEGORIES,
+    index=api_client.CATEGORIES.index(st.session_state.get("category", api_client.DEFAULT_CATEGORY))
+    if st.session_state.get("category") in api_client.CATEGORIES
+    else 0,
+)
 limit = st.number_input("User limit", min_value=1, max_value=100, value=20)
 
 if st.button("Load users", type="primary"):

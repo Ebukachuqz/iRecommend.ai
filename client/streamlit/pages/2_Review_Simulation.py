@@ -42,7 +42,13 @@ nigerian_mode = st.toggle("Nigerian shopping context", value=False)
 
 if mode == "Existing user":
     user_id = st.text_input("User ID", value=st.session_state.get("selected_user_id", ""))
-    category = st.text_input("Category", value=st.session_state.get("category", api_client.DEFAULT_CATEGORY))
+    category = st.selectbox(
+        "Category",
+        api_client.CATEGORIES,
+        index=api_client.CATEGORIES.index(st.session_state.get("category", api_client.DEFAULT_CATEGORY))
+        if st.session_state.get("category") in api_client.CATEGORIES
+        else 0,
+    )
     product_limit = st.number_input("Unseen product limit", min_value=1, max_value=100, value=20)
 
     if st.button("Load unseen products"):
