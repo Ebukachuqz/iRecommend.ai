@@ -54,6 +54,64 @@ export type OrganisationSummary = {
   latest_upload_status: string | null;
 };
 
+export type CountItem = {
+  label: string;
+  count: number;
+};
+
+export type DashboardOverview = {
+  total_personas: number;
+  avg_strictness?: string | null;
+  top_values: string[];
+  top_values_counts: CountItem[];
+  top_complaints: string[];
+  top_complaints_counts: CountItem[];
+  categories_covered: string[];
+  categories_covered_counts: CountItem[];
+  last_upload_at?: string | null;
+};
+
+export type DashboardCustomerSummary = {
+  customer_id: string;
+  review_count: number;
+  avg_rating: number;
+  strictness: string;
+  top_values: string[];
+  top_category?: string | null;
+};
+
+export type DashboardCustomersResponse = {
+  customers: DashboardCustomerSummary[];
+  total: number;
+  page: number;
+  per_page: number;
+};
+
+export type DashboardCustomerProfile = {
+  customer_id: string;
+  persona: Record<string, unknown>;
+  review_count: number;
+};
+
+export type MerchantSimulationProduct = {
+  title: string;
+  category: string;
+  price?: number | null;
+  features?: string[];
+  description?: string | null;
+};
+
+export type MerchantSimulationResult = {
+  customer_id: string;
+  product_title?: string | null;
+  final_predicted_rating: number;
+  simulated_review_title: string;
+  simulated_review_text: string;
+  confidence?: number | null;
+  reasoning_summary?: string | null;
+  evidence_used?: string[];
+};
+
 export class SaasApiError extends Error {
   constructor(message: string) {
     super(message);
@@ -183,4 +241,48 @@ export async function uploadReviewsCsv(
 
 export async function getUploadStatus(accessToken: string, uploadId: string): Promise<UploadStatus> {
   return requestSaas<UploadStatus>(`/saas/uploads/${encodeURIComponent(uploadId)}/status`, accessToken);
+}
+
+export async function getDashboardOverview(accessToken: string, orgId: string): Promise<DashboardOverview> {
+  return requestSaas<DashboardOverview>(`/saas/organisations/${encodeURIComponent(orgId)}/overview`, accessToken);
+}
+
+export async function getDashboardCustomers(
+  accessToken: string,
+  orgId: string,
+  options: { page?: number; perPage?: number; search?: string } = {},
+): Promise<DashboardCustomersResponse> {
+  const params = new URLSearchParams();
+  params.set("page", String(options.page || 1));
+  params.set("per_page", String(options.perPage || 20));
+  if (options.search?.trim()) {
+    params.set("search", options.search.trim());
+  }
+  return requestSaas<DashboardCustomersResponse>(
+    `/saas/organisations/${encodeURIComponent(orgId)}/customers?${params.toString()}`,
+    accessToken,
+  );
+}
+
+export async function getDashboardCustomer(
+  accessToken: string,
+  orgId: string,
+  customerId: string,
+): Promise<DashboardCustomerProfile> {
+  return requestSaas<DashboardCustomerProfile>(
+    `/saas/organisations/${encodeURIComponent(orgId)}/customers/${encodeURIComponent(customerId)}`,
+    accessToken,
+  );
+}
+
+export async function simulateMerchantCustomer(
+  accessToken: string,
+  orgId: string,
+  customerId: string,
+  product: MerchantSimulationProduct,
+): Promise<MerchantSimulationResult> {
+  return requestSaas<MerchantSimulationResult>(`/saas/organisations/${encodeURIComponent(orgId)}/simulate`, accessToken, {
+    method: "POST",
+    body: JSON.stringify({ customer_id: customerId, product }),
+  });
 }

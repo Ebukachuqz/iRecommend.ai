@@ -60,3 +60,66 @@ class OrganisationSummaryResponse(BaseModel):
     review_count: int
     latest_upload: dict[str, Any] | None = None
     latest_upload_status: str | None = None
+
+
+class CountItem(BaseModel):
+    label: str
+    count: int
+
+
+class DashboardOverviewResponse(BaseModel):
+    total_personas: int
+    avg_strictness: str | None = None
+    top_values: list[str] = Field(default_factory=list)
+    top_values_counts: list[CountItem] = Field(default_factory=list)
+    top_complaints: list[str] = Field(default_factory=list)
+    top_complaints_counts: list[CountItem] = Field(default_factory=list)
+    categories_covered: list[str] = Field(default_factory=list)
+    categories_covered_counts: list[CountItem] = Field(default_factory=list)
+    last_upload_at: str | None = None
+
+
+class CustomerSummary(BaseModel):
+    customer_id: str
+    review_count: int = 0
+    avg_rating: float = 0.0
+    strictness: str = "moderate"
+    top_values: list[str] = Field(default_factory=list)
+    top_category: str | None = None
+
+
+class CustomersResponse(BaseModel):
+    customers: list[CustomerSummary]
+    total: int
+    page: int
+    per_page: int
+
+
+class CustomerProfileResponse(BaseModel):
+    customer_id: str
+    persona: dict[str, Any]
+    review_count: int = 0
+
+
+class MerchantProductInput(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    category: str = Field(min_length=1, max_length=120)
+    price: float | None = Field(default=None, ge=0)
+    features: list[str] = Field(default_factory=list)
+    description: str | None = None
+
+
+class MerchantSimulationRequest(BaseModel):
+    customer_id: str = Field(min_length=1)
+    product: MerchantProductInput
+
+
+class MerchantSimulationResponse(BaseModel):
+    customer_id: str
+    product_title: str | None = None
+    final_predicted_rating: float
+    simulated_review_title: str
+    simulated_review_text: str
+    confidence: float | None = None
+    reasoning_summary: str | None = None
+    evidence_used: list[str] = Field(default_factory=list)

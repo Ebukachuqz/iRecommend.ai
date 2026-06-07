@@ -8,6 +8,7 @@ import {
   LogOut,
   PieChart,
   Rocket,
+  Upload,
   Users,
 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
@@ -30,6 +31,11 @@ const navItems = [
     label: "Customers",
     href: "/dashboard/customers",
     icon: Users,
+  },
+  {
+    label: "Upload data",
+    href: "/dashboard/upload",
+    icon: Upload,
   },
   {
     label: "Segments",
