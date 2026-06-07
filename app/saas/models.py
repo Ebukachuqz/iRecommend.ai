@@ -35,3 +35,28 @@ class OrganisationResponse(BaseModel):
 
 class MyOrganisationResponse(BaseModel):
     organisation: OrganisationResponse | None = None
+
+
+class UploadStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    upload_id: str
+    upload_type: str
+    status: str
+    total_rows: int = 0
+    processed_rows: int = 0
+    personas_generated: int = 0
+    error_message: str | None = None
+    processing_summary: dict[str, Any] = Field(default_factory=dict)
+
+
+class UploadCreateResponse(BaseModel):
+    upload_id: str
+    total_rows: int
+
+
+class OrganisationSummaryResponse(BaseModel):
+    persona_count: int
+    review_count: int
+    latest_upload: dict[str, Any] | None = None
+    latest_upload_status: str | None = None

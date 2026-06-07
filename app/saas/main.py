@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.saas.routes import organisations
+from app.saas.routes import organisations, uploads
 
 
 app = FastAPI(
@@ -27,3 +27,4 @@ def health() -> dict[str, str]:
 
 
 app.include_router(organisations.router)
+app.include_router(uploads.router)

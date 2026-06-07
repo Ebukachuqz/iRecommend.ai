@@ -1,15 +1,24 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Loader2, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { getMyOrganisation, type Organisation } from "@/lib/saas-api";
+import { ReviewCsvUploadFlow } from "@/components/uploads/ReviewCsvUploadFlow";
+import { Button } from "@/components/ui/button";
+import {
+  getMyOrganisation,
+  getOrganisationSummary,
+  type Organisation,
+  type OrganisationSummary,
+} from "@/lib/saas-api";
 import { createBrowserClient } from "@/lib/supabase/client";
 
 export default function DashboardPage() {
   const router = useRouter();
   const [organisation, setOrganisation] = useState<Organisation | null>(null);
+  const [summary, setSummary] = useState<OrganisationSummary | null>(null);
+  const [showUpload, setShowUpload] = useState(false);
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,6 +55,11 @@ export default function DashboardPage() {
         }
 
         setOrganisation(result.organisation);
+        const nextSummary = await getOrganisationSummary(session.access_token, result.organisation.id);
+        if (!mounted) {
+          return;
+        }
+        setSummary(nextSummary);
       } catch (err) {
         if (!mounted) {
           return;
@@ -92,6 +106,76 @@ export default function DashboardPage() {
     );
   }
 
+  if (showUpload && organisation) {
+    return (
+      <main className="min-h-screen bg-background px-4 py-12">
+        <section className="mx-auto max-w-3xl">
+          <button
+            type="button"
+            onClick={() => setShowUpload(false)}
+            className="text-sm font-semibold text-primary underline-offset-4 hover:underline"
+          >
+            Back to dashboard
+          </button>
+          <div className="mt-6 command-card p-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+              Customer intelligence setup
+            </p>
+            <h1 className="mt-3 font-display text-3xl font-semibold text-text-primary">
+              Upload customer reviews
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-text-secondary">
+              Map your CSV columns and build behavioural personas for {organisation.name}.
+            </p>
+            <div className="mt-8">
+              <ReviewCsvUploadFlow
+                orgId={organisation.id}
+                onComplete={async () => {
+                  const supabase = createBrowserClient();
+                  const {
+                    data: { session },
+                  } = await supabase.auth.getSession();
+                  if (session) {
+                    setSummary(await getOrganisationSummary(session.access_token, organisation.id));
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if ((summary?.persona_count || 0) === 0) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
+        <section className="command-card max-w-2xl p-8 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary-light text-primary">
+            <Upload className="h-6 w-6" />
+          </div>
+          <p className="mt-6 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+            {organisation?.name || "Organisation"} workspace
+          </p>
+          <h1 className="mt-3 font-display text-3xl font-semibold text-text-primary">
+            Upload your customer reviews CSV to build your first personas.
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-text-secondary">
+            iRecommend needs review history before it can explain why customers buy, complain, and recommend products.
+          </p>
+          <Button
+            type="button"
+            onClick={() => setShowUpload(true)}
+            className="violet-focus-ring mt-8 bg-primary text-white hover:bg-primary-hover"
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Upload customer reviews
+          </Button>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <section className="command-card max-w-xl p-8 text-center">
@@ -105,7 +189,8 @@ export default function DashboardPage() {
           Dashboard coming in the next dashboard build.
         </h1>
         <p className="mt-3 text-sm leading-6 text-text-secondary">
-          Organisation setup complete. The merchant intelligence dashboard will appear here next.
+          Organisation setup complete. You have {summary?.persona_count || 0} personas from{" "}
+          {summary?.review_count || 0} reviews. The merchant intelligence dashboard will appear here next.
         </p>
       </section>
     </main>

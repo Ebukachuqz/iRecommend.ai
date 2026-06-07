@@ -9,6 +9,7 @@ from app.saas.models import (
     OrganisationCreateRequest,
     OrganisationCreateResponse,
     OrganisationResponse,
+    OrganisationSummaryResponse,
     OrganisationSettingsUpdateRequest,
     SuccessResponse,
 )
@@ -28,6 +29,21 @@ def fetch_user_organisation(user_id: str) -> dict | None:
     )
     rows = response.data or []
     return dict(rows[0]) if rows else None
+
+
+def count_table_rows(table_name: str, org_id: str) -> int:
+    response = (
+        get_saas_client()
+        .table(table_name)
+        .select("id", count="exact")
+        .eq("organisation_id", org_id)
+        .limit(1)
+        .execute()
+    )
+    count = getattr(response, "count", None)
+    if count is not None:
+        return int(count)
+    return len(response.data or [])
 
 
 @router.get("/me/organisation", response_model=MyOrganisationResponse)
@@ -106,6 +122,31 @@ def update_organisation_settings(
         ) from exc
 
     return SuccessResponse(success=True)
+
+
+@router.get("/organisations/{org_id}/summary", response_model=OrganisationSummaryResponse)
+def get_organisation_summary(
+    org_id: str,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+) -> OrganisationSummaryResponse:
+    user_id = get_current_user_id(authorization)
+    validate_organisation_owner(org_id, user_id)
+    latest_response = (
+        get_saas_client()
+        .table("csv_uploads")
+        .select("*")
+        .eq("organisation_id", org_id)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    latest_upload = (latest_response.data or [None])[0]
+    return OrganisationSummaryResponse(
+        persona_count=count_table_rows("merchant_personas", org_id),
+        review_count=count_table_rows("merchant_reviews", org_id),
+        latest_upload=latest_upload,
+        latest_upload_status=(latest_upload or {}).get("status") if latest_upload else None,
+    )
 
 
 @router.get("/organisations/{org_id}", response_model=OrganisationResponse)

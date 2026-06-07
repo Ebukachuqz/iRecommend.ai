@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Check, Code2, Loader2, ShoppingBag, Upload } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { Logo } from "@/components/layout/Navbar";
+import { ReviewCsvUploadFlow } from "@/components/uploads/ReviewCsvUploadFlow";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -56,6 +57,7 @@ export default function OnboardingPage() {
   const [businessName, setBusinessName] = useState("");
   const [orgId, setOrgId] = useState<string | null>(null);
   const [selectedMarket, setSelectedMarket] = useState("global");
+  const [reviewsUploaded, setReviewsUploaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checkingOrg, setCheckingOrg] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -205,73 +207,32 @@ export default function OnboardingPage() {
               {step === 2 && (
                 <div>
                   <h1 className="font-display text-3xl font-semibold text-text-primary">
-                    Connect your customer data
+                    Upload your customer reviews
                   </h1>
                   <p className="mt-2 text-sm leading-6 text-text-secondary">
-                    Choose how to bring in your customer review history.
+                    Tell us what your CSV columns mean. We&apos;ll turn those reviews into customer personas.
                   </p>
 
-                  <div className="mt-8 space-y-4">
-                    <div className="violet-focus-ring rounded-2xl border border-primary bg-primary-light p-5">
-                      <div className="flex items-start gap-4">
-                        <div className="rounded-xl bg-surface p-3 text-primary">
-                          <Upload className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h2 className="font-display text-lg font-semibold text-text-primary">Upload CSV</h2>
-                            <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-white">
-                              Selected
-                            </span>
-                          </div>
-                          <p className="mt-2 text-sm leading-6 text-text-secondary">
-                            Upload a CSV of your customer reviews. We&apos;ll walk you through mapping your columns.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="relative cursor-not-allowed rounded-2xl border border-border bg-soft-surface p-5 opacity-70">
-                      <span className="absolute right-4 top-4 rounded-full border border-border bg-surface px-2 py-0.5 text-xs font-semibold text-text-muted">
-                        Coming soon
-                      </span>
-                      <div className="flex items-start gap-4">
-                        <div className="rounded-xl bg-surface p-3 text-text-muted">
-                          <ShoppingBag className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <h2 className="font-display text-lg font-semibold text-text-primary">Connect Shopify</h2>
-                          <p className="mt-2 text-sm leading-6 text-text-secondary">
-                            Sync your Shopify store reviews and orders.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="relative cursor-not-allowed rounded-2xl border border-border bg-soft-surface p-5 opacity-70">
-                      <span className="absolute right-4 top-4 rounded-full border border-border bg-surface px-2 py-0.5 text-xs font-semibold text-text-muted">
-                        Coming soon
-                      </span>
-                      <div className="flex items-start gap-4">
-                        <div className="rounded-xl bg-surface p-3 text-text-muted">
-                          <Code2 className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <h2 className="font-display text-lg font-semibold text-text-primary">Connect via API</h2>
-                          <p className="mt-2 text-sm leading-6 text-text-secondary">
-                            For developers who want to send customer intelligence data directly.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+                  <div className="mt-8">
+                    {orgId ? (
+                      <ReviewCsvUploadFlow
+                        orgId={orgId}
+                        onComplete={() => setReviewsUploaded(true)}
+                      />
+                    ) : (
+                      <p className="rounded-xl border border-error/30 bg-error/5 p-4 text-sm text-error">
+                        Create your organisation before uploading reviews.
+                      </p>
+                    )}
                   </div>
 
                   <Button
                     type="button"
+                    disabled={!reviewsUploaded}
                     onClick={() => setStep(3)}
                     className="violet-focus-ring mt-8 h-11 w-full bg-primary text-white hover:bg-primary-hover"
                   >
-                    Continue
+                    Continue to market context
                   </Button>
                 </div>
               )}
