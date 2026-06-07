@@ -11,6 +11,7 @@ const config: Config = {
       colors: {
         background: "#FAFBFF",
         surface: "#FFFFFF",
+        "soft-surface": "#F6F7FB",
         border: "#E8EBF4",
         foreground: "#111827",
         "text-primary": "#111827",

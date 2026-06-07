@@ -54,19 +54,21 @@ export default function Home() {
       <Navbar />
 
       <section className="flex min-h-[calc(100vh-64px)] items-center bg-background px-4 py-20 sm:px-6 lg:px-8">
-        <div className="mx-auto w-full max-w-4xl text-center">
-          <p className="mb-5 text-[13px] font-bold uppercase tracking-[0.22em] text-primary">
+        <div className="mx-auto w-full max-w-5xl">
+          <div className="aurora-panel px-5 py-14 text-center shadow-[0_26px_80px_rgba(91,33,182,0.22)] sm:px-10 sm:py-16">
+            <div className="relative z-10 mx-auto max-w-4xl">
+          <p className="mb-5 text-[13px] font-bold uppercase tracking-[0.22em] text-white/80">
             Customer Intelligence for Modern Merchants
           </p>
-          <h1 className="font-display text-[40px] font-bold leading-[1.05] tracking-tight text-text-primary sm:text-6xl lg:text-[64px]">
+          <h1 className="font-display text-[40px] font-bold leading-[1.05] tracking-tight text-white sm:text-6xl lg:text-[64px]">
             Know your customers.
             <br />
-            <span className="inline-block border-b-[3px] border-primary leading-[1.08]">
+            <span className="inline-block border-b-[3px] border-white leading-[1.08]">
               Before
             </span>{" "}
             they tell you.
           </h1>
-          <p className="mx-auto mt-6 max-w-xl text-lg leading-8 text-text-secondary">
+          <p className="mx-auto mt-6 max-w-xl text-lg leading-8 text-white/80">
             iRecommend builds behavioural personas from customer review data.
             Understand what your customers value, predict how they&apos;ll react
             to new products, and power recommendations that actually fit them.
@@ -75,23 +77,25 @@ export default function Home() {
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
               href="/playground"
-              className="inline-flex h-12 items-center justify-center rounded-lg bg-primary px-6 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+              className="inline-flex h-12 items-center justify-center rounded-lg bg-white px-6 text-sm font-semibold text-primary shadow-[0_12px_28px_rgba(17,24,39,0.18)] transition-colors hover:bg-primary-light"
             >
               Try the Playground
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
             <Link
               href="/auth/signup"
-              className="inline-flex h-12 items-center justify-center rounded-lg border border-border bg-surface px-6 text-sm font-semibold text-text-primary transition-colors hover:border-primary-light hover:bg-primary-light"
+              className="inline-flex h-12 items-center justify-center rounded-lg border border-white/25 bg-white/10 px-6 text-sm font-semibold text-white transition-colors hover:bg-white/15"
             >
               Get started free
             </Link>
           </div>
-          <p className="mt-3 text-xs font-medium text-text-muted">
+          <p className="mt-3 text-xs font-medium text-white/70">
             No account needed for the Playground
           </p>
 
           <HeroMetrics />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -110,7 +114,7 @@ export default function Home() {
               return (
                 <article
                   key={step.title}
-                  className="rounded-lg border border-border bg-surface p-6 shadow-sm"
+                  className="command-card p-6"
                 >
                   <div className="flex items-start justify-between">
                     <span className="font-display text-5xl font-bold text-primary">
@@ -156,7 +160,7 @@ export default function Home() {
             </Link>
           </div>
 
-          <div className="rounded-lg border border-border bg-surface p-5 shadow-sm">
+          <div className="violet-glow-card rounded-2xl p-5">
             <div className="flex items-start justify-between gap-4 border-b border-border pb-5">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
@@ -172,15 +176,15 @@ export default function Home() {
             </div>
 
             <div className="grid gap-4 py-5 sm:grid-cols-2">
-              <div className="rounded-lg bg-background p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+              <div className="aurora-panel rounded-2xl p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
                   Predicted rating
                 </p>
-                <p className="mt-2 text-2xl font-bold text-warning">
-                  ★★★★☆ <span className="text-text-primary">4.1 / 5</span>
+                <p className="mt-2 text-2xl font-bold text-white">
+                  ★★★★☆ <span className="text-white">4.1 / 5</span>
                 </p>
               </div>
-              <div className="rounded-lg bg-background p-4">
+              <div className="command-card bg-soft-surface p-4 shadow-none">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
                   Launch read
                 </p>
@@ -192,7 +196,7 @@ export default function Home() {
             </div>
 
             <div className="space-y-3">
-              <div className="rounded-lg border border-border p-4">
+              <div className="command-card p-4 shadow-none">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-error">
                   Most likely complaint
                 </p>
@@ -200,7 +204,7 @@ export default function Home() {
                   Scroll wheel feels cheap
                 </p>
               </div>
-              <div className="rounded-lg border border-border p-4">
+              <div className="command-card p-4 shadow-none">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-success">
                   Most likely praise
                 </p>
@@ -235,7 +239,7 @@ export default function Home() {
                 key={item.label}
                 className={
                   item.active
-                    ? "inline-flex items-center gap-2 rounded-full border border-primary bg-primary-light px-4 py-2 text-sm font-semibold text-primary"
+                    ? "violet-glow-card inline-flex items-center gap-2 rounded-full border-primary bg-primary-light px-4 py-2 text-sm font-semibold text-primary"
                     : "inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-text-muted"
                 }
               >
@@ -252,8 +256,9 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="bg-primary px-4 py-20 text-white sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-3xl text-center">
+      <section className="bg-background px-4 py-20 sm:px-6 lg:px-8">
+        <div className="aurora-panel mx-auto max-w-4xl px-6 py-16 text-center shadow-[0_24px_70px_rgba(91,33,182,0.2)] sm:px-10">
+          <div className="relative z-10">
           <Rocket className="mx-auto h-8 w-8" />
           <h2 className="mt-5 font-display text-3xl font-bold tracking-tight sm:text-4xl">
             Ready to understand your customers?
@@ -267,6 +272,7 @@ export default function Home() {
           <p className="mt-4 text-sm text-white/80">
             Takes 5 minutes. Upload a CSV and go.
           </p>
+          </div>
         </div>
       </section>
 

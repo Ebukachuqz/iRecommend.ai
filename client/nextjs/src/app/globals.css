@@ -66,3 +66,69 @@
     background: #b9c0dc;
   }
 }
+
+@layer components {
+  .aurora-panel {
+    position: relative;
+    overflow: hidden;
+    border-radius: 32px;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(91, 33, 182, 0.85), transparent 34%),
+      radial-gradient(circle at 85% 25%, rgba(76, 29, 149, 0.78), transparent 36%),
+      radial-gradient(circle at 50% 90%, rgba(238, 242, 255, 0.95), transparent 42%),
+      linear-gradient(135deg, #5b21b6 0%, #4c1d95 48%, #5b21b6 100%);
+    color: #ffffff;
+  }
+
+  .aurora-panel::before {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    pointer-events: none;
+    border-radius: inherit;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  .violet-glow-card {
+    background: #ffffff;
+    border: 1px solid #e8ebf4;
+    box-shadow:
+      0 0 0 1px rgba(91, 33, 182, 0.04),
+      0 18px 40px rgba(91, 33, 182, 0.08);
+    transition:
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      transform 180ms ease;
+  }
+
+  .violet-glow-card:hover {
+    border-color: rgba(91, 33, 182, 0.25);
+    box-shadow:
+      0 0 0 1px rgba(91, 33, 182, 0.08),
+      0 22px 48px rgba(91, 33, 182, 0.12);
+  }
+
+  .violet-focus-ring {
+    border-color: #e8ebf4;
+    transition:
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      background-color 180ms ease;
+  }
+
+  .violet-focus-ring:focus-visible,
+  .violet-focus-ring[data-state="active"],
+  .violet-focus-ring[data-selected="true"] {
+    border-color: #5b21b6;
+    background: #eef2ff;
+    box-shadow: 0 0 0 4px rgba(91, 33, 182, 0.25);
+    outline: none;
+  }
+
+  .command-card {
+    background: #ffffff;
+    border: 1px solid #e8ebf4;
+    border-radius: 16px;
+    box-shadow: 0 12px 30px rgba(17, 24, 39, 0.05);
+  }
+}

@@ -47,7 +47,7 @@ export function HeroMetrics() {
               visible: { opacity: 1, y: 0 },
             }}
             transition={{ duration: 0.45, ease: "easeOut" }}
-            className="rounded-lg border border-border bg-surface px-4 py-3 shadow-sm"
+            className="violet-glow-card rounded-lg px-4 py-3"
           >
             <div className="flex items-center justify-center gap-2 text-sm font-semibold">
               <Icon className={`h-4 w-4 ${metric.className}`} />

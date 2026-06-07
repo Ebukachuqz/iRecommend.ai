@@ -63,7 +63,7 @@ export function DashboardSidebar({
   }
 
   return (
-    <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-border bg-surface">
+    <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-border bg-soft-surface">
       <div className="flex h-16 items-center border-b border-border px-5">
         <Logo />
       </div>
@@ -75,7 +75,7 @@ export function DashboardSidebar({
             "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
             item.locked
               ? "cursor-not-allowed text-text-muted"
-              : "text-text-secondary hover:bg-primary-light hover:text-primary",
+              : "text-text-secondary hover:bg-primary-light hover:text-primary hover:shadow-[0_10px_24px_rgba(91,33,182,0.08)]",
           );
 
           if (item.locked) {
@@ -112,7 +112,7 @@ export function DashboardSidebar({
         <button
           type="button"
           onClick={handleLogout}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:border-primary-light hover:bg-primary-light hover:text-primary"
+          className="violet-focus-ring flex w-full items-center justify-center gap-2 rounded-lg border bg-surface px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:border-primary-light hover:bg-primary-light hover:text-primary"
         >
           <LogOut className="h-4 w-4" />
           Log out

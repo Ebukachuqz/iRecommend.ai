@@ -39,13 +39,13 @@ export function Navbar() {
         <div className="hidden items-center gap-3 md:flex">
           <Link
             href="/auth/login"
-            className="rounded-lg px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:text-text-primary"
+            className="violet-focus-ring rounded-lg px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:text-text-primary"
           >
             Log in
           </Link>
           <Link
             href="/auth/signup"
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+            className="violet-focus-ring rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
           >
             Get started
           </Link>
@@ -53,7 +53,7 @@ export function Navbar() {
 
         <button
           type="button"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-text-primary md:hidden"
+          className="violet-focus-ring inline-flex h-10 w-10 items-center justify-center rounded-lg border bg-surface text-text-primary md:hidden"
           aria-label={open ? "Close menu" : "Open menu"}
           aria-expanded={open}
           onClick={() => setOpen((value) => !value)}
