@@ -32,7 +32,6 @@ import {
 } from "@/lib/prototype-api";
 
 type PlaygroundTab = "simulation" | "recommendations";
-type ProductMode = "demo" | "custom";
 
 const categoryLabelByValue = Object.fromEntries(
   DEMO_CATEGORIES.map((category) => [category.value, category.label]),
@@ -353,7 +352,6 @@ export default function PlaygroundPage() {
   const [apiWarning, setApiWarning] = useState<string | null>(null);
 
   const [product, setProduct] = useState<ProductInput>(defaultProduct);
-  const [productMode, setProductMode] = useState<ProductMode>("demo");
   const [demoProducts, setDemoProducts] = useState<ProductSummary[]>([]);
   const [selectedProductKey, setSelectedProductKey] = useState("");
   const [productsLoading, setProductsLoading] = useState(false);
@@ -386,7 +384,6 @@ export default function PlaygroundPage() {
       setSelectedProductKey("");
       setProductsError(null);
       setProductsLoading(false);
-      setProductMode("demo");
       setProduct(defaultProduct);
       return;
     }
@@ -396,7 +393,6 @@ export default function PlaygroundPage() {
       setSelectedProductKey("");
       setProductsError(null);
       setProductsLoading(false);
-      setProductMode("custom");
       setProduct((current) => ({
         ...current,
         category: personaSelection.category || current.category,
@@ -404,7 +400,6 @@ export default function PlaygroundPage() {
       return;
     }
 
-    setProductMode("demo");
     setDemoProducts([]);
     setSelectedProductKey("");
     setProductsError(null);
@@ -457,6 +452,7 @@ export default function PlaygroundPage() {
 
   const canSimulate = Boolean(personaSelection && productForSubmit.title.trim());
   const canRecommend = Boolean(personaSelection);
+  const usesDemoProductDropdown = personaSelection?.mode !== "custom";
 
   function handleDemoProductSelection(nextKey: string) {
     setSelectedProductKey(nextKey);
@@ -599,58 +595,19 @@ export default function PlaygroundPage() {
                 <div>
                   <p className="font-display text-lg font-semibold text-text-primary">Product details</p>
                   <p className="mt-1 text-sm text-text-secondary">
-                    Pick a real demo product, or describe a new one to test before launch.
+                    {usesDemoProductDropdown
+                      ? "Pick a real product from the demo database for this customer."
+                      : "Describe a product and predict how this customer may react."}
                   </p>
-                </div>
-
-                <div className="grid grid-cols-2 rounded-xl border border-border bg-soft-surface p-1">
-                  <button
-                    type="button"
-                    disabled={personaSelection?.mode !== "demo"}
-                    onClick={() => {
-                      setProductMode("demo");
-                      setProduct((current) => ({
-                        ...current,
-                        title: selectedProductKey ? current.title : "",
-                        category: personaSelection?.category || current.category,
-                      }));
-                    }}
-                    className={`violet-focus-ring rounded-lg px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:text-text-muted ${
-                      productMode === "demo"
-                        ? "bg-surface text-primary shadow-sm"
-                        : "text-text-secondary hover:text-text-primary"
-                    }`}
-                  >
-                    Demo product
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProductMode("custom");
-                      setSelectedProductKey("");
-                      setProduct((current) => ({
-                        ...defaultProduct,
-                        category: personaSelection?.category || current.category,
-                      }));
-                      setFeaturesText("");
-                    }}
-                    className={`violet-focus-ring rounded-lg px-3 py-2 text-sm font-semibold transition ${
-                      productMode === "custom"
-                        ? "bg-surface text-primary shadow-sm"
-                        : "text-text-secondary hover:text-text-primary"
-                    }`}
-                  >
-                    Custom product
-                  </button>
                 </div>
 
                 {personaSelection?.mode === "custom" && (
                   <p className="rounded-lg bg-soft-surface px-3 py-2 text-xs text-text-secondary">
-                    Demo product selection needs a demo database persona. Pasted personas use custom product details.
+                    Pasted personas use custom product details because there is no demo customer history to query.
                   </p>
                 )}
 
-                {productMode === "demo" ? (
+                {usesDemoProductDropdown ? (
                   <div className="space-y-4">
                     <label className="block">
                       <span className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
