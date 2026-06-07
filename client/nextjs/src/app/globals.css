@@ -1,27 +1,68 @@
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #fafbff;
+    --foreground: #111827;
+    --card: #ffffff;
+    --card-foreground: #111827;
+    --popover: #ffffff;
+    --popover-foreground: #111827;
+    --primary: #5b21b6;
+    --primary-foreground: #ffffff;
+    --secondary: #eef2ff;
+    --secondary-foreground: #111827;
+    --muted: #f1f3f9;
+    --muted-foreground: #6b7280;
+    --accent: #eef2ff;
+    --accent-foreground: #111827;
+    --destructive: #dc2626;
+    --border: #e8ebf4;
+    --input: #e8ebf4;
+    --ring: #5b21b6;
+    --radius: 0.625rem;
   }
-}
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-}
+  * {
+    box-sizing: border-box;
+    @apply border-border;
+  }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+  html {
+    scroll-behavior: smooth;
+    background: #fafbff;
+  }
+
+  body {
+    background: #fafbff;
+    color: #111827;
+  }
+
+  ::selection {
+    background: #eef2ff;
+    color: #111827;
+  }
+
+  ::-webkit-scrollbar {
+    height: 10px;
+    width: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #f1f3f9;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #d1d5e8;
+    border: 2px solid #f1f3f9;
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #b9c0dc;
   }
 }

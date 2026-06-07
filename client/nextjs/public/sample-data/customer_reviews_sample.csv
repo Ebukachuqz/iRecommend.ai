@@ -1,0 +1,7 @@
+customer_id,product_name,category,rating,review_text,review_date,order_value
+CUST-001,Everyday Hydration Serum,Skincare,5,"Absorbs quickly and keeps my skin calm all day. I would buy this again.",2026-01-12,34.00
+CUST-002,Everyday Hydration Serum,Skincare,3,"Good texture, but the scent is stronger than I expected for sensitive skin.",2026-01-14,34.00
+CUST-003,Compact Desk Lamp,Home Office,4,"The lamp feels sturdy and the warm light makes evening work easier.",2026-01-16,49.99
+CUST-004,Compact Desk Lamp,Home Office,2,"Looks nice, but the switch feels cheap and I worry it will not last.",2026-01-18,49.99
+CUST-005,Travel Cable Organizer,Accessories,5,"Simple, durable, and saves me time when packing. Exactly what I needed.",2026-01-19,18.50
+CUST-006,Travel Cable Organizer,Accessories,4,"Useful little case. I wish it had one more elastic loop for larger chargers.",2026-01-21,18.50
