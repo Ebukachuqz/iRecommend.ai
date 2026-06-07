@@ -20,16 +20,19 @@ import {
   DEMO_CATEGORIES,
   checkPrototypeHealth,
   getRecommendations,
+  listUnseenProducts,
   refineRecommendations,
   simulateReview,
   type DemoCategory,
   type PersonaSelection,
   type ProductInput,
+  type ProductSummary,
   type RecommendationResult,
   type SimulationResult,
 } from "@/lib/prototype-api";
 
 type PlaygroundTab = "simulation" | "recommendations";
+type ProductMode = "demo" | "custom";
 
 const categoryLabelByValue = Object.fromEntries(
   DEMO_CATEGORIES.map((category) => [category.value, category.label]),
@@ -75,6 +78,25 @@ function evidenceList(value?: unknown) {
     return [value.trim()];
   }
   return [];
+}
+
+function productOptionKey(product: ProductSummary) {
+  return product.parent_asin;
+}
+
+function productSummaryToInput(product: ProductSummary, category: DemoCategory): ProductInput {
+  return {
+    parent_asin: product.parent_asin,
+    title: product.title || product.parent_asin,
+    category,
+    main_category: product.main_category,
+    price: product.price ?? undefined,
+    average_rating: product.average_rating,
+    rating_number: product.rating_number,
+    store: product.store,
+    features: [],
+    description: "",
+  };
 }
 
 function EmptyState({ title, description }: { title: string; description: string }) {
@@ -162,7 +184,7 @@ function SimulationResultPanel({
       <div className="command-card p-6">
         <p className="text-lg font-semibold text-text-primary">{result.simulated_review_title}</p>
         <p className="mt-3 text-sm italic leading-7 text-text-secondary">
-          “{result.simulated_review_text}”
+          &quot;{result.simulated_review_text}&quot;
         </p>
       </div>
 
@@ -254,7 +276,7 @@ function RecommendationResults({
                       Why this?
                     </p>
                     <p className="mt-1 text-sm italic leading-6 text-text-secondary">
-                      “{item.reason || "The recommender selected this product from the candidate pool."}”
+                      &quot;{item.reason || "The recommender selected this product from the candidate pool."}&quot;
                     </p>
                   </div>
 
@@ -331,6 +353,11 @@ export default function PlaygroundPage() {
   const [apiWarning, setApiWarning] = useState<string | null>(null);
 
   const [product, setProduct] = useState<ProductInput>(defaultProduct);
+  const [productMode, setProductMode] = useState<ProductMode>("demo");
+  const [demoProducts, setDemoProducts] = useState<ProductSummary[]>([]);
+  const [selectedProductKey, setSelectedProductKey] = useState("");
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productsError, setProductsError] = useState<string | null>(null);
   const [featuresText, setFeaturesText] = useState("");
   const [simulationLoading, setSimulationLoading] = useState(false);
   const [simulationError, setSimulationError] = useState<string | null>(null);
@@ -351,6 +378,72 @@ export default function PlaygroundPage() {
     });
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+
+    if (!personaSelection) {
+      setDemoProducts([]);
+      setSelectedProductKey("");
+      setProductsError(null);
+      setProductsLoading(false);
+      setProductMode("demo");
+      setProduct(defaultProduct);
+      return;
+    }
+
+    if (personaSelection.mode !== "demo" || !personaSelection.userId) {
+      setDemoProducts([]);
+      setSelectedProductKey("");
+      setProductsError(null);
+      setProductsLoading(false);
+      setProductMode("custom");
+      setProduct((current) => ({
+        ...current,
+        category: personaSelection.category || current.category,
+      }));
+      return;
+    }
+
+    setProductMode("demo");
+    setDemoProducts([]);
+    setSelectedProductKey("");
+    setProductsError(null);
+    setProductsLoading(true);
+    setProduct((current) => ({
+      ...current,
+      title: "",
+      category: personaSelection.category,
+      parent_asin: undefined,
+      main_category: undefined,
+    }));
+
+    listUnseenProducts(personaSelection.userId)
+      .then((products) => {
+        if (!mounted) {
+          return;
+        }
+        setDemoProducts(products);
+        if (!products.length) {
+          setProductsError("No demo products were returned for this customer.");
+        }
+      })
+      .catch((error) => {
+        if (!mounted) {
+          return;
+        }
+        setProductsError(friendlyError(error));
+      })
+      .finally(() => {
+        if (mounted) {
+          setProductsLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [personaSelection]);
+
   const productForSubmit = useMemo<ProductInput>(
     () => ({
       ...product,
@@ -364,6 +457,22 @@ export default function PlaygroundPage() {
 
   const canSimulate = Boolean(personaSelection && productForSubmit.title.trim());
   const canRecommend = Boolean(personaSelection);
+
+  function handleDemoProductSelection(nextKey: string) {
+    setSelectedProductKey(nextKey);
+    const selected = demoProducts.find((item) => productOptionKey(item) === nextKey);
+    if (!selected || !personaSelection) {
+      setProduct((current) => ({
+        ...current,
+        title: "",
+        parent_asin: undefined,
+        main_category: undefined,
+      }));
+      return;
+    }
+    setProduct(productSummaryToInput(selected, personaSelection.category));
+    setFeaturesText("");
+  }
 
   async function handleSimulation() {
     if (!personaSelection || !productForSubmit.title.trim()) {
@@ -490,84 +599,183 @@ export default function PlaygroundPage() {
                 <div>
                   <p className="font-display text-lg font-semibold text-text-primary">Product details</p>
                   <p className="mt-1 text-sm text-text-secondary">
-                    Describe a product and predict how this customer may react.
+                    Pick a real demo product, or describe a new one to test before launch.
                   </p>
                 </div>
 
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
-                    Product title*
-                  </span>
-                  <Input
-                    value={product.title}
-                    onChange={(event) => setProduct((current) => ({ ...current, title: event.target.value }))}
-                    placeholder="Foam Massage Roller"
-                    className="violet-focus-ring mt-2"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
-                    Category*
-                  </span>
-                  <select
-                    value={product.category}
-                    onChange={(event) =>
-                      setProduct((current) => ({ ...current, category: event.target.value as DemoCategory }))
-                    }
-                    className="violet-focus-ring mt-2 h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary outline-none"
-                  >
-                    {DEMO_CATEGORIES.map((category) => (
-                      <option key={category.value} value={category.value}>
-                        {category.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
-                    Price
-                  </span>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={product.price ?? ""}
-                    onChange={(event) =>
+                <div className="grid grid-cols-2 rounded-xl border border-border bg-soft-surface p-1">
+                  <button
+                    type="button"
+                    disabled={personaSelection?.mode !== "demo"}
+                    onClick={() => {
+                      setProductMode("demo");
                       setProduct((current) => ({
                         ...current,
-                        price: event.target.value ? Number(event.target.value) : undefined,
-                      }))
-                    }
-                    placeholder="49.99"
-                    className="violet-focus-ring mt-2"
-                  />
-                </label>
+                        title: selectedProductKey ? current.title : "",
+                        category: personaSelection?.category || current.category,
+                      }));
+                    }}
+                    className={`violet-focus-ring rounded-lg px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:text-text-muted ${
+                      productMode === "demo"
+                        ? "bg-surface text-primary shadow-sm"
+                        : "text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    Demo product
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProductMode("custom");
+                      setSelectedProductKey("");
+                      setProduct((current) => ({
+                        ...defaultProduct,
+                        category: personaSelection?.category || current.category,
+                      }));
+                      setFeaturesText("");
+                    }}
+                    className={`violet-focus-ring rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                      productMode === "custom"
+                        ? "bg-surface text-primary shadow-sm"
+                        : "text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    Custom product
+                  </button>
+                </div>
 
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
-                    Features
-                  </span>
-                  <Textarea
-                    value={featuresText}
-                    onChange={(event) => setFeaturesText(event.target.value)}
-                    rows={3}
-                    placeholder={"EVA foam construction\nHigh-density ridges\nPortable size"}
-                    className="violet-focus-ring mt-2 resize-none"
-                  />
-                </label>
+                {personaSelection?.mode === "custom" && (
+                  <p className="rounded-lg bg-soft-surface px-3 py-2 text-xs text-text-secondary">
+                    Demo product selection needs a demo database persona. Pasted personas use custom product details.
+                  </p>
+                )}
 
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
-                    Description
-                  </span>
-                  <Textarea
-                    value={product.description}
-                    onChange={(event) => setProduct((current) => ({ ...current, description: event.target.value }))}
-                    rows={2}
-                    className="violet-focus-ring mt-2 resize-none"
-                  />
-                </label>
+                {productMode === "demo" ? (
+                  <div className="space-y-4">
+                    <label className="block">
+                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                        Product from demo database*
+                      </span>
+                      <select
+                        value={selectedProductKey}
+                        disabled={!personaSelection || productsLoading}
+                        onChange={(event) => handleDemoProductSelection(event.target.value)}
+                        className="violet-focus-ring mt-2 h-11 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary outline-none disabled:cursor-not-allowed disabled:text-text-muted"
+                      >
+                        <option value="">
+                          {!personaSelection
+                            ? "Select a demo customer first"
+                            : productsLoading
+                              ? "Loading products..."
+                              : "Select a product"}
+                        </option>
+                        {demoProducts.map((item) => (
+                          <option key={productOptionKey(item)} value={productOptionKey(item)}>
+                            {(item.title || item.parent_asin).slice(0, 80)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    {productsError && <p className="text-sm text-error">{productsError}</p>}
+
+                    {selectedProductKey && (
+                      <div className="rounded-xl border border-border bg-soft-surface p-3 text-sm text-text-secondary">
+                        <p className="font-semibold text-text-primary">{product.title}</p>
+                        <div className="mt-2 grid gap-1 text-xs">
+                          <span>ASIN: {product.parent_asin}</span>
+                          {product.main_category && <span>Subcategory: {product.main_category}</span>}
+                          {product.store && <span>Store: {product.store}</span>}
+                          {typeof product.price === "number" && <span>Price: ${product.price.toFixed(2)}</span>}
+                          {typeof product.average_rating === "number" && (
+                            <span>Average rating: {product.average_rating.toFixed(1)} / 5</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <label className="block">
+                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                        Product title*
+                      </span>
+                      <Input
+                        value={product.title}
+                        onChange={(event) =>
+                          setProduct((current) => ({ ...current, title: event.target.value }))
+                        }
+                        placeholder="Foam Massage Roller"
+                        className="violet-focus-ring mt-2"
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                        Category*
+                      </span>
+                      <select
+                        value={product.category}
+                        onChange={(event) =>
+                          setProduct((current) => ({ ...current, category: event.target.value as DemoCategory }))
+                        }
+                        className="violet-focus-ring mt-2 h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary outline-none"
+                      >
+                        {DEMO_CATEGORIES.map((category) => (
+                          <option key={category.value} value={category.value}>
+                            {category.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="block">
+                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                        Price
+                      </span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={product.price ?? ""}
+                        onChange={(event) =>
+                          setProduct((current) => ({
+                            ...current,
+                            price: event.target.value ? Number(event.target.value) : undefined,
+                          }))
+                        }
+                        placeholder="49.99"
+                        className="violet-focus-ring mt-2"
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                        Features
+                      </span>
+                      <Textarea
+                        value={featuresText}
+                        onChange={(event) => setFeaturesText(event.target.value)}
+                        rows={3}
+                        placeholder={"EVA foam construction\nHigh-density ridges\nPortable size"}
+                        className="violet-focus-ring mt-2 resize-none"
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                        Description
+                      </span>
+                      <Textarea
+                        value={product.description}
+                        onChange={(event) =>
+                          setProduct((current) => ({ ...current, description: event.target.value }))
+                        }
+                        rows={2}
+                        className="violet-focus-ring mt-2 resize-none"
+                      />
+                    </label>
+                  </div>
+                )}
 
                 <Button
                   type="button"

@@ -38,11 +38,26 @@ export type PersonaSelection = {
 };
 
 export type ProductInput = {
+  parent_asin?: string;
   title: string;
   category: DemoCategory;
+  main_category?: string | null;
   price?: number;
   features?: string[];
   description?: string;
+  average_rating?: number | null;
+  rating_number?: number | null;
+  store?: string | null;
+};
+
+export type ProductSummary = {
+  parent_asin: string;
+  title?: string | null;
+  main_category?: string | null;
+  price?: number | null;
+  average_rating?: number | null;
+  rating_number?: number | null;
+  store?: string | null;
 };
 
 export type SimulationResult = {
@@ -149,6 +164,12 @@ export async function getPersona(userId: string, category: string): Promise<Pers
   );
 }
 
+export async function listUnseenProducts(userId: string, limit = 50): Promise<ProductSummary[]> {
+  return requestJson<ProductSummary[]>(
+    `/users/${encodeURIComponent(userId)}/unseen-products?limit=${limit}`,
+  );
+}
+
 export async function parsePersona(rawInput: string): Promise<Record<string, unknown> | string> {
   try {
     const response = await requestJson<{ persona?: Record<string, unknown>; parsed_persona?: Record<string, unknown> }>(
@@ -178,19 +199,19 @@ export async function simulateReview(selection: PersonaSelection, product: Produ
     body: JSON.stringify({
       user_id: selection.mode === "demo" ? selection.userId : undefined,
       category: product.category,
-      parent_asin: "playground_custom_product",
+      parent_asin: product.parent_asin || "playground_custom_product",
       persona: selection.persona,
       product: {
-        parent_asin: "playground_custom_product",
+        parent_asin: product.parent_asin || "playground_custom_product",
         title: product.title,
         category: product.category,
-        main_category: product.category,
+        main_category: product.main_category || product.category,
         price: product.price,
         features: product.features || [],
         description: product.description ? [product.description] : [],
-        average_rating: 4.2,
-        rating_number: 100,
-        store: "Playground merchant",
+        average_rating: product.average_rating ?? 4.2,
+        rating_number: product.rating_number ?? 100,
+        store: product.store || "Playground merchant",
         details: {},
       },
       context: { source: "nextjs_playground" },
