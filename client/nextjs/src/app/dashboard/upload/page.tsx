@@ -19,7 +19,7 @@ export default function DashboardUploadPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Upload data</p>
         <h1 className="mt-2 font-display text-4xl font-semibold text-text-primary">Upload customer reviews</h1>
         <p className="mt-2 max-w-2xl text-text-secondary">
-          Map your CSV columns and build behavioural personas for {orgName}. Product catalog upload comes later.
+          Map your CSV columns and build behavioural personas for {orgName}. Product catalog upload is available inside the launch simulator.
         </p>
       </header>
 

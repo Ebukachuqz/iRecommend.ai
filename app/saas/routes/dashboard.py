@@ -9,6 +9,10 @@ from app.saas.models import (
     CustomerSummary,
     CustomersResponse,
     DashboardOverviewResponse,
+    MerchantBulkSimulationRequest,
+    MerchantBulkSimulationResponse,
+    MerchantProductResponse,
+    MerchantProductsResponse,
     MerchantSimulationRequest,
     MerchantSimulationResponse,
 )
@@ -47,6 +51,21 @@ def fetch_latest_upload(org_id: str) -> dict | None:
     )
     rows = response.data or []
     return dict(rows[0]) if rows else None
+
+
+def normalize_product_row(row: dict) -> MerchantProductResponse:
+    features = row.get("features") or []
+    if not isinstance(features, list):
+        features = [features]
+    return MerchantProductResponse(
+        id=str(row.get("id")) if row.get("id") is not None else None,
+        product_id=str(row.get("product_id")) if row.get("product_id") is not None else None,
+        product_name=str(row.get("product_name") or ""),
+        category=str(row.get("category") or ""),
+        price=float(row["price"]) if row.get("price") not in (None, "") else None,
+        description=str(row.get("description")) if row.get("description") not in (None, "") else None,
+        features=[str(item) for item in features if str(item).strip()],
+    )
 
 
 @router.get("/organisations/{org_id}/overview", response_model=DashboardOverviewResponse)
@@ -127,4 +146,45 @@ def simulate_customer_reaction(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to simulate this customer reaction.",
+        ) from exc
+
+
+@router.get("/organisations/{org_id}/products", response_model=MerchantProductsResponse)
+def get_merchant_products(
+    org_id: str,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+) -> MerchantProductsResponse:
+    require_org(org_id, authorization)
+    response = (
+        get_saas_client()
+        .table("merchant_products")
+        .select("*")
+        .eq("organisation_id", org_id)
+        .order("product_name")
+        .limit(250)
+        .execute()
+    )
+    return MerchantProductsResponse(products=[normalize_product_row(dict(row)) for row in response.data or []])
+
+
+@router.post("/organisations/{org_id}/simulate/bulk", response_model=MerchantBulkSimulationResponse)
+def simulate_launch_reactions(
+    org_id: str,
+    payload: MerchantBulkSimulationRequest,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+) -> MerchantBulkSimulationResponse:
+    require_org(org_id, authorization)
+    try:
+        return MerchantSimulator().simulate_bulk(
+            org_id=org_id,
+            product=payload.product,
+            customer_ids=payload.customer_ids,
+            sample_size=payload.sample_size,
+        )
+    except MerchantSimulationError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to run the product launch simulation.",
         ) from exc

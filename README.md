@@ -27,6 +27,7 @@ The core insight is that structured user personas, extracted from Amazon review 
 - [Pipeline Overview](#pipeline-overview)
 - [Command Cheat Sheet](#command-cheat-sheet)
 - [API and Client](#api-and-client)
+- [iRecommend Next.js SaaS App](#irecommend-nextjs-saas-app)
 - [Evaluation](#evaluation)
 - [MVP Demo Flow](#mvp-demo-flow)
 - [Known Limitations](#known-limitations)
@@ -186,6 +187,57 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for Docker and Render deployment in
 
 ---
 
+## iRecommend Next.js SaaS App
+
+The SaaS app lives in `client/nextjs` and runs alongside the existing prototype API.
+
+### Running locally
+
+Terminal 1 - Prototype API from project root:
+
+```powershell
+uvicorn app.api.main:app --reload --port 8000
+```
+
+Terminal 2 - SaaS API from project root:
+
+```powershell
+uvicorn app.saas.main:app --reload --port 8001
+```
+
+Terminal 3 - Next.js app:
+
+```powershell
+cd client/nextjs
+npm run dev
+```
+
+### Environment variables
+
+Copy `client/nextjs/.env.local.example` to `client/nextjs/.env.local` and fill in:
+
+```text
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_SAAS_API_URL=http://localhost:8001
+```
+
+### Database setup
+
+Run `client/nextjs/supabase/migrations/001_saas_tables.sql` in the Supabase SQL editor for the merchant SaaS tables.
+
+If patching an older database, also run:
+
+```text
+app/saas/sql/001_csv_upload_processing_summary.sql
+app/saas/sql/002_product_extra_fields.sql
+```
+
+See `client/nextjs/PRESENTATION_CHECKLIST.md` before a live demo.
+
+---
+
 ## Evaluation
 
 Evaluation is fully implemented and writes paper-ready artifacts to `outputs/evaluation/`.
@@ -216,7 +268,7 @@ See [EVALUATION.md](EVALUATION.md) for the full evaluation methodology, metrics,
 - Product embeddings and personas must be prepared before meaningful recommendations are possible.
 - Broader baselines and ablations are future work.
 - Evaluation has been implemented; see [EVALUATION.md](EVALUATION.md).
-- The Next.js frontend under `client/nextjs` is reserved for future work.
+- The Next.js SaaS app is an MVP demo surface; production billing, reporting, monitoring, and segmentation are future work.
 
 ---
 

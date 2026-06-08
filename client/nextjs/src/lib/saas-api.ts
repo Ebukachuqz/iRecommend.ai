@@ -101,6 +101,20 @@ export type MerchantSimulationProduct = {
   description?: string | null;
 };
 
+export type MerchantCatalogProduct = {
+  id?: string | null;
+  product_id?: string | null;
+  product_name: string;
+  category: string;
+  price?: number | null;
+  description?: string | null;
+  features: string[];
+};
+
+export type MerchantProductsResponse = {
+  products: MerchantCatalogProduct[];
+};
+
 export type MerchantSimulationResult = {
   customer_id: string;
   product_title?: string | null;
@@ -110,6 +124,16 @@ export type MerchantSimulationResult = {
   confidence?: number | null;
   reasoning_summary?: string | null;
   evidence_used?: string[];
+};
+
+export type MerchantBulkSimulationResult = {
+  simulations: MerchantSimulationResult[];
+  avg_predicted_rating: number;
+  pct_4_plus: number;
+  pct_3_or_below: number;
+  top_praises: string[];
+  top_concerns: string[];
+  interpretation: string;
 };
 
 export class SaasApiError extends Error {
@@ -130,7 +154,10 @@ async function requestSaas<T>(path: string, accessToken: string, init?: RequestI
         ...(init?.headers || {}),
       },
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new SaasApiError("This request took too long. Try again with a smaller sample, or load the sample result.");
+    }
     throw new SaasApiError("SaaS API is offline. Start it with: uvicorn app.saas.main:app --reload --port 8001.");
   }
 
@@ -239,6 +266,19 @@ export async function uploadReviewsCsv(
   return requestSaasForm<UploadCreateResponse>("/saas/uploads/reviews", accessToken, formData);
 }
 
+export async function uploadProductsCsv(
+  accessToken: string,
+  orgId: string,
+  file: File,
+  columnMapping: Record<string, string>,
+): Promise<UploadCreateResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("org_id", orgId);
+  formData.append("column_mapping", JSON.stringify(columnMapping));
+  return requestSaasForm<UploadCreateResponse>("/saas/uploads/products", accessToken, formData);
+}
+
 export async function getUploadStatus(accessToken: string, uploadId: string): Promise<UploadStatus> {
   return requestSaas<UploadStatus>(`/saas/uploads/${encodeURIComponent(uploadId)}/status`, accessToken);
 }
@@ -285,4 +325,37 @@ export async function simulateMerchantCustomer(
     method: "POST",
     body: JSON.stringify({ customer_id: customerId, product }),
   });
+}
+
+export async function getMerchantProducts(
+  accessToken: string,
+  orgId: string,
+): Promise<MerchantProductsResponse> {
+  return requestSaas<MerchantProductsResponse>(`/saas/organisations/${encodeURIComponent(orgId)}/products`, accessToken);
+}
+
+export async function simulateMerchantLaunchBulk(
+  accessToken: string,
+  orgId: string,
+  payload: {
+    product: MerchantSimulationProduct;
+    customer_ids?: string[] | null;
+    sample_size?: number;
+  },
+): Promise<MerchantBulkSimulationResult> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 90000);
+  try {
+    return await requestSaas<MerchantBulkSimulationResult>(
+      `/saas/organisations/${encodeURIComponent(orgId)}/simulate/bulk`,
+      accessToken,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      },
+    );
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }

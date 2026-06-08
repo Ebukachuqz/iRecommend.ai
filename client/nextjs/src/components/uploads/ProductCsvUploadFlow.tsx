@@ -5,44 +5,21 @@ import { AlertCircle, CheckCircle2, Download, FileText, Loader2, Upload } from "
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { ColumnMapper, type FieldDef } from "@/components/uploads/ColumnMapper";
+import { ColumnMapper } from "@/components/uploads/ColumnMapper";
+import { productOptionalFields, productRequiredFields } from "@/components/uploads/ReviewCsvUploadFlow";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
   getUploadStatus,
-  uploadReviewsCsv,
+  uploadProductsCsv,
   type UploadStatus,
 } from "@/lib/saas-api";
 import { createBrowserClient } from "@/lib/supabase/client";
 
-type ReviewCsvUploadFlowProps = {
+type ProductCsvUploadFlowProps = {
   orgId: string;
   onComplete?: (status: UploadStatus) => void;
 };
-
-const reviewRequiredFields: FieldDef[] = [
-  { key: "customer_id", label: "Customer ID", description: "Unique identifier per customer" },
-  { key: "rating", label: "Rating (1-5)", description: "Numeric star rating" },
-  { key: "review_text", label: "Review Text", description: "The written review" },
-];
-
-const reviewOptionalFields: FieldDef[] = [
-  { key: "product_name", label: "Product Name", description: "Name of the reviewed product" },
-  { key: "category", label: "Category", description: "Product category" },
-  { key: "date", label: "Date", description: "When the review was written" },
-];
-
-export const productRequiredFields: FieldDef[] = [
-  { key: "product_name", label: "Product Name", description: "Name of the product" },
-  { key: "category", label: "Category", description: "Product category" },
-];
-
-export const productOptionalFields: FieldDef[] = [
-  { key: "product_id", label: "Product ID", description: "Unique product identifier" },
-  { key: "price", label: "Price", description: "Product price (numeric)" },
-  { key: "description", label: "Description", description: "Product description text" },
-  { key: "features", label: "Features", description: "Comma-separated feature list" },
-];
 
 type FlowStep = "select" | "map" | "confirm" | "processing" | "complete" | "failed";
 
@@ -52,7 +29,7 @@ async function getAccessToken() {
     data: { session },
   } = await supabase.auth.getSession();
   if (!session) {
-    throw new Error("Log in again before uploading customer reviews.");
+    throw new Error("Log in again before uploading your product catalog.");
   }
   return session.access_token;
 }
@@ -70,7 +47,7 @@ function estimateRows(file: File) {
   });
 }
 
-export function ReviewCsvUploadFlow({ orgId, onComplete }: ReviewCsvUploadFlowProps) {
+export function ProductCsvUploadFlow({ orgId, onComplete }: ProductCsvUploadFlowProps) {
   const [step, setStep] = useState<FlowStep>("select");
   const [file, setFile] = useState<File | null>(null);
   const [detectedColumns, setDetectedColumns] = useState<string[]>([]);
@@ -104,14 +81,11 @@ export function ReviewCsvUploadFlow({ orgId, onComplete }: ReviewCsvUploadFlowPr
       preview: 3,
       skipEmptyLines: true,
       complete: (result) => {
-        const columns = result.meta.fields || [];
-        setDetectedColumns(columns);
+        setDetectedColumns(result.meta.fields || []);
         setPreviewRows(result.data || []);
         setStep("map");
       },
-      error: () => {
-        setError("Could not read this CSV. Check the file and try again.");
-      },
+      error: () => setError("Could not read this CSV. Check the file and try again."),
     });
   }
 
@@ -123,15 +97,15 @@ export function ReviewCsvUploadFlow({ orgId, onComplete }: ReviewCsvUploadFlowPr
     setError(null);
     try {
       const token = await getAccessToken();
-      toast.loading("Uploading customer reviews...", { id: "review-upload" });
-      const result = await uploadReviewsCsv(token, orgId, file, mapping);
+      toast.loading("Uploading product catalog...", { id: "product-upload" });
+      const result = await uploadProductsCsv(token, orgId, file, mapping);
       setUploadId(result.upload_id);
       setStep("processing");
-      toast.success("Customer review upload started.", { id: "review-upload" });
+      toast.success("Product catalog upload started.", { id: "product-upload" });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to upload customer reviews.";
+      const message = err instanceof Error ? err.message : "Unable to upload product catalog.";
       setError(message);
-      toast.error(message, { id: "review-upload" });
+      toast.error(message, { id: "product-upload" });
     } finally {
       setLoading(false);
     }
@@ -153,12 +127,12 @@ export function ReviewCsvUploadFlow({ orgId, onComplete }: ReviewCsvUploadFlowPr
         setStatus(nextStatus);
         if (nextStatus.status === "complete") {
           setStep("complete");
-          toast.success("Customer personas generated.");
+          toast.success("Product catalog uploaded.");
           onComplete?.(nextStatus);
         }
         if (nextStatus.status === "failed") {
           setStep("failed");
-          toast.error("Customer review processing failed.");
+          toast.error("Product catalog upload failed.");
         }
       } catch (err) {
         if (!cancelled) {
@@ -184,8 +158,8 @@ export function ReviewCsvUploadFlow({ orgId, onComplete }: ReviewCsvUploadFlowPr
         <ColumnMapper
           detectedColumns={detectedColumns}
           previewRows={previewRows}
-          requiredFields={reviewRequiredFields}
-          optionalFields={reviewOptionalFields}
+          requiredFields={productRequiredFields}
+          optionalFields={productOptionalFields}
           onMappingComplete={(nextMapping) => {
             setMapping(nextMapping);
             setStep("confirm");
@@ -201,11 +175,9 @@ export function ReviewCsvUploadFlow({ orgId, onComplete }: ReviewCsvUploadFlowPr
       <div className="space-y-6">
         <UploadHeader rowEstimate={rowEstimate} fileName={file.name} />
         <div className="command-card p-5">
-          <h3 className="font-display text-xl font-semibold text-text-primary">
-            Ready to upload
-          </h3>
+          <h3 className="font-display text-xl font-semibold text-text-primary">Ready to upload catalog</h3>
           <p className="mt-2 text-sm leading-6 text-text-secondary">
-            {rowEstimate.toLocaleString()} rows are ready. We will preserve unmapped columns as extra fields.
+            {rowEstimate.toLocaleString()} products are ready. Unmapped columns are kept as extra fields when your SaaS table has that optional column.
           </p>
           <div className="mt-4 grid gap-2 text-sm text-text-secondary">
             {Object.entries(mapping)
@@ -224,7 +196,7 @@ export function ReviewCsvUploadFlow({ orgId, onComplete }: ReviewCsvUploadFlowPr
             className="violet-focus-ring mt-6 h-11 w-full bg-primary text-white hover:bg-primary-hover"
           >
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-            Upload and generate personas
+            Upload product catalog
           </Button>
         </div>
         {error ? <ErrorMessage message={error} /> : null}
@@ -238,60 +210,35 @@ export function ReviewCsvUploadFlow({ orgId, onComplete }: ReviewCsvUploadFlowPr
         <div className="flex items-center gap-3">
           <span
             className={`h-3 w-3 rounded-full ${
-              step === "complete"
-                ? "bg-success"
-                : step === "failed"
-                  ? "bg-error"
-                  : "animate-pulse bg-primary"
+              step === "complete" ? "bg-success" : step === "failed" ? "bg-error" : "animate-pulse bg-primary"
             }`}
           />
           <p className="text-sm font-semibold text-text-primary">
-            {step === "complete"
-              ? "Done"
-              : step === "failed"
-                ? "Upload failed"
-                : "Processing your data..."}
+            {step === "complete" ? "Done" : step === "failed" ? "Upload failed" : "Processing your catalog..."}
           </p>
         </div>
         <h3 className="mt-5 font-display text-2xl font-semibold text-text-primary">
-          We are turning your reviews into customer personas.
+          We are saving your product catalog for simulator autofill.
         </h3>
         <Progress className="mt-6" value={progressValue} />
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <Metric label="Rows processed" value={`${(status?.processed_rows || 0).toLocaleString()} of ${(status?.total_rows || rowEstimate).toLocaleString()}`} />
-          <Metric label="Customers detected" value={`${status?.processing_summary.customers_detected || 0}`} />
-          <Metric label="Personas generated" value={`${status?.personas_generated || 0}`} />
-        </div>
-        <div className="mt-4 grid gap-2 text-xs text-text-muted sm:grid-cols-3">
-          <span>Valid rows: {status?.processing_summary.valid_rows || 0}</span>
-          <span>Skipped invalid rows: {status?.processing_summary.skipped_invalid_rows || 0}</span>
-          <span>Skipped customers: {status?.processing_summary.skipped_insufficient_reviews || 0}</span>
+          <Metric label="Products saved" value={`${status?.processing_summary.valid_rows || 0}`} />
+          <Metric label="Skipped rows" value={`${status?.processing_summary.skipped_invalid_rows || 0}`} />
         </div>
         {step === "complete" ? (
           <div className="aurora-panel mt-6 p-5">
             <CheckCircle2 className="h-6 w-6 text-white" />
             <p className="mt-3 font-display text-xl font-semibold text-white">
-              {status?.personas_generated || 0} customer personas built successfully.
+              {status?.processing_summary.valid_rows || 0} products added to your catalog.
             </p>
-            <p className="mt-2 text-sm text-white/80">
-              Your customer intelligence workspace is ready for the next step.
-            </p>
+            <p className="mt-2 text-sm text-white/80">You can now select these products inside the launch simulator.</p>
           </div>
         ) : null}
         {step === "failed" ? (
           <div className="mt-6 rounded-xl border border-error/30 bg-error/5 p-4 text-sm text-error">
             {status?.error_message || error || "Processing failed. Try uploading again."}
           </div>
-        ) : null}
-        {status?.processing_summary.error_samples?.length ? (
-          <details className="mt-5 text-sm text-text-secondary">
-            <summary className="cursor-pointer font-semibold text-text-primary">Processing notes</summary>
-            <ul className="mt-3 list-disc space-y-1 pl-5">
-              {status.processing_summary.error_samples.map((sample, index) => (
-                <li key={`${sample}-${index}`}>{sample}</li>
-              ))}
-            </ul>
-          </details>
         ) : null}
       </div>
     );
@@ -326,23 +273,15 @@ export function ReviewCsvUploadFlow({ orgId, onComplete }: ReviewCsvUploadFlowPr
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary-light text-primary">
           <FileText className="h-6 w-6" />
         </div>
-        <h3 className="mt-4 font-display text-xl font-semibold text-text-primary">
-          Drag your customer reviews CSV here
-        </h3>
+        <h3 className="mt-4 font-display text-xl font-semibold text-text-primary">Drag your product catalog CSV here</h3>
         <p className="mt-2 text-sm leading-6 text-text-secondary">
-          Or click to browse. We will guide you through mapping your columns before anything is processed.
+          Or click to browse. Product catalog upload is optional and only helps the simulator prefill product details.
         </p>
       </div>
-      <div className="flex flex-wrap gap-3 text-sm">
-        <a className="inline-flex items-center gap-2 font-semibold text-primary underline-offset-4 hover:underline" href="/sample-data/customer_reviews_sample.csv" download>
-          <Download className="h-4 w-4" />
-          Download sample reviews CSV
-        </a>
-        <a className="inline-flex items-center gap-2 font-semibold text-text-secondary underline-offset-4 hover:text-primary hover:underline" href="/sample-data/product_catalog_sample.csv" download>
-          <Download className="h-4 w-4" />
-          Download sample products CSV
-        </a>
-      </div>
+      <a className="inline-flex items-center gap-2 text-sm font-semibold text-primary underline-offset-4 hover:underline" href="/sample-data/product_catalog_sample.csv" download>
+        <Download className="h-4 w-4" />
+        Download sample products CSV
+      </a>
       {error ? <ErrorMessage message={error} /> : null}
     </div>
   );
@@ -352,9 +291,7 @@ function UploadHeader({ rowEstimate, fileName }: { rowEstimate: number; fileName
   return (
     <div className="rounded-2xl border border-border bg-soft-surface p-4">
       <p className="text-sm font-semibold text-text-primary">{fileName}</p>
-      <p className="mt-1 text-sm text-text-secondary">
-        Estimated rows: {rowEstimate.toLocaleString()}
-      </p>
+      <p className="mt-1 text-sm text-text-secondary">Estimated rows: {rowEstimate.toLocaleString()}</p>
     </div>
   );
 }

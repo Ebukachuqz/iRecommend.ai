@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 
 import { DashboardOrgProvider } from "@/components/dashboard/DashboardOrgContext";
 import { DashboardSidebar } from "@/components/layout/DashboardSidebar";
@@ -6,6 +7,10 @@ import { getMyOrganisationServer } from "@/lib/saas-server-api";
 import { createServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Dashboard",
+};
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = createServerClient();

@@ -262,7 +262,7 @@ function QuoteList({ title, items }: { title: string; items: string[] }) {
       <div className="mt-3 space-y-3">
         {(items.length ? items : ["No review evidence captured yet."]).map((item) => (
           <blockquote key={item} className="rounded-xl border border-border bg-soft-surface p-4 text-sm italic leading-6 text-text-secondary">
-            “{item}”
+            &quot;{item}&quot;
           </blockquote>
         ))}
       </div>
@@ -345,7 +345,7 @@ function QuickSimulation({ orgId, customerId }: { orgId: string; customerId: str
             </span>
           </div>
           <h3 className="mt-4 font-semibold text-text-primary">{result.simulated_review_title}</h3>
-          <p className="mt-2 text-sm italic leading-6 text-text-secondary">“{result.simulated_review_text}”</p>
+          <p className="mt-2 text-sm italic leading-6 text-text-secondary">&quot;{result.simulated_review_text}&quot;</p>
           {result.reasoning_summary ? (
             <p className="mt-4 rounded-xl bg-soft-surface p-4 text-sm leading-6 text-text-secondary">
               {result.reasoning_summary}

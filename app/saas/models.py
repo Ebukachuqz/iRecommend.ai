@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class OrganisationCreateRequest(BaseModel):
@@ -109,6 +109,20 @@ class MerchantProductInput(BaseModel):
     description: str | None = None
 
 
+class MerchantProductResponse(BaseModel):
+    id: str | None = None
+    product_id: str | None = None
+    product_name: str
+    category: str
+    price: float | None = None
+    description: str | None = None
+    features: list[str] = Field(default_factory=list)
+
+
+class MerchantProductsResponse(BaseModel):
+    products: list[MerchantProductResponse] = Field(default_factory=list)
+
+
 class MerchantSimulationRequest(BaseModel):
     customer_id: str = Field(min_length=1)
     product: MerchantProductInput
@@ -123,3 +137,26 @@ class MerchantSimulationResponse(BaseModel):
     confidence: float | None = None
     reasoning_summary: str | None = None
     evidence_used: list[str] = Field(default_factory=list)
+
+
+class MerchantBulkSimulationRequest(BaseModel):
+    product: MerchantProductInput
+    customer_ids: list[str] | None = None
+    sample_size: int = Field(default=3, ge=1, le=10)
+
+    @field_validator("sample_size")
+    @classmethod
+    def validate_sample_size(cls, value: int) -> int:
+        if value not in {3, 5, 10}:
+            raise ValueError("sample_size must be one of 3, 5, or 10.")
+        return value
+
+
+class MerchantBulkSimulationResponse(BaseModel):
+    simulations: list[MerchantSimulationResponse] = Field(default_factory=list)
+    avg_predicted_rating: float = 0.0
+    pct_4_plus: float = 0.0
+    pct_3_or_below: float = 0.0
+    top_praises: list[str] = Field(default_factory=list)
+    top_concerns: list[str] = Field(default_factory=list)
+    interpretation: str

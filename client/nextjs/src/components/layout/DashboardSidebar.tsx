@@ -89,7 +89,7 @@ export function DashboardSidebar({
               <div
                 key={item.label}
                 className={className}
-                title="Customer segmentation — coming soon"
+                title="Customer segmentation - coming soon"
                 aria-disabled="true"
               >
                 <Icon className="h-4 w-4" />

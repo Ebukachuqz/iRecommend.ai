@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const inter = Inter({
@@ -16,9 +17,15 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "iRecommend | Customer Intelligence for Modern Merchants",
+  title: {
+    default: "iRecommend — Customer Intelligence for Modern Merchants",
+    template: "%s — iRecommend",
+  },
   description:
     "Build behavioural customer personas from review data, simulate product launches, and power better recommendations.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
@@ -33,6 +40,7 @@ export default function RootLayout({
     >
       <body className="min-h-screen bg-background font-sans text-text-primary antialiased">
         {children}
+        <Toaster richColors position="top-right" />
       </body>
     </html>
   );

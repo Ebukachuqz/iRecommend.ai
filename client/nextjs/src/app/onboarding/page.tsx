@@ -5,6 +5,7 @@ import { Check, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { Logo } from "@/components/layout/Navbar";
+import { ProductCsvUploadFlow } from "@/components/uploads/ProductCsvUploadFlow";
 import { ReviewCsvUploadFlow } from "@/components/uploads/ReviewCsvUploadFlow";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +16,7 @@ import {
 } from "@/lib/saas-api";
 import { createBrowserClient } from "@/lib/supabase/client";
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 
 const markets = [
   { label: "Global", value: "global" },
@@ -29,7 +30,7 @@ const markets = [
 function StepIndicator({ currentStep }: { currentStep: Step }) {
   return (
     <div className="flex items-center justify-between">
-      {[1, 2, 3].map((step, index) => (
+      {[1, 2, 3, 4].map((step, index) => (
         <div key={step} className="flex flex-1 items-center">
           <div
             className={`flex h-9 w-9 items-center justify-center rounded-full border text-sm font-bold ${
@@ -40,7 +41,7 @@ function StepIndicator({ currentStep }: { currentStep: Step }) {
           >
             {currentStep > step ? <Check className="h-4 w-4" /> : step}
           </div>
-          {index < 2 && (
+          {index < 3 && (
             <div
               className={`mx-3 h-px flex-1 ${currentStep > step ? "bg-primary" : "bg-border"}`}
             />
@@ -58,6 +59,7 @@ export default function OnboardingPage() {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [selectedMarket, setSelectedMarket] = useState("global");
   const [reviewsUploaded, setReviewsUploaded] = useState(false);
+  const [productsUploaded, setProductsUploaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checkingOrg, setCheckingOrg] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,7 +134,7 @@ export default function OnboardingPage() {
     }
   }
 
-  async function handleFinish() {
+  async function handleMarketContext() {
     setLoading(true);
     setError(null);
     try {
@@ -147,8 +149,7 @@ export default function OnboardingPage() {
       }
 
       await updateOrganisationSettings(token, resolvedOrgId, selectedMarket);
-      router.replace("/dashboard");
-      router.refresh();
+      setStep(4);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save market context.");
     } finally {
@@ -270,10 +271,57 @@ export default function OnboardingPage() {
                   <Button
                     type="button"
                     disabled={loading}
-                    onClick={() => void handleFinish()}
+                    onClick={() => void handleMarketContext()}
                     className="violet-focus-ring mt-8 h-11 w-full bg-primary text-white hover:bg-primary-hover"
                   >
                     {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Continue to product catalog
+                  </Button>
+                </div>
+              )}
+
+              {step === 4 && (
+                <div>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h1 className="font-display text-3xl font-semibold text-text-primary">
+                        Add your product catalog
+                      </h1>
+                      <p className="mt-2 text-sm leading-6 text-text-secondary">
+                        Optional: upload your products so the launch simulator can reference them later.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        router.replace("/dashboard");
+                        router.refresh();
+                      }}
+                      className="text-sm font-semibold text-text-muted underline-offset-4 hover:text-primary hover:underline"
+                    >
+                      Skip for now
+                    </button>
+                  </div>
+
+                  <div className="mt-8">
+                    {orgId ? (
+                      <ProductCsvUploadFlow orgId={orgId} onComplete={() => setProductsUploaded(true)} />
+                    ) : (
+                      <p className="rounded-xl border border-error/30 bg-error/5 p-4 text-sm text-error">
+                        Create your organisation before uploading products.
+                      </p>
+                    )}
+                  </div>
+
+                  <Button
+                    type="button"
+                    disabled={!productsUploaded}
+                    onClick={() => {
+                      router.replace("/dashboard");
+                      router.refresh();
+                    }}
+                    className="violet-focus-ring mt-8 h-11 w-full bg-primary text-white hover:bg-primary-hover"
+                  >
                     Go to your dashboard
                   </Button>
                 </div>

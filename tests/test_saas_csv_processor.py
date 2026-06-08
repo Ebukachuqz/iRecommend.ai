@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.saas.services.csv_processor import MerchantCsvProcessor, map_review_row
+from app.saas.services.csv_processor import MerchantCsvProcessor, map_product_row, map_review_row
 from app.saas.services.persona_generator import build_fallback_persona, compute_review_stats
 
 
@@ -28,6 +28,34 @@ def test_map_review_row_preserves_unmapped_columns_as_extra_fields() -> None:
     assert payload["customer_id"] == "C-1"
     assert payload["rating"] == 4.0
     assert payload["extra_fields"] == {"segment": "office"}
+
+
+def test_map_product_row_preserves_optional_fields_and_extra_fields() -> None:
+    row = {
+        "sku": "SKU-1",
+        "name": "Air purifier",
+        "dept": "Home",
+        "cost": "$79.99",
+        "bullets": "HEPA filter, Quiet mode",
+        "warehouse": "Lagos",
+    }
+    mapping = {
+        "sku": "product_id",
+        "name": "product_name",
+        "dept": "category",
+        "cost": "price",
+        "bullets": "features",
+    }
+
+    payload, error = map_product_row(row, mapping, "org-1")
+
+    assert error is None
+    assert payload is not None
+    assert payload["product_name"] == "Air purifier"
+    assert payload["category"] == "Home"
+    assert payload["price"] == 79.99
+    assert payload["features"] == ["HEPA filter", "Quiet mode"]
+    assert payload["extra_fields"] == {"warehouse": "Lagos"}
 
 
 def test_compute_review_stats_and_fallback_persona_are_valid() -> None:
@@ -94,7 +122,8 @@ class FakeClient:
             "merchant_reviews": [
                 {"organisation_id": "org-1", "customer_id": "C-1", "rating": 5, "review_text": "Existing good"},
                 {"organisation_id": "org-1", "customer_id": "C-1", "rating": 4, "review_text": "Existing useful"},
-            ]
+            ],
+            "merchant_products": [],
         }
         self.updates: list[tuple[str, dict[str, Any], dict[str, Any]]] = []
 
@@ -133,3 +162,31 @@ def test_processor_generates_persona_from_all_stored_reviews_for_affected_custom
     complete_updates = [payload for table, payload, _ in fake_client.updates if table == "csv_uploads" and payload.get("status") == "complete"]
     assert complete_updates
     assert complete_updates[-1]["processing_summary"]["customers_detected"] == 1
+
+
+def test_processor_uploads_products_without_generating_personas() -> None:
+    fake_client = FakeClient()
+    fake_generator = FakePersonaGenerator()
+    processor = MerchantCsvProcessor(client=fake_client, persona_generator=fake_generator)  # type: ignore[arg-type]
+    csv_content = b"sku,name,category,price,features\nP-1,Desk lamp,Office,25.50,\"metal,LED\"\n"
+
+    processor.process_products_csv(
+        file_content=csv_content,
+        column_mapping={
+            "sku": "product_id",
+            "name": "product_name",
+            "category": "category",
+            "price": "price",
+            "features": "features",
+        },
+        org_id="org-1",
+        upload_id="upload-products-1",
+    )
+
+    assert fake_generator.upserted == []
+    assert fake_client.rows["merchant_products"][0]["product_name"] == "Desk lamp"
+    assert fake_client.rows["merchant_products"][0]["features"] == ["metal", "LED"]
+    complete_updates = [payload for table, payload, _ in fake_client.updates if table == "csv_uploads" and payload.get("status") == "complete"]
+    assert complete_updates
+    assert complete_updates[-1]["processed_rows"] == 1
+    assert complete_updates[-1]["processing_summary"]["valid_rows"] == 1

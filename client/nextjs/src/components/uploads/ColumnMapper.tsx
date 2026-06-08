@@ -122,7 +122,7 @@ export function ColumnMapper({
             <code className="truncate rounded-lg bg-soft-surface px-3 py-2 text-sm text-text-secondary">
               {column}
             </code>
-            <span className="text-center text-text-muted">→</span>
+            <span className="text-center text-text-muted">-&gt;</span>
             <select
               value={mapping[column] || SKIP_VALUE}
               onChange={(event) => updateColumn(column, event.target.value)}
