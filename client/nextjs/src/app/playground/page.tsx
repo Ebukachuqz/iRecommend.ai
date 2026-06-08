@@ -15,7 +15,6 @@ import { Stars } from "@/components/dashboard/DashboardUi";
 import { PersonaSelector } from "@/components/playground/PersonaSelector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
   DEMO_CATEGORIES,
@@ -580,211 +579,209 @@ export default function PlaygroundPage() {
           <TopTabs active={activeTab} onChange={setActiveTab} />
         </div>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-3">
-          <aside className="space-y-5">
-            <PersonaSelector value={personaSelection} onChange={setPersonaSelection} />
-            <Separator />
+        <div className="mt-6 grid gap-6 xl:grid-cols-2">
+          <PersonaSelector value={personaSelection} onChange={setPersonaSelection} />
 
-            {activeTab === "simulation" ? (
-              <div className="command-card space-y-4 p-5">
-                <div>
-                  <p className="font-display text-heading-md text-text-primary">Product details</p>
-                  <p className="mt-1 text-body-sm text-text-secondary">
-                    {usesDemoProductDropdown
-                      ? "Pick a real product from the demo database for this customer."
-                      : "Describe a product and predict how this customer may react."}
-                  </p>
-                </div>
+          {activeTab === "simulation" ? (
+            <div className="command-card space-y-4 p-5">
+              <div>
+                <p className="font-display text-heading-md text-text-primary">Product details</p>
+                <p className="mt-1 text-body-sm text-text-secondary">
+                  {usesDemoProductDropdown
+                    ? "Pick a real product from the demo database for this customer."
+                    : "Describe a product and predict how this customer may react."}
+                </p>
+              </div>
 
-                {personaSelection?.mode === "custom" && (
-                  <p className="rounded-lg bg-surface-0 px-3 py-2 text-body-xs text-text-secondary">
-                    Pasted personas use custom product details because there is no demo customer history to query.
-                  </p>
-                )}
+              {personaSelection?.mode === "custom" && (
+                <p className="rounded-lg bg-surface-0 px-3 py-2 text-body-xs text-text-secondary">
+                  Pasted personas use custom product details because there is no demo customer history to query.
+                </p>
+              )}
 
-                {usesDemoProductDropdown ? (
-                  <div className="space-y-4">
-                    <label className="block">
-                      <span className="text-label-sm text-text-muted">
-                        Product from demo database*
-                      </span>
-                      <select
-                        value={selectedProductKey}
-                        disabled={!personaSelection || productsLoading}
-                        onChange={(event) => handleDemoProductSelection(event.target.value)}
-                        className="mt-2 h-11 w-full rounded-md border border-border bg-surface-1 px-3 text-body-md text-text-primary outline-none transition-colors hover:border-border-strong focus:border-primary focus:shadow-[0_0_0_3px_var(--color-primary-light)] disabled:cursor-not-allowed disabled:text-text-muted"
-                      >
-                        <option value="">
-                          {!personaSelection
-                            ? "Select a demo customer first"
-                            : productsLoading
-                              ? "Loading products..."
-                              : "Select a product"}
+              {usesDemoProductDropdown ? (
+                <div className="space-y-4">
+                  <label className="block">
+                    <span className="text-label-sm text-text-muted">
+                      Product from demo database*
+                    </span>
+                    <select
+                      value={selectedProductKey}
+                      disabled={!personaSelection || productsLoading}
+                      onChange={(event) => handleDemoProductSelection(event.target.value)}
+                      className="mt-2 h-11 w-full rounded-md border border-border bg-surface-1 px-3 text-body-md text-text-primary outline-none transition-colors hover:border-border-strong focus:border-primary focus:shadow-[0_0_0_3px_var(--color-primary-light)] disabled:cursor-not-allowed disabled:text-text-muted"
+                    >
+                      <option value="">
+                        {!personaSelection
+                          ? "Select a demo customer first"
+                          : productsLoading
+                            ? "Loading products..."
+                            : "Select a product"}
+                      </option>
+                      {demoProducts.map((item) => (
+                        <option key={productOptionKey(item)} value={productOptionKey(item)}>
+                          {(item.title || item.parent_asin).slice(0, 80)}
                         </option>
-                        {demoProducts.map((item) => (
-                          <option key={productOptionKey(item)} value={productOptionKey(item)}>
-                            {(item.title || item.parent_asin).slice(0, 80)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                      ))}
+                    </select>
+                  </label>
 
-                    {productsError && <p className="text-body-sm text-error-text">{productsError}</p>}
+                  {productsError && <p className="text-body-sm text-error-text">{productsError}</p>}
 
-                    {selectedProductKey && (
-                      <div className="rounded-lg border border-border bg-surface-0 p-3 text-body-sm text-text-secondary">
-                        <p className="font-semibold text-text-primary">{product.title}</p>
-                        <div className="mt-2 grid gap-1 text-xs">
-                          <span>ASIN: {product.parent_asin}</span>
-                          {product.main_category && <span>Subcategory: {product.main_category}</span>}
-                          {product.store && <span>Store: {product.store}</span>}
-                          {typeof product.price === "number" && <span>Price: ${product.price.toFixed(2)}</span>}
-                          {typeof product.average_rating === "number" && (
-                            <span>Average rating: {product.average_rating.toFixed(1)} / 5</span>
-                          )}
-                        </div>
+                  {selectedProductKey && (
+                    <div className="rounded-lg border border-border bg-surface-0 p-3 text-body-sm text-text-secondary">
+                      <p className="font-semibold text-text-primary">{product.title}</p>
+                      <div className="mt-2 grid gap-1 text-xs">
+                        <span>ASIN: {product.parent_asin}</span>
+                        {product.main_category && <span>Subcategory: {product.main_category}</span>}
+                        {product.store && <span>Store: {product.store}</span>}
+                        {typeof product.price === "number" && <span>Price: ${product.price.toFixed(2)}</span>}
+                        {typeof product.average_rating === "number" && (
+                          <span>Average rating: {product.average_rating.toFixed(1)} / 5</span>
+                        )}
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <label className="block">
-                      <span className="text-label-sm text-text-muted">
-                        Product title*
-                      </span>
-                      <Input
-                        value={product.title}
-                        onChange={(event) =>
-                          setProduct((current) => ({ ...current, title: event.target.value }))
-                        }
-                        placeholder="Foam Massage Roller"
-                        className="mt-2"
-                      />
-                    </label>
-
-                    <label className="block">
-                      <span className="text-label-sm text-text-muted">
-                        Category*
-                      </span>
-                      <select
-                        value={product.category}
-                        onChange={(event) =>
-                          setProduct((current) => ({ ...current, category: event.target.value as DemoCategory }))
-                        }
-                        className="mt-2 h-10 w-full rounded-md border border-border bg-surface-1 px-3 text-body-md text-text-primary outline-none transition-colors hover:border-border-strong focus:border-primary focus:shadow-[0_0_0_3px_var(--color-primary-light)]"
-                      >
-                        {DEMO_CATEGORIES.map((category) => (
-                          <option key={category.value} value={category.value}>
-                            {category.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="block">
-                      <span className="text-label-sm text-text-muted">
-                        Price
-                      </span>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={product.price ?? ""}
-                        onChange={(event) =>
-                          setProduct((current) => ({
-                            ...current,
-                            price: event.target.value ? Number(event.target.value) : undefined,
-                          }))
-                        }
-                        placeholder="49.99"
-                        className="mt-2"
-                      />
-                    </label>
-
-                    <label className="block">
-                      <span className="text-label-sm text-text-muted">
-                        Features
-                      </span>
-                      <Textarea
-                        value={featuresText}
-                        onChange={(event) => setFeaturesText(event.target.value)}
-                        rows={3}
-                        placeholder={"EVA foam construction\nHigh-density ridges\nPortable size"}
-                        className="mt-2 resize-none"
-                      />
-                    </label>
-
-                    <label className="block">
-                      <span className="text-label-sm text-text-muted">
-                        Description
-                      </span>
-                      <Textarea
-                        value={product.description}
-                        onChange={(event) =>
-                          setProduct((current) => ({ ...current, description: event.target.value }))
-                        }
-                        rows={2}
-                        className="mt-2 resize-none"
-                      />
-                    </label>
-                  </div>
-                )}
-
-                <Button
-                  type="button"
-                  disabled={!canSimulate || simulationLoading}
-                  onClick={() => void handleSimulation()}
-                  className="w-full"
-                >
-                  {simulationLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Thinking...
-                    </>
-                  ) : (
-                    "Simulate review"
+                    </div>
                   )}
-                </Button>
-              </div>
-            ) : (
-              <div className="command-card space-y-4 p-5">
-                <div>
-                  <p className="font-display text-heading-md text-text-primary">
-                    Your request <span className="text-text-muted">(optional)</span>
-                  </p>
-                  <p className="mt-1 text-body-sm text-text-secondary">
-                    A request is helpful, but the persona can drive recommendations on its own.
-                  </p>
                 </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="text-label-sm text-text-muted">
+                      Product title*
+                    </span>
+                    <Input
+                      value={product.title}
+                      onChange={(event) =>
+                        setProduct((current) => ({ ...current, title: event.target.value }))
+                      }
+                      placeholder="Foam Massage Roller"
+                      className="mt-2"
+                    />
+                  </label>
 
-                <Textarea
-                  value={requestText}
-                  onChange={(event) => setRequestText(event.target.value)}
-                  rows={2}
-                  placeholder={"What are you looking for? (optional)\nLeave empty - your persona is enough."}
-                  className="resize-none"
-                />
-                <p className="text-body-xs text-text-muted">A request is not required.</p>
+                  <label className="block">
+                    <span className="text-label-sm text-text-muted">
+                      Category*
+                    </span>
+                    <select
+                      value={product.category}
+                      onChange={(event) =>
+                        setProduct((current) => ({ ...current, category: event.target.value as DemoCategory }))
+                      }
+                      className="mt-2 h-10 w-full rounded-md border border-border bg-surface-1 px-3 text-body-md text-text-primary outline-none transition-colors hover:border-border-strong focus:border-primary focus:shadow-[0_0_0_3px_var(--color-primary-light)]"
+                    >
+                      {DEMO_CATEGORIES.map((category) => (
+                        <option key={category.value} value={category.value}>
+                          {category.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                <Button
-                  type="button"
-                  disabled={!canRecommend || recommendationLoading}
-                  onClick={() => void handleRecommendations()}
-                  className="w-full"
-                >
-                  {recommendationLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Finding matches...
-                    </>
-                  ) : (
-                    "Get recommendations"
-                  )}
-                </Button>
+                  <label className="block">
+                    <span className="text-label-sm text-text-muted">
+                      Price
+                    </span>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={product.price ?? ""}
+                      onChange={(event) =>
+                        setProduct((current) => ({
+                          ...current,
+                          price: event.target.value ? Number(event.target.value) : undefined,
+                        }))
+                      }
+                      placeholder="49.99"
+                      className="mt-2"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-label-sm text-text-muted">
+                      Features
+                    </span>
+                    <Textarea
+                      value={featuresText}
+                      onChange={(event) => setFeaturesText(event.target.value)}
+                      rows={3}
+                      placeholder={"EVA foam construction\nHigh-density ridges\nPortable size"}
+                      className="mt-2 resize-none"
+                    />
+                  </label>
+
+                  <label className="block md:col-span-2">
+                    <span className="text-label-sm text-text-muted">
+                      Description
+                    </span>
+                    <Textarea
+                      value={product.description}
+                      onChange={(event) =>
+                        setProduct((current) => ({ ...current, description: event.target.value }))
+                      }
+                      rows={2}
+                      className="mt-2 resize-none"
+                    />
+                  </label>
+                </div>
+              )}
+
+              <Button
+                type="button"
+                disabled={!canSimulate || simulationLoading}
+                onClick={() => void handleSimulation()}
+                className="w-full"
+              >
+                {simulationLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Thinking...
+                  </>
+                ) : (
+                  "Simulate review"
+                )}
+              </Button>
+            </div>
+          ) : (
+            <div className="command-card space-y-4 p-5">
+              <div>
+                <p className="font-display text-heading-md text-text-primary">
+                  Your request <span className="text-text-muted">(optional)</span>
+                </p>
+                <p className="mt-1 text-body-sm text-text-secondary">
+                  A request is helpful, but the persona can drive recommendations on its own.
+                </p>
               </div>
-            )}
-          </aside>
 
-          <section className="lg:col-span-2">
+              <Textarea
+                value={requestText}
+                onChange={(event) => setRequestText(event.target.value)}
+                rows={2}
+                placeholder={"What are you looking for? (optional)\nLeave empty - your persona is enough."}
+                className="resize-none"
+              />
+              <p className="text-body-xs text-text-muted">A request is not required.</p>
+
+              <Button
+                type="button"
+                disabled={!canRecommend || recommendationLoading}
+                onClick={() => void handleRecommendations()}
+                className="w-full"
+              >
+                {recommendationLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Finding matches...
+                  </>
+                ) : (
+                  "Get recommendations"
+                )}
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <section className="mt-6">
             {activeTab === "simulation" ? (
               <div>
                 {simulationError && (
@@ -825,8 +822,7 @@ export default function PlaygroundPage() {
                 )}
               </div>
             )}
-          </section>
-        </div>
+        </section>
 
         <div className="mt-10 flex items-center justify-center">
           <a
