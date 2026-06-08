@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   FileText,
@@ -421,6 +421,7 @@ export default function PlaygroundPage() {
   const [activeTab, setActiveTab] = useState<PlaygroundTab>("simulation");
   const [personaSelection, setPersonaSelection] = useState<PersonaSelection | null>(null);
   const [apiWarning, setApiWarning] = useState<string | null>(null);
+  const outputSectionRef = useRef<HTMLElement | null>(null);
 
   const [product, setProduct] = useState<ProductInput>(defaultProduct);
   const [demoProducts, setDemoProducts] = useState<ProductSummary[]>([]);
@@ -507,6 +508,15 @@ export default function PlaygroundPage() {
   const canRecommend = Boolean(personaSelection);
   const usesDemoProductDropdown = !personaSelection || personaSelection.mode === "demo";
 
+  function scrollToOutput() {
+    window.requestAnimationFrame(() => {
+      outputSectionRef.current?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+      });
+    });
+  }
+
   async function handleLoadUnseenProducts() {
     if (personaSelection?.mode !== "demo" || !personaSelection.userId) {
       setProductsError("Please select a demo customer first.");
@@ -562,6 +572,7 @@ export default function PlaygroundPage() {
     try {
       const result = await simulateReview(personaSelection, productForSubmit);
       setSimulationResult(result);
+      scrollToOutput();
     } catch (error) {
       setSimulationError(friendlyError(error));
     } finally {
@@ -580,6 +591,7 @@ export default function PlaygroundPage() {
     try {
       const result = await getRecommendations(personaSelection, requestText, sessionId, recommendationLimit);
       setRecommendationResult({ ...result, session_id: result.session_id || sessionId });
+      scrollToOutput();
       setConversation([
         {
           role: "merchant",
@@ -612,6 +624,7 @@ export default function PlaygroundPage() {
         recommendationLimit,
       );
       setRecommendationResult({ ...result, session_id: result.session_id || recommendationResult.session_id });
+      scrollToOutput();
       setConversation((current) => [
         ...current,
         { role: "merchant", text: message },
@@ -938,7 +951,7 @@ export default function PlaygroundPage() {
           )}
         </div>
 
-        <section className="mt-6">
+        <section ref={outputSectionRef} className="mt-6 scroll-mt-24">
             {activeTab === "simulation" ? (
               <div>
                 {simulationError && (
