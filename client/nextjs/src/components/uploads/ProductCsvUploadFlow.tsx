@@ -183,7 +183,7 @@ export function ProductCsvUploadFlow({ orgId, onComplete }: ProductCsvUploadFlow
             {Object.entries(mapping)
               .filter(([, value]) => value !== "skip")
               .map(([column, value]) => (
-                <div key={column} className="flex justify-between rounded-lg bg-soft-surface px-3 py-2">
+                <div key={column} className="flex justify-between rounded-md bg-surface-0 px-3 py-2">
                   <span>{column}</span>
                   <span className="font-semibold text-primary">{value}</span>
                 </div>
@@ -193,7 +193,7 @@ export function ProductCsvUploadFlow({ orgId, onComplete }: ProductCsvUploadFlow
             type="button"
             disabled={loading}
             onClick={() => void startUpload()}
-            className="violet-focus-ring mt-6 h-11 w-full bg-primary text-white hover:bg-primary-hover"
+            className="mt-6 h-11 w-full"
           >
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
             Upload product catalog
@@ -227,16 +227,16 @@ export function ProductCsvUploadFlow({ orgId, onComplete }: ProductCsvUploadFlow
           <Metric label="Skipped rows" value={`${status?.processing_summary.skipped_invalid_rows || 0}`} />
         </div>
         {step === "complete" ? (
-          <div className="aurora-panel mt-6 p-5">
-            <CheckCircle2 className="h-6 w-6 text-white" />
-            <p className="mt-3 font-display text-xl font-semibold text-white">
+          <div className="mt-6 rounded-lg border border-success bg-success-light p-5">
+            <CheckCircle2 className="h-6 w-6 text-success" />
+            <p className="mt-3 font-display text-heading-lg text-text-primary">
               {status?.processing_summary.valid_rows || 0} products added to your catalog.
             </p>
-            <p className="mt-2 text-sm text-white/80">You can now select these products inside the launch simulator.</p>
+            <p className="mt-2 text-body-sm text-text-secondary">You can now select these products inside the launch simulator.</p>
           </div>
         ) : null}
         {step === "failed" ? (
-          <div className="mt-6 rounded-xl border border-error/30 bg-error/5 p-4 text-sm text-error">
+          <div className="mt-6 rounded-lg border border-border-error bg-error-light p-4 text-body-sm text-error-text">
             {status?.error_message || error || "Processing failed. Try uploading again."}
           </div>
         ) : null}
@@ -247,7 +247,7 @@ export function ProductCsvUploadFlow({ orgId, onComplete }: ProductCsvUploadFlow
   return (
     <div className="space-y-5">
       <div
-        className="violet-glow-card cursor-pointer rounded-2xl border border-dashed border-primary/30 p-8 text-center"
+        className="command-card cursor-pointer border-dashed p-8 text-center transition-colors duration-150 hover:border-border-strong hover:bg-surface-0"
         onClick={() => inputRef.current?.click()}
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {
@@ -289,25 +289,25 @@ export function ProductCsvUploadFlow({ orgId, onComplete }: ProductCsvUploadFlow
 
 function UploadHeader({ rowEstimate, fileName }: { rowEstimate: number; fileName: string }) {
   return (
-    <div className="rounded-2xl border border-border bg-soft-surface p-4">
-      <p className="text-sm font-semibold text-text-primary">{fileName}</p>
-      <p className="mt-1 text-sm text-text-secondary">Estimated rows: {rowEstimate.toLocaleString()}</p>
+    <div className="rounded-lg border border-border bg-surface-0 p-4">
+      <p className="text-body-sm font-semibold text-text-primary">{fileName}</p>
+      <p className="mt-1 text-body-sm text-text-secondary">Estimated rows: {rowEstimate.toLocaleString()}</p>
     </div>
   );
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">{label}</p>
-      <p className="mt-2 font-display text-xl font-semibold text-text-primary">{value}</p>
+    <div className="rounded-lg border border-border bg-surface-1 p-4">
+      <p className="text-label-sm text-text-muted">{label}</p>
+      <p className="mt-2 font-display text-heading-lg text-text-primary">{value}</p>
     </div>
   );
 }
 
 function ErrorMessage({ message }: { message: string }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-error/30 bg-error/5 p-4 text-sm text-error">
+    <div className="flex items-start gap-3 rounded-lg border border-border-error bg-error-light p-4 text-body-sm text-error-text">
       <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
       <p>{message}</p>
     </div>

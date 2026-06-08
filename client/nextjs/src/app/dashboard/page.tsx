@@ -79,28 +79,28 @@ export default function DashboardPage() {
   if (error) {
     return (
       <section className="command-card p-8">
-        <h1 className="font-display text-3xl font-semibold text-text-primary">Unable to load dashboard</h1>
-        <p className="mt-3 text-sm text-error">{error}</p>
+        <h1 className="font-display text-display-sm text-text-primary">Unable to load dashboard</h1>
+        <p className="mt-3 text-body-sm text-error-text">{error}</p>
       </section>
     );
   }
 
   if (!overview || overview.total_personas === 0) {
     return (
-      <section className="flex min-h-[70vh] items-center justify-center">
+      <section className="flex justify-center py-24">
         <div className="command-card max-w-2xl p-8 text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-light text-primary">
             <Upload className="h-7 w-7" />
           </div>
-          <h1 className="mt-6 font-display text-3xl font-semibold text-text-primary">
+          <h1 className="mt-6 font-display text-display-sm text-text-primary">
             No customer intelligence yet
           </h1>
-          <p className="mt-3 text-sm leading-6 text-text-secondary">
+          <p className="mt-3 text-body-sm text-text-secondary">
             Upload your review CSV and iRecommend will build behavioural personas from your customer feedback.
           </p>
           <Button
             render={<Link href="/dashboard/upload" />}
-            className="violet-focus-ring mt-8 bg-primary text-white hover:bg-primary-hover"
+            className="mt-8"
           >
             Upload customer reviews
           </Button>
@@ -112,9 +112,9 @@ export default function DashboardPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-8">
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Customer intelligence</p>
-        <h1 className="mt-2 font-display text-4xl font-semibold text-text-primary">{orgName}</h1>
-        <p className="mt-2 text-text-secondary">Here&apos;s how your customer base looks.</p>
+        <p className="text-label-lg text-primary">Customer intelligence</p>
+        <h1 className="mt-2 font-display text-display-md text-text-primary">{orgName}</h1>
+        <p className="mt-2 text-body-md text-text-secondary">Here&apos;s how your customer base looks.</p>
       </header>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -145,17 +145,17 @@ export default function DashboardPage() {
         />
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(320px,2fr)]">
-        <div className="command-card p-6">
-          <h2 className="font-display text-2xl font-semibold text-text-primary">What your customers value</h2>
-          <p className="mt-2 text-sm text-text-secondary">What your customers repeatedly praise or look for.</p>
+      <section className="grid gap-6 lg:grid-cols-5">
+        <div className="command-card p-6 lg:col-span-3">
+          <h2 className="font-display text-heading-xl text-text-primary">What your customers value</h2>
+          <p className="mt-2 text-body-sm text-text-secondary">What your customers repeatedly praise or look for.</p>
           <div className="mt-6">
             <InsightBars items={overview.top_values_counts} />
           </div>
         </div>
-        <div className="command-card p-6">
-          <h2 className="font-display text-2xl font-semibold text-text-primary">Common complaints</h2>
-          <p className="mt-2 text-sm text-text-secondary">What your customers repeatedly dislike or warn about.</p>
+        <div className="command-card p-6 lg:col-span-2">
+          <h2 className="font-display text-heading-xl text-text-primary">Common complaints</h2>
+          <p className="mt-2 text-body-sm text-text-secondary">What your customers repeatedly dislike or warn about.</p>
           <div className="mt-6">
             <InsightBars items={overview.top_complaints_counts} tone="red" />
           </div>
@@ -165,10 +165,10 @@ export default function DashboardPage() {
       <section className="command-card p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="font-display text-2xl font-semibold text-text-primary">Recent customer profiles</h2>
-            <p className="mt-2 text-sm text-text-secondary">Click any row to view their full persona.</p>
+            <h2 className="font-display text-heading-xl text-text-primary">Recent customer profiles</h2>
+            <p className="mt-2 text-body-sm text-text-secondary">Click any row to view their full persona.</p>
           </div>
-          <Link href="/dashboard/customers" className="text-sm font-semibold text-primary underline-offset-4 hover:underline">
+          <Link href="/dashboard/customers" className="text-body-sm font-medium text-primary underline-offset-4 hover:underline">
             View all customers
           </Link>
         </div>
@@ -192,30 +192,30 @@ function StatCard({
   detail?: string;
 }) {
   return (
-    <div className="violet-glow-card rounded-2xl p-5">
+    <div className="rounded-lg border border-border bg-surface-1 p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">{label}</p>
-          <p className="mt-3 font-display text-3xl font-semibold text-text-primary">{value}</p>
+          <p className="text-label-md text-text-muted">{label}</p>
+          <p className="metric-number mt-3 font-display text-metric-lg text-text-primary">{value}</p>
         </div>
-        <div className="rounded-xl bg-primary-light p-3 text-primary">
+        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary-light text-primary">
           <Icon className="h-5 w-5" />
         </div>
       </div>
-      <p className="mt-4 text-sm leading-6 text-text-secondary">{explanation}</p>
-      {detail ? <p className="mt-2 truncate text-xs text-text-muted">{detail}</p> : null}
+      <p className="mt-4 text-body-sm text-text-secondary">{explanation}</p>
+      {detail ? <p className="mt-2 truncate text-body-xs text-text-muted">{detail}</p> : null}
     </div>
   );
 }
 
 function CustomerTable({ customers }: { customers: DashboardCustomerSummary[] }) {
   if (!customers.length) {
-    return <p className="mt-6 text-sm text-text-secondary">No customer profiles found.</p>;
+    return <p className="mt-6 text-body-sm text-text-secondary">No customer profiles found.</p>;
   }
   return (
-    <div className="mt-6 overflow-hidden rounded-2xl border border-border">
-      <table className="min-w-full text-left text-sm">
-        <thead className="bg-soft-surface text-xs uppercase tracking-[0.14em] text-text-muted">
+    <div className="mt-6 overflow-hidden rounded-lg border border-border">
+      <table className="min-w-full text-left text-body-md">
+        <thead className="bg-surface-0 text-label-md text-text-muted">
           <tr>
             <th className="px-4 py-3">Customer ID</th>
             <th className="px-4 py-3">Reviews</th>
@@ -227,17 +227,17 @@ function CustomerTable({ customers }: { customers: DashboardCustomerSummary[] })
         </thead>
         <tbody>
           {customers.map((customer) => (
-            <tr key={customer.customer_id} className="border-t border-border hover:bg-primary-light/40">
+            <tr key={customer.customer_id} className="border-t border-surface-0 transition-colors duration-100 hover:bg-surface-0">
               <td className="px-4 py-4">
                 <Link href={`/dashboard/customers/${encodeURIComponent(customer.customer_id)}`}>
                   <TruncatedCustomerId customerId={customer.customer_id} />
                 </Link>
               </td>
-              <td className="px-4 py-4 text-text-secondary">{customer.review_count}</td>
+              <td className="px-4 py-4 font-mono text-mono-md text-text-secondary">{customer.review_count}</td>
               <td className="px-4 py-4">
                 <div className="flex items-center gap-2">
                   <Stars rating={customer.avg_rating} />
-                  <span className="text-text-secondary">{customer.avg_rating.toFixed(1)}</span>
+                  <span className="font-mono text-mono-md text-text-secondary">{customer.avg_rating.toFixed(1)}</span>
                 </div>
               </td>
               <td className="px-4 py-4">
@@ -258,13 +258,13 @@ function CustomerTable({ customers }: { customers: DashboardCustomerSummary[] })
 function DashboardSkeleton() {
   return (
     <div className="mx-auto max-w-7xl space-y-8">
-      <div className="h-24 animate-pulse rounded-2xl bg-soft-surface" />
+      <div className="skeleton-shimmer h-24 rounded-lg" />
       <div className="grid gap-4 md:grid-cols-4">
         {[0, 1, 2, 3].map((item) => (
-          <div key={item} className="h-40 animate-pulse rounded-2xl bg-soft-surface" />
+          <div key={item} className="skeleton-shimmer h-40 rounded-lg" />
         ))}
       </div>
-      <div className="h-80 animate-pulse rounded-2xl bg-soft-surface" />
+      <div className="skeleton-shimmer h-80 rounded-lg" />
     </div>
   );
 }

@@ -86,42 +86,42 @@ export default function SignupPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
-      <section className="w-full max-w-[420px] rounded-xl border border-border bg-surface p-8 shadow-sm">
+      <section className="w-full max-w-md rounded-lg border border-border bg-surface-1 p-8">
         <div className="flex justify-center">
           <Logo />
         </div>
 
         <div className="mt-8 text-center">
-          <h1 className="font-display text-2xl font-semibold text-text-primary">Create your account</h1>
-          <p className="mt-2 text-sm text-text-secondary">Start understanding your customers.</p>
+          <h1 className="font-display text-heading-xl text-text-primary">Create your account</h1>
+          <p className="mt-2 text-body-sm text-text-secondary">Start understanding your customers.</p>
         </div>
 
         <form className="mt-8 space-y-5" onSubmit={(event) => void handleSubmit(event)}>
           <label className="block">
-            <span className="text-sm font-medium text-text-primary">Full name</span>
+            <span className="text-body-sm font-medium text-text-primary">Full name</span>
             <Input
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
               required
-              className="violet-focus-ring mt-2"
+              className="mt-2"
               placeholder="Ada Merchant"
             />
           </label>
 
           <label className="block">
-            <span className="text-sm font-medium text-text-primary">Email</span>
+            <span className="text-body-sm font-medium text-text-primary">Email</span>
             <Input
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
-              className="violet-focus-ring mt-2"
+              className="mt-2"
               placeholder="you@store.com"
             />
           </label>
 
           <label className="block">
-            <span className="text-sm font-medium text-text-primary">Password</span>
+            <span className="text-body-sm font-medium text-text-primary">Password</span>
             <div className="relative mt-2">
               <Input
                 type={showPassword ? "text" : "password"}
@@ -129,25 +129,25 @@ export default function SignupPage() {
                 onChange={(event) => setPassword(event.target.value)}
                 required
                 minLength={8}
-                className="violet-focus-ring pr-11"
+                className="pr-11"
                 placeholder="8 or more characters"
               />
               <button
                 type="button"
-                className="violet-focus-ring absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-text-muted hover:text-text-primary"
+                className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-text-muted transition-colors hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 onClick={() => setShowPassword((value) => !value)}
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            <p className="mt-2 text-xs text-text-muted">8 or more characters</p>
+            <p className="mt-2 text-body-xs text-text-muted">8 or more characters</p>
           </label>
 
           <Button
             type="submit"
             disabled={loading}
-            className="violet-focus-ring h-11 w-full bg-primary text-white hover:bg-primary-hover"
+            className="h-11 w-full"
           >
             {loading ? (
               <>
@@ -159,11 +159,11 @@ export default function SignupPage() {
             )}
           </Button>
 
-          {error && <p className="text-sm font-medium text-error">{error}</p>}
-          {notice && <p className="text-sm font-medium text-success">{notice}</p>}
+          {error && <p className="text-body-sm font-medium text-error-text">{error}</p>}
+          {notice && <p className="text-body-sm font-medium text-success-text">{notice}</p>}
         </form>
 
-        <p className="mt-6 text-center text-sm text-text-secondary">
+        <p className="mt-6 text-center text-body-sm text-text-secondary">
           Already have an account?{" "}
           <Link href="/auth/login" className="font-semibold text-primary underline-offset-4 hover:underline">
             Log in

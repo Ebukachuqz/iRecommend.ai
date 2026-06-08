@@ -73,9 +73,9 @@ export default function CustomersPage() {
     <div className="mx-auto max-w-7xl space-y-6">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Customer profiles</p>
-          <h1 className="mt-2 font-display text-4xl font-semibold text-text-primary">Customer Profiles</h1>
-          <p className="mt-2 text-text-secondary">
+          <p className="text-label-lg text-primary">Customer profiles</p>
+          <h1 className="mt-2 font-display text-display-md text-text-primary">Customer Profiles</h1>
+          <p className="mt-2 text-body-md text-text-secondary">
             {(data?.total || 0).toLocaleString()} customers with personas
           </p>
         </div>
@@ -85,7 +85,7 @@ export default function CustomersPage() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search customer ID..."
-            className="violet-focus-ring h-11 pl-10"
+          className="h-11 pl-10"
           />
         </label>
       </header>
@@ -94,7 +94,7 @@ export default function CustomersPage() {
         {loading ? (
           <CustomerSkeleton />
         ) : error ? (
-          <p className="p-6 text-sm text-error">{error}</p>
+          <p className="p-6 text-body-sm text-error-text">{error}</p>
         ) : (
           <CustomerTable customers={data?.customers || []} />
         )}
@@ -129,11 +129,11 @@ export default function CustomersPage() {
 
 function CustomerTable({ customers }: { customers: DashboardCustomerSummary[] }) {
   if (!customers.length) {
-    return <p className="p-6 text-sm text-text-secondary">No customer profiles found.</p>;
+    return <p className="p-6 text-body-sm text-text-secondary">No customers yet. Upload a CSV to get started.</p>;
   }
   return (
-    <table className="min-w-full text-left text-sm">
-      <thead className="bg-soft-surface text-xs uppercase tracking-[0.14em] text-text-muted">
+    <table className="min-w-full text-left text-body-md">
+      <thead className="bg-surface-0 text-label-md text-text-muted">
         <tr>
           <th className="px-4 py-3">Customer ID</th>
           <th className="px-4 py-3">Reviews</th>
@@ -145,17 +145,17 @@ function CustomerTable({ customers }: { customers: DashboardCustomerSummary[] })
       </thead>
       <tbody>
         {customers.map((customer) => (
-          <tr key={customer.customer_id} className="border-t border-border hover:bg-primary-light/40">
+          <tr key={customer.customer_id} className="border-t border-surface-0 transition-colors duration-100 hover:bg-surface-0">
             <td className="px-4 py-4">
               <Link href={`/dashboard/customers/${encodeURIComponent(customer.customer_id)}`}>
                 <TruncatedCustomerId customerId={customer.customer_id} />
               </Link>
             </td>
-            <td className="px-4 py-4 text-text-secondary">{customer.review_count}</td>
+            <td className="px-4 py-4 font-mono text-mono-md text-text-secondary">{customer.review_count}</td>
             <td className="px-4 py-4">
               <div className="flex items-center gap-2">
                 <Stars rating={customer.avg_rating} />
-                <span className="text-text-secondary">{customer.avg_rating.toFixed(1)}</span>
+                <span className="font-mono text-mono-md text-text-secondary">{customer.avg_rating.toFixed(1)}</span>
               </div>
             </td>
             <td className="px-4 py-4">
@@ -174,7 +174,7 @@ function CustomerSkeleton() {
   return (
     <div className="space-y-3 p-5">
       {[0, 1, 2, 3, 4].map((item) => (
-        <div key={item} className="h-12 animate-pulse rounded-xl bg-soft-surface" />
+        <div key={item} className="skeleton-shimmer h-11 rounded-md" />
       ))}
     </div>
   );

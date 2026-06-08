@@ -35,8 +35,8 @@ function StepIndicator({ currentStep }: { currentStep: Step }) {
           <div
             className={`flex h-9 w-9 items-center justify-center rounded-full border text-sm font-bold ${
               currentStep >= step
-                ? "border-primary bg-primary text-white"
-                : "border-border bg-surface text-text-muted"
+                ? "border-primary bg-primary text-text-inverse"
+                : "border-border bg-surface-1 text-text-muted"
             }`}
           >
             {currentStep > step ? <Check className="h-4 w-4" /> : step}
@@ -163,33 +163,33 @@ export default function OnboardingPage() {
         <Logo />
       </div>
 
-      <section className="mx-auto mt-10 max-w-[600px]">
+      <section className="mx-auto mt-10 max-w-xl">
         <StepIndicator currentStep={step} />
 
         <div className="command-card mt-8 p-8">
           {checkingOrg ? (
             <div className="flex min-h-64 flex-col items-center justify-center text-center">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="mt-4 text-sm font-medium text-text-secondary">Checking your organisation setup...</p>
+              <p className="mt-4 text-body-sm font-medium text-text-secondary">Checking your organisation setup...</p>
             </div>
           ) : (
             <>
               {step === 1 && (
                 <div>
-                  <h1 className="font-display text-3xl font-semibold text-text-primary">
+                  <h1 className="font-display text-display-sm text-text-primary">
                     Tell us about your business
                   </h1>
-                  <p className="mt-2 text-sm leading-6 text-text-secondary">
+                  <p className="mt-2 text-body-sm text-text-secondary">
                     This is how you&apos;ll appear in iRecommend.
                   </p>
 
                   <label className="mt-8 block">
-                    <span className="text-sm font-semibold text-text-primary">Business name</span>
+                    <span className="text-body-sm font-medium text-text-primary">Business name</span>
                     <Input
                       value={businessName}
                       onChange={(event) => setBusinessName(event.target.value)}
                       placeholder="Acme Store"
-                      className="violet-focus-ring mt-2 h-11"
+                      className="mt-2 h-11"
                     />
                   </label>
 
@@ -197,7 +197,7 @@ export default function OnboardingPage() {
                     type="button"
                     disabled={!businessName.trim() || loading}
                     onClick={() => void handleBusinessSetup()}
-                    className="violet-focus-ring mt-8 h-11 w-full bg-primary text-white hover:bg-primary-hover"
+                    className="mt-8 h-11 w-full"
                   >
                     {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Continue
@@ -207,10 +207,10 @@ export default function OnboardingPage() {
 
               {step === 2 && (
                 <div>
-                  <h1 className="font-display text-3xl font-semibold text-text-primary">
+                  <h1 className="font-display text-display-sm text-text-primary">
                     Upload your customer reviews
                   </h1>
-                  <p className="mt-2 text-sm leading-6 text-text-secondary">
+                  <p className="mt-2 text-body-sm text-text-secondary">
                     Tell us what your CSV columns mean. We&apos;ll turn those reviews into customer personas.
                   </p>
 
@@ -221,7 +221,7 @@ export default function OnboardingPage() {
                         onComplete={() => setReviewsUploaded(true)}
                       />
                     ) : (
-                      <p className="rounded-xl border border-error/30 bg-error/5 p-4 text-sm text-error">
+                      <p className="rounded-lg border border-border-error bg-error-light p-4 text-body-sm text-error-text">
                         Create your organisation before uploading reviews.
                       </p>
                     )}
@@ -231,7 +231,7 @@ export default function OnboardingPage() {
                     type="button"
                     disabled={!reviewsUploaded}
                     onClick={() => setStep(3)}
-                    className="violet-focus-ring mt-8 h-11 w-full bg-primary text-white hover:bg-primary-hover"
+                    className="mt-8 h-11 w-full"
                   >
                     Continue to market context
                   </Button>
@@ -240,10 +240,10 @@ export default function OnboardingPage() {
 
               {step === 3 && (
                 <div>
-                  <h1 className="font-display text-3xl font-semibold text-text-primary">
+                  <h1 className="font-display text-display-sm text-text-primary">
                     Where are your customers?
                   </h1>
-                  <p className="mt-2 text-sm leading-6 text-text-secondary">
+                  <p className="mt-2 text-body-sm text-text-secondary">
                     This helps iRecommend contextualise your customer behaviour.
                   </p>
 
@@ -253,10 +253,10 @@ export default function OnboardingPage() {
                         key={market.value}
                         type="button"
                         onClick={() => setSelectedMarket(market.value)}
-                        className={`violet-focus-ring rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                        className={`rounded-full border px-4 py-2 text-body-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
                           selectedMarket === market.value
                             ? "border-primary bg-primary-light text-primary"
-                            : "border-border bg-surface text-text-secondary hover:text-text-primary"
+                            : "border-border bg-surface-1 text-text-secondary hover:bg-surface-0 hover:text-text-primary"
                         }`}
                       >
                         {market.label}
@@ -264,7 +264,7 @@ export default function OnboardingPage() {
                     ))}
                   </div>
 
-                  <p className="mt-6 rounded-xl bg-soft-surface px-4 py-3 text-sm leading-6 text-text-secondary">
+                  <p className="mt-6 rounded-lg bg-surface-0 px-4 py-3 text-body-sm text-text-secondary">
                     This setting shapes future personalisation features. iRecommend currently operates globally.
                   </p>
 
@@ -272,7 +272,7 @@ export default function OnboardingPage() {
                     type="button"
                     disabled={loading}
                     onClick={() => void handleMarketContext()}
-                    className="violet-focus-ring mt-8 h-11 w-full bg-primary text-white hover:bg-primary-hover"
+                    className="mt-8 h-11 w-full"
                   >
                     {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Continue to product catalog
@@ -284,10 +284,10 @@ export default function OnboardingPage() {
                 <div>
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <h1 className="font-display text-3xl font-semibold text-text-primary">
+                      <h1 className="font-display text-display-sm text-text-primary">
                         Add your product catalog
                       </h1>
-                      <p className="mt-2 text-sm leading-6 text-text-secondary">
+                      <p className="mt-2 text-body-sm text-text-secondary">
                         Optional: upload your products so the launch simulator can reference them later.
                       </p>
                     </div>
@@ -297,7 +297,7 @@ export default function OnboardingPage() {
                         router.replace("/dashboard");
                         router.refresh();
                       }}
-                      className="text-sm font-semibold text-text-muted underline-offset-4 hover:text-primary hover:underline"
+                      className="text-body-sm font-medium text-text-muted underline-offset-4 hover:text-primary hover:underline"
                     >
                       Skip for now
                     </button>
@@ -307,7 +307,7 @@ export default function OnboardingPage() {
                     {orgId ? (
                       <ProductCsvUploadFlow orgId={orgId} onComplete={() => setProductsUploaded(true)} />
                     ) : (
-                      <p className="rounded-xl border border-error/30 bg-error/5 p-4 text-sm text-error">
+                      <p className="rounded-lg border border-border-error bg-error-light p-4 text-body-sm text-error-text">
                         Create your organisation before uploading products.
                       </p>
                     )}
@@ -320,14 +320,14 @@ export default function OnboardingPage() {
                       router.replace("/dashboard");
                       router.refresh();
                     }}
-                    className="violet-focus-ring mt-8 h-11 w-full bg-primary text-white hover:bg-primary-hover"
+                    className="mt-8 h-11 w-full"
                   >
                     Go to your dashboard
                   </Button>
                 </div>
               )}
 
-              {error && <p className="mt-6 text-sm font-medium text-error">{error}</p>}
+              {error && <p className="mt-6 text-body-sm font-medium text-error-text">{error}</p>}
             </>
           )}
         </div>

@@ -1,25 +1,34 @@
 import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
+
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const inter = Inter({
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
   variable: "--font-inter",
   display: "swap",
 });
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "600", "700", "800"],
   variable: "--font-plus-jakarta",
+  display: "swap",
+});
+
+const geistMono = localFont({
+  src: "./fonts/GeistMonoVF.woff",
+  variable: "--font-geist-mono",
   display: "swap",
 });
 
 export const metadata: Metadata = {
   title: {
-    default: "iRecommend — Customer Intelligence for Modern Merchants",
-    template: "%s — iRecommend",
+    default: "iRecommend - Customer Intelligence for Modern Merchants",
+    template: "%s - iRecommend",
   },
   description:
     "Build behavioural customer personas from review data, simulate product launches, and power better recommendations.",
@@ -36,9 +45,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${plusJakarta.variable} scroll-smooth bg-background text-text-primary`}
+      className={`${inter.variable} ${plusJakarta.variable} ${geistMono.variable} scroll-smooth bg-background text-text-primary`}
     >
-      <body className="min-h-screen bg-background font-sans text-text-primary antialiased">
+      <body className="min-h-screen bg-background font-sans text-body-md text-text-primary antialiased">
         {children}
         <Toaster richColors position="top-right" />
       </body>

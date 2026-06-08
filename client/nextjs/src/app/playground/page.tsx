@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { Navbar } from "@/components/layout/Navbar";
+import { Stars } from "@/components/dashboard/DashboardUi";
 import { PersonaSelector } from "@/components/playground/PersonaSelector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,11 +57,6 @@ function friendlyError(error: unknown) {
   return error instanceof Error ? error.message : "Something went wrong. Please try again.";
 }
 
-function starsForRating(value: number) {
-  const rounded = Math.max(1, Math.min(5, Math.round(value)));
-  return "★".repeat(rounded) + "☆".repeat(5 - rounded);
-}
-
 function confidencePercent(value?: number | null) {
   if (typeof value !== "number" || Number.isNaN(value)) {
     return 0;
@@ -100,12 +96,12 @@ function productSummaryToInput(product: ProductSummary, category: DemoCategory):
 
 function EmptyState({ title, description }: { title: string; description: string }) {
   return (
-    <div className="command-card flex min-h-[440px] flex-col items-center justify-center px-8 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-soft-surface text-text-muted">
+    <div className="command-card flex flex-col items-center justify-center px-8 py-24 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-0 text-text-muted">
         <FileText className="h-8 w-8" />
       </div>
-      <h3 className="mt-5 font-display text-xl font-semibold text-text-primary">{title}</h3>
-      <p className="mt-2 max-w-sm text-sm leading-6 text-text-secondary">{description}</p>
+      <h3 className="mt-5 font-display text-heading-lg text-text-primary">{title}</h3>
+      <p className="mt-2 max-w-sm text-body-sm text-text-secondary">{description}</p>
     </div>
   );
 }
@@ -133,21 +129,21 @@ function TopTabs({
   ];
 
   return (
-    <div className="grid gap-3 rounded-2xl border border-border bg-surface p-2 shadow-sm md:grid-cols-2">
+    <div className="grid gap-3 rounded-lg border border-border bg-surface-1 p-2 md:grid-cols-2">
       {tabs.map((tab) => (
         <button
           key={tab.id}
           type="button"
           onClick={() => onChange(tab.id)}
-          className={`violet-focus-ring rounded-xl px-4 py-4 text-left transition ${
+          className={`rounded-md px-4 py-4 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
             active === tab.id
-              ? "border border-primary/25 bg-primary-light text-primary shadow-sm"
-              : "border border-transparent text-text-secondary hover:bg-soft-surface hover:text-text-primary"
+              ? "border border-primary bg-primary-light text-primary"
+              : "border border-transparent text-text-secondary hover:bg-surface-0 hover:text-text-primary"
           }`}
         >
-          <span className="text-xs font-semibold uppercase tracking-[0.16em]">{tab.kicker}</span>
-          <span className="mt-1 block text-base font-semibold">{tab.label}</span>
-          <span className="mt-1 block text-sm leading-5">{tab.description}</span>
+          <span className="text-label-sm">{tab.kicker}</span>
+          <span className="mt-1 block text-body-md font-semibold">{tab.label}</span>
+          <span className="mt-1 block text-body-sm">{tab.description}</span>
         </button>
       ))}
     </div>
@@ -167,46 +163,46 @@ function SimulationResultPanel({
 
   return (
     <div className="space-y-5">
-      <div className="aurora-panel p-6 text-white shadow-lg">
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-white/75">
+      <div className="command-card p-6">
+        <p className="text-label-md text-primary">
           Predicted rating
         </p>
         <div className="mt-4 flex flex-wrap items-end gap-4">
-          <p className="text-3xl tracking-wide text-warning">{starsForRating(rating)}</p>
-          <p className="font-display text-5xl font-bold">{rating.toFixed(1)} / 5</p>
+          <Stars rating={rating} />
+          <p className="metric-number font-display text-metric-2xl text-text-primary">{rating.toFixed(1)} / 5</p>
         </div>
-        <p className="mt-3 max-w-xl text-sm leading-6 text-white/80">
+        <p className="mt-3 max-w-xl text-body-sm text-text-secondary">
           This is how the selected customer persona is likely to react to the product details.
         </p>
       </div>
 
       <div className="command-card p-6">
-        <p className="text-lg font-semibold text-text-primary">{result.simulated_review_title}</p>
-        <p className="mt-3 text-sm italic leading-7 text-text-secondary">
+        <p className="text-body-lg font-semibold text-text-primary">{result.simulated_review_title}</p>
+        <p className="mt-3 text-body-sm italic text-text-secondary">
           &quot;{result.simulated_review_text}&quot;
         </p>
       </div>
 
       <div className="command-card space-y-5 p-6">
         <div>
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center justify-between text-body-sm">
             <span className="font-semibold text-text-primary">Confidence</span>
-            <span className="font-semibold text-primary">{confidence}%</span>
+            <span className="font-mono text-mono-md text-primary">{confidence}%</span>
           </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-soft-surface">
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-0">
             <div className="h-full rounded-full bg-primary" style={{ width: `${confidence}%` }} />
           </div>
         </div>
 
         <div>
-          <p className="text-sm font-semibold text-text-primary">Why this rating?</p>
-          <p className="mt-2 text-sm leading-6 text-text-secondary">
+          <p className="text-body-sm font-semibold text-text-primary">Why this rating?</p>
+          <p className="mt-2 text-body-sm text-text-secondary">
             {result.reasoning_summary || "The prototype returned a rating without extra reasoning."}
           </p>
         </div>
 
         {evidence.length > 0 && (
-          <details className="rounded-lg border border-border bg-soft-surface px-4 py-3 text-sm text-text-secondary">
+          <details className="rounded-lg border border-border bg-surface-0 px-4 py-3 text-body-sm text-text-secondary">
             <summary className="cursor-pointer font-semibold text-text-primary">Evidence used</summary>
             <ul className="mt-3 list-disc space-y-2 pl-5">
               {evidence.map((item) => (
@@ -220,7 +216,7 @@ function SimulationResultPanel({
       <button
         type="button"
         onClick={onReset}
-        className="inline-flex items-center gap-2 text-sm font-semibold text-primary underline-offset-4 hover:underline"
+        className="inline-flex items-center gap-2 text-body-sm font-medium text-primary underline-offset-4 hover:underline"
       >
         <RefreshCcw className="h-4 w-4" />
         Simulate another product
@@ -247,40 +243,40 @@ function RecommendationResults({
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="font-display text-2xl font-semibold text-text-primary">Recommended for you</h2>
-        <p className="mt-1 text-sm text-text-secondary">Based on your behavioural persona.</p>
+        <h2 className="font-display text-heading-xl text-text-primary">Recommended for you</h2>
+        <p className="mt-1 text-body-sm text-text-secondary">Based on your behavioural persona.</p>
       </div>
 
       <div className="space-y-4">
         {result.recommendations.map((item, index) => {
           const evidence = evidenceList(item.evidence);
           return (
-            <article key={`${item.parent_asin}-${index}`} className="violet-glow-card rounded-2xl p-5">
+            <article key={`${item.parent_asin}-${index}`} className="rounded-lg border border-border bg-surface-1 p-5">
               <div className="flex gap-4">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-body-sm font-medium text-text-inverse">
                   {item.rank || index + 1}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-base font-semibold text-text-primary">
+                    <h3 className="text-body-md font-semibold text-text-primary">
                       {item.title || item.parent_asin}
                     </h3>
-                    <span className="rounded-full border border-border bg-soft-surface px-2.5 py-1 text-xs font-semibold text-text-secondary">
+                    <span className="inline-flex h-5 items-center rounded-full border border-border bg-surface-0 px-2 text-label-sm text-text-secondary">
                       {categoryLabelByValue[result.category as DemoCategory] || result.category}
                     </span>
                   </div>
 
                   <div className="mt-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                    <p className="text-label-sm text-text-muted">
                       Why this?
                     </p>
-                    <p className="mt-1 text-sm italic leading-6 text-text-secondary">
+                    <p className="mt-1 text-body-sm italic text-text-secondary">
                       &quot;{item.reason || "The recommender selected this product from the candidate pool."}&quot;
                     </p>
                   </div>
 
                   {evidence.length > 0 && (
-                    <details className="mt-4 rounded-lg border border-border bg-soft-surface px-4 py-3 text-sm text-text-secondary">
+                    <details className="mt-4 rounded-lg border border-border bg-surface-0 px-4 py-3 text-body-sm text-text-secondary">
                       <summary className="cursor-pointer font-semibold text-text-primary">
                         Evidence
                       </summary>
@@ -300,15 +296,15 @@ function RecommendationResults({
 
       {result.session_id && (
         <div className="command-card p-5">
-          <h3 className="font-display text-lg font-semibold text-text-primary">Refine</h3>
-          <p className="mt-1 text-sm text-text-secondary">
+          <h3 className="font-display text-heading-md text-text-primary">Refine</h3>
+          <p className="mt-1 text-body-sm text-text-secondary">
             Keep the same persona and ask the engine to adjust the result.
           </p>
 
           {conversation.length > 0 && (
-            <div className="mt-4 space-y-2 rounded-xl bg-soft-surface p-3">
+            <div className="mt-4 space-y-2 rounded-lg bg-surface-0 p-3">
               {conversation.map((entry, index) => (
-                <p key={`${entry.role}-${index}`} className="text-xs leading-5 text-text-secondary">
+                <p key={`${entry.role}-${index}`} className="text-body-xs text-text-secondary">
                   <span className="font-semibold text-text-primary">
                     {entry.role === "merchant" ? "You" : "Engine"}:
                   </span>{" "}
@@ -323,14 +319,13 @@ function RecommendationResults({
               value={refineText}
               onChange={(event) => setRefineText(event.target.value)}
               placeholder="Something cheaper... / Different brand... / More options in X"
-              className="violet-focus-ring"
             />
             <Button
               type="button"
               variant="outline"
               disabled={!refineText.trim() || refining}
               onClick={onRefine}
-              className="violet-focus-ring shrink-0"
+              className="shrink-0"
             >
               {refining ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -543,30 +538,30 @@ export default function PlaygroundPage() {
       <Navbar />
 
       <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="rounded-3xl border border-primary/15 bg-surface p-5 shadow-sm">
+        <div className="rounded-lg border border-border bg-surface-1 p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+              <p className="text-label-lg text-primary">
                 Public Playground
               </p>
-              <h1 className="mt-3 font-display text-4xl font-bold tracking-tight text-text-primary sm:text-5xl">
+              <h1 className="mt-3 font-display text-display-md text-text-primary">
                 Playground
               </h1>
-              <p className="mt-3 max-w-2xl text-base leading-7 text-text-secondary">
+              <p className="mt-3 max-w-2xl text-body-lg text-text-secondary">
                 Experience the iRecommend engine live. Using our demo customer database.
               </p>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-text-secondary">
+              <p className="mt-2 max-w-2xl text-body-sm text-text-secondary">
                 Try the intelligence engine on demo data. Sign up later to run it on your own customers.
               </p>
             </div>
-            <div className="violet-glow-card rounded-2xl p-4">
+            <div className="rounded-lg border border-border bg-surface-1 p-4">
               <div className="flex items-start gap-3">
-                <div className="rounded-xl bg-primary-light p-2 text-primary">
+                <div className="rounded-md bg-primary-light p-2 text-primary">
                   <Sparkles className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-text-primary">Prototype engine</p>
-                  <p className="mt-1 max-w-xs text-sm leading-6 text-text-secondary">
+                  <p className="text-body-sm font-semibold text-text-primary">Prototype engine</p>
+                  <p className="mt-1 max-w-xs text-body-sm text-text-secondary">
                     No account needed. This page calls the existing FastAPI backend on port 8000.
                   </p>
                 </div>
@@ -575,7 +570,7 @@ export default function PlaygroundPage() {
           </div>
 
           {apiWarning && (
-            <div className="mt-5 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm font-medium text-warning">
+            <div className="mt-5 rounded-lg border border-warning bg-warning-light px-4 py-3 text-body-sm font-medium text-warning-text">
               {apiWarning}
             </div>
           )}
@@ -585,7 +580,7 @@ export default function PlaygroundPage() {
           <TopTabs active={activeTab} onChange={setActiveTab} />
         </div>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[380px_minmax(0,1fr)]">
+        <div className="mt-6 grid gap-6 lg:grid-cols-3">
           <aside className="space-y-5">
             <PersonaSelector value={personaSelection} onChange={setPersonaSelection} />
             <Separator />
@@ -593,8 +588,8 @@ export default function PlaygroundPage() {
             {activeTab === "simulation" ? (
               <div className="command-card space-y-4 p-5">
                 <div>
-                  <p className="font-display text-lg font-semibold text-text-primary">Product details</p>
-                  <p className="mt-1 text-sm text-text-secondary">
+                  <p className="font-display text-heading-md text-text-primary">Product details</p>
+                  <p className="mt-1 text-body-sm text-text-secondary">
                     {usesDemoProductDropdown
                       ? "Pick a real product from the demo database for this customer."
                       : "Describe a product and predict how this customer may react."}
@@ -602,7 +597,7 @@ export default function PlaygroundPage() {
                 </div>
 
                 {personaSelection?.mode === "custom" && (
-                  <p className="rounded-lg bg-soft-surface px-3 py-2 text-xs text-text-secondary">
+                  <p className="rounded-lg bg-surface-0 px-3 py-2 text-body-xs text-text-secondary">
                     Pasted personas use custom product details because there is no demo customer history to query.
                   </p>
                 )}
@@ -610,14 +605,14 @@ export default function PlaygroundPage() {
                 {usesDemoProductDropdown ? (
                   <div className="space-y-4">
                     <label className="block">
-                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                      <span className="text-label-sm text-text-muted">
                         Product from demo database*
                       </span>
                       <select
                         value={selectedProductKey}
                         disabled={!personaSelection || productsLoading}
                         onChange={(event) => handleDemoProductSelection(event.target.value)}
-                        className="violet-focus-ring mt-2 h-11 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary outline-none disabled:cursor-not-allowed disabled:text-text-muted"
+                        className="mt-2 h-11 w-full rounded-md border border-border bg-surface-1 px-3 text-body-md text-text-primary outline-none transition-colors hover:border-border-strong focus:border-primary focus:shadow-[0_0_0_3px_var(--color-primary-light)] disabled:cursor-not-allowed disabled:text-text-muted"
                       >
                         <option value="">
                           {!personaSelection
@@ -634,10 +629,10 @@ export default function PlaygroundPage() {
                       </select>
                     </label>
 
-                    {productsError && <p className="text-sm text-error">{productsError}</p>}
+                    {productsError && <p className="text-body-sm text-error-text">{productsError}</p>}
 
                     {selectedProductKey && (
-                      <div className="rounded-xl border border-border bg-soft-surface p-3 text-sm text-text-secondary">
+                      <div className="rounded-lg border border-border bg-surface-0 p-3 text-body-sm text-text-secondary">
                         <p className="font-semibold text-text-primary">{product.title}</p>
                         <div className="mt-2 grid gap-1 text-xs">
                           <span>ASIN: {product.parent_asin}</span>
@@ -654,7 +649,7 @@ export default function PlaygroundPage() {
                 ) : (
                   <div className="space-y-4">
                     <label className="block">
-                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                      <span className="text-label-sm text-text-muted">
                         Product title*
                       </span>
                       <Input
@@ -663,12 +658,12 @@ export default function PlaygroundPage() {
                           setProduct((current) => ({ ...current, title: event.target.value }))
                         }
                         placeholder="Foam Massage Roller"
-                        className="violet-focus-ring mt-2"
+                        className="mt-2"
                       />
                     </label>
 
                     <label className="block">
-                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                      <span className="text-label-sm text-text-muted">
                         Category*
                       </span>
                       <select
@@ -676,7 +671,7 @@ export default function PlaygroundPage() {
                         onChange={(event) =>
                           setProduct((current) => ({ ...current, category: event.target.value as DemoCategory }))
                         }
-                        className="violet-focus-ring mt-2 h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary outline-none"
+                        className="mt-2 h-10 w-full rounded-md border border-border bg-surface-1 px-3 text-body-md text-text-primary outline-none transition-colors hover:border-border-strong focus:border-primary focus:shadow-[0_0_0_3px_var(--color-primary-light)]"
                       >
                         {DEMO_CATEGORIES.map((category) => (
                           <option key={category.value} value={category.value}>
@@ -687,7 +682,7 @@ export default function PlaygroundPage() {
                     </label>
 
                     <label className="block">
-                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                      <span className="text-label-sm text-text-muted">
                         Price
                       </span>
                       <Input
@@ -701,12 +696,12 @@ export default function PlaygroundPage() {
                           }))
                         }
                         placeholder="49.99"
-                        className="violet-focus-ring mt-2"
+                        className="mt-2"
                       />
                     </label>
 
                     <label className="block">
-                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                      <span className="text-label-sm text-text-muted">
                         Features
                       </span>
                       <Textarea
@@ -714,12 +709,12 @@ export default function PlaygroundPage() {
                         onChange={(event) => setFeaturesText(event.target.value)}
                         rows={3}
                         placeholder={"EVA foam construction\nHigh-density ridges\nPortable size"}
-                        className="violet-focus-ring mt-2 resize-none"
+                        className="mt-2 resize-none"
                       />
                     </label>
 
                     <label className="block">
-                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                      <span className="text-label-sm text-text-muted">
                         Description
                       </span>
                       <Textarea
@@ -728,7 +723,7 @@ export default function PlaygroundPage() {
                           setProduct((current) => ({ ...current, description: event.target.value }))
                         }
                         rows={2}
-                        className="violet-focus-ring mt-2 resize-none"
+                        className="mt-2 resize-none"
                       />
                     </label>
                   </div>
@@ -738,7 +733,7 @@ export default function PlaygroundPage() {
                   type="button"
                   disabled={!canSimulate || simulationLoading}
                   onClick={() => void handleSimulation()}
-                  className="violet-focus-ring w-full bg-primary text-white hover:bg-primary-hover"
+                  className="w-full"
                 >
                   {simulationLoading ? (
                     <>
@@ -753,10 +748,10 @@ export default function PlaygroundPage() {
             ) : (
               <div className="command-card space-y-4 p-5">
                 <div>
-                  <p className="font-display text-lg font-semibold text-text-primary">
+                  <p className="font-display text-heading-md text-text-primary">
                     Your request <span className="text-text-muted">(optional)</span>
                   </p>
-                  <p className="mt-1 text-sm text-text-secondary">
+                  <p className="mt-1 text-body-sm text-text-secondary">
                     A request is helpful, but the persona can drive recommendations on its own.
                   </p>
                 </div>
@@ -766,15 +761,15 @@ export default function PlaygroundPage() {
                   onChange={(event) => setRequestText(event.target.value)}
                   rows={2}
                   placeholder={"What are you looking for? (optional)\nLeave empty - your persona is enough."}
-                  className="violet-focus-ring resize-none"
+                  className="resize-none"
                 />
-                <p className="text-xs text-text-muted">A request is not required.</p>
+                <p className="text-body-xs text-text-muted">A request is not required.</p>
 
                 <Button
                   type="button"
                   disabled={!canRecommend || recommendationLoading}
                   onClick={() => void handleRecommendations()}
-                  className="violet-focus-ring w-full bg-primary text-white hover:bg-primary-hover"
+                  className="w-full"
                 >
                   {recommendationLoading ? (
                     <>
@@ -789,11 +784,11 @@ export default function PlaygroundPage() {
             )}
           </aside>
 
-          <section>
+          <section className="lg:col-span-2">
             {activeTab === "simulation" ? (
               <div>
                 {simulationError && (
-                  <div className="mb-5 rounded-xl border border-error/25 bg-error/10 px-4 py-3 text-sm font-medium text-error">
+                  <div className="mb-5 rounded-lg border border-border-error bg-error-light px-4 py-3 text-body-sm font-medium text-error-text">
                     {simulationError}
                   </div>
                 )}
@@ -809,7 +804,7 @@ export default function PlaygroundPage() {
             ) : (
               <div>
                 {recommendationError && (
-                  <div className="mb-5 rounded-xl border border-error/25 bg-error/10 px-4 py-3 text-sm font-medium text-error">
+                  <div className="mb-5 rounded-lg border border-border-error bg-error-light px-4 py-3 text-body-sm font-medium text-error-text">
                     {recommendationError}
                   </div>
                 )}
@@ -836,7 +831,7 @@ export default function PlaygroundPage() {
         <div className="mt-10 flex items-center justify-center">
           <a
             href="/auth/signup"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-primary underline-offset-4 hover:underline"
+            className="inline-flex items-center gap-2 text-body-sm font-medium text-primary underline-offset-4 hover:underline"
           >
             Run this on your own customer reviews
             <ArrowRight className="h-4 w-4" />

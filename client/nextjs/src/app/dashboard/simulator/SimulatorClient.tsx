@@ -205,9 +205,9 @@ export function SimulatorClient() {
   return (
     <div className="mx-auto max-w-7xl space-y-8">
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Launch intelligence</p>
-        <h1 className="mt-2 font-display text-4xl font-semibold text-text-primary">Product Launch Simulator</h1>
-        <p className="mt-2 max-w-3xl text-text-secondary">
+        <p className="text-label-lg text-primary">Launch intelligence</p>
+        <h1 className="mt-2 font-display text-display-md text-text-primary">Product Launch Simulator</h1>
+        <p className="mt-2 max-w-3xl text-body-md text-text-secondary">
           Test how your customers would react to a new product before you manufacture a single unit.
         </p>
       </header>
@@ -215,21 +215,21 @@ export function SimulatorClient() {
       <section className="grid gap-6 xl:grid-cols-2">
         <div className="space-y-6">
           <div className="command-card p-6">
-            <h2 className="font-display text-2xl font-semibold text-text-primary">Product details</h2>
-            <p className="mt-2 text-sm leading-6 text-text-secondary">
+            <h2 className="font-display text-heading-xl text-text-primary">Product details</h2>
+            <p className="mt-2 text-body-sm text-text-secondary">
               Describe the product you want to test, or autofill from your uploaded catalog.
             </p>
 
             {productsLoading ? (
-              <div className="mt-5 h-12 animate-pulse rounded-xl bg-soft-surface" />
+              <div className="skeleton-shimmer mt-5 h-11 rounded-md" />
             ) : products.length ? (
               <div className="mt-5 space-y-3">
                 <label className="block">
-                  <span className="text-sm font-semibold text-text-primary">Select from your catalog</span>
+                  <span className="text-body-sm font-medium text-text-primary">Select from your catalog</span>
                   <select
                     value={selectedProductId}
                     onChange={(event) => applyCatalogProduct(event.target.value)}
-                    className="violet-focus-ring mt-2 h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text-primary outline-none"
+                    className="mt-2 h-11 w-full rounded-md border border-border bg-surface-1 px-3 text-body-md text-text-primary outline-none transition-colors hover:border-border-strong focus:border-primary focus:shadow-[0_0_0_3px_var(--color-primary-light)]"
                   >
                     <option value="">Choose a catalog product...</option>
                     {products.map((product) => {
@@ -245,15 +245,15 @@ export function SimulatorClient() {
                 <button
                   type="button"
                   onClick={() => setShowProductUpload((current) => !current)}
-                  className="text-sm font-semibold text-primary underline-offset-4 hover:underline"
+                  className="text-body-sm font-medium text-primary underline-offset-4 hover:underline"
                 >
                   Upload more products
                 </button>
               </div>
             ) : (
-              <div className="mt-5 rounded-2xl border border-dashed border-primary/30 bg-primary-light/40 p-4">
-                <p className="text-sm font-semibold text-text-primary">No catalog uploaded yet</p>
-                <p className="mt-1 text-sm leading-6 text-text-secondary">
+              <div className="mt-5 rounded-lg border border-dashed border-border bg-surface-0 p-4">
+                <p className="text-body-sm font-semibold text-text-primary">No catalog uploaded yet</p>
+                <p className="mt-1 text-body-sm text-text-secondary">
                   Manual entry works now. Upload a catalog if you want simulator autofill.
                 </p>
                 <Button
@@ -268,14 +268,14 @@ export function SimulatorClient() {
               </div>
             )}
 
-            {productError ? <p className="mt-3 text-sm text-error">{productError}</p> : null}
+            {productError ? <p className="mt-3 text-body-sm text-error-text">{productError}</p> : null}
 
             <div className="mt-6 grid gap-4">
-              <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Wireless Ergonomic Mouse" className="violet-focus-ring h-11" />
+              <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Wireless Ergonomic Mouse" className="h-11" />
               <select
                 value={category}
                 onChange={(event) => setCategory(event.target.value)}
-                className="violet-focus-ring h-11 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary outline-none"
+                className="h-11 rounded-md border border-border bg-surface-1 px-3 text-body-md text-text-primary outline-none transition-colors hover:border-border-strong focus:border-primary focus:shadow-[0_0_0_3px_var(--color-primary-light)]"
               >
                 {categories.map((item) => (
                   <option key={item} value={item}>
@@ -283,9 +283,9 @@ export function SimulatorClient() {
                   </option>
                 ))}
               </select>
-              <Input value={price} onChange={(event) => setPrice(event.target.value)} placeholder="49.99" type="number" step="0.01" className="violet-focus-ring h-11" />
-              <Textarea value={features} onChange={(event) => setFeatures(event.target.value)} placeholder={"USB-C charging\nErgonomic grip\n6-month battery"} className="violet-focus-ring min-h-32" />
-              <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Short product description" className="violet-focus-ring min-h-24" />
+              <Input value={price} onChange={(event) => setPrice(event.target.value)} placeholder="49.99" type="number" step="0.01" className="h-11" />
+              <Textarea value={features} onChange={(event) => setFeatures(event.target.value)} placeholder={"USB-C charging\nErgonomic grip\n6-month battery"} className="min-h-32" />
+              <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Short product description" className="min-h-24" />
             </div>
           </div>
 
@@ -302,22 +302,22 @@ export function SimulatorClient() {
           ) : null}
 
           <div className="command-card p-6">
-            <h2 className="font-display text-2xl font-semibold text-text-primary">Simulation scope</h2>
+            <h2 className="font-display text-heading-xl text-text-primary">Simulation scope</h2>
             <div className="mt-5 grid gap-3">
-              <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border p-4 hover:border-primary/30">
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-4 transition-colors hover:border-border-strong">
                 <input type="radio" checked={scope === "sample"} onChange={() => setScope("sample")} className="mt-1" />
                 <span>
                   <span className="block font-semibold text-text-primary">Sample customers</span>
-                  <span className="mt-1 block text-sm text-text-secondary">Recommended for live demos. Smaller samples run faster.</span>
+                  <span className="mt-1 block text-body-sm text-text-secondary">Recommended for live demos. Smaller samples run faster.</span>
                 </span>
               </label>
               {scope === "sample" ? (
                 <label className="block">
-                  <span className="text-sm font-semibold text-text-primary">Sample size</span>
+                  <span className="text-body-sm font-medium text-text-primary">Sample size</span>
                   <select
                     value={sampleSize}
                     onChange={(event) => setSampleSize(Number(event.target.value))}
-                    className="violet-focus-ring mt-2 h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text-primary outline-none"
+                    className="mt-2 h-11 w-full rounded-md border border-border bg-surface-1 px-3 text-body-md text-text-primary outline-none transition-colors hover:border-border-strong focus:border-primary focus:shadow-[0_0_0_3px_var(--color-primary-light)]"
                   >
                     {[3, 5, 10].map((size) => (
                       <option key={size} value={size}>
@@ -327,15 +327,15 @@ export function SimulatorClient() {
                   </select>
                 </label>
               ) : null}
-              <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border p-4 hover:border-primary/30">
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-4 transition-colors hover:border-border-strong">
                 <input type="radio" checked={scope === "specific"} onChange={() => setScope("specific")} className="mt-1" />
                 <span>
                   <span className="block font-semibold text-text-primary">Specific customer</span>
-                  <span className="mt-1 block text-sm text-text-secondary">Use a known customer ID for a focused analyst briefing.</span>
+                  <span className="mt-1 block text-body-sm text-text-secondary">Use a known customer ID for a focused analyst briefing.</span>
                 </span>
               </label>
               {scope === "specific" ? (
-                <Input value={customerId} onChange={(event) => setCustomerId(event.target.value)} placeholder="Customer ID" className="violet-focus-ring h-11" />
+                <Input value={customerId} onChange={(event) => setCustomerId(event.target.value)} placeholder="Customer ID" className="h-11" />
               ) : null}
             </div>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -343,7 +343,7 @@ export function SimulatorClient() {
                 type="button"
                 disabled={mode === "loading"}
                 onClick={() => void runLiveSimulation()}
-                className="violet-focus-ring h-11 bg-primary text-white hover:bg-primary-hover"
+                className="h-11"
               >
                 {mode === "loading" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rocket className="mr-2 h-4 w-4" />}
                 Run live simulation
@@ -352,7 +352,7 @@ export function SimulatorClient() {
                 Load sample result
               </Button>
             </div>
-            <p className="mt-3 text-xs leading-5 text-text-muted">
+            <p className="mt-3 text-body-xs text-text-muted">
               Live simulation uses your real customer personas. Sample result shows a pre-cached demo.
             </p>
           </div>
@@ -397,13 +397,13 @@ function ResultsPanel({
       <section className="command-card p-6">
         <div className="flex items-center gap-3">
           <Loader2 className="h-5 w-5 animate-spin text-primary" />
-          <h2 className="font-display text-2xl font-semibold text-text-primary">Simulating customer reactions...</h2>
+          <h2 className="font-display text-heading-xl text-text-primary">Simulating customer reactions...</h2>
         </div>
-        <p className="mt-2 text-sm text-text-secondary">Running live LLM simulation across selected personas.</p>
+        <p className="mt-2 text-body-sm text-text-secondary">Running live LLM simulation across selected personas.</p>
         <Progress className="mt-6" value={66} />
         <div className="mt-6 space-y-4">
           {[0, 1, 2].map((item) => (
-            <div key={item} className="h-32 animate-pulse rounded-2xl bg-soft-surface" />
+            <div key={item} className="skeleton-shimmer h-32 rounded-lg" />
           ))}
         </div>
       </section>
@@ -413,16 +413,16 @@ function ResultsPanel({
   if (mode === "error") {
     return (
       <section className="command-card p-6">
-        <div className="flex h-full min-h-[520px] flex-col items-center justify-center text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-error/10 text-error">
+        <div className="flex h-full flex-col items-center justify-center py-24 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-error-light text-error">
             <AlertCircle className="h-7 w-7" />
           </div>
-          <h2 className="mt-5 font-display text-2xl font-semibold text-text-primary">Live simulation could not finish</h2>
-          <p className="mt-3 max-w-md text-sm leading-6 text-text-secondary">
+          <h2 className="mt-5 font-display text-heading-xl text-text-primary">Live simulation could not finish</h2>
+          <p className="mt-3 max-w-md text-body-sm text-text-secondary">
             {error || "The simulator hit a temporary issue. Try again with 3 customers, or use the sample result for the demo."}
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Button type="button" onClick={onRetry} className="bg-primary text-white hover:bg-primary-hover">
+            <Button type="button" onClick={onRetry}>
               Try again
             </Button>
             <Button type="button" variant="outline" onClick={onLoadSample}>
@@ -437,12 +437,12 @@ function ResultsPanel({
   if (!result) {
     return (
       <section className="command-card p-6">
-        <div className="flex h-full min-h-[520px] flex-col items-center justify-center text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-primary-light text-primary">
+        <div className="flex h-full flex-col items-center justify-center py-24 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-light text-primary">
             <Rocket className="h-8 w-8" />
           </div>
-          <h2 className="mt-6 font-display text-2xl font-semibold text-text-primary">Results will appear here.</h2>
-          <p className="mt-3 max-w-sm text-sm leading-6 text-text-secondary">
+          <h2 className="mt-6 font-display text-heading-xl text-text-primary">Results will appear here.</h2>
+          <p className="mt-3 max-w-sm text-body-sm text-text-secondary">
             Fill in product details and click Run live simulation, or load the sample result instantly.
           </p>
         </div>
@@ -453,7 +453,7 @@ function ResultsPanel({
   return (
     <section className="space-y-6">
       {mode === "sample" && showSampleBanner ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
+        <div className="flex items-start gap-3 rounded-lg border border-warning bg-warning-light p-4 text-body-sm text-warning-text">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <p className="flex-1">
             This is a sample result. Run a live simulation to use your actual customer data.
@@ -464,14 +464,14 @@ function ResultsPanel({
         </div>
       ) : null}
 
-      <div className="aurora-panel p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/70">Predicted average rating</p>
+      <div className="command-card p-6">
+        <p className="text-label-md text-primary">Predicted average rating</p>
         <div className="mt-4 flex flex-wrap items-end gap-4">
-          <div className="rounded-2xl bg-white/12 px-4 py-3">
+          <div className="rounded-lg border border-border bg-surface-0 px-4 py-3">
             <Stars rating={result.avg_predicted_rating} />
           </div>
-          <p className="font-display text-5xl font-semibold text-white">{result.avg_predicted_rating.toFixed(1)}</p>
-          <p className="pb-2 text-white/75">Across {result.simulations.length} customer personas</p>
+          <p className="metric-number font-display text-metric-2xl text-text-primary">{result.avg_predicted_rating.toFixed(1)}</p>
+          <p className="pb-2 text-body-sm text-text-secondary">Across {result.simulations.length} customer personas</p>
         </div>
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
           <MetricChip label="Customers likely to rate 4+" value={percent(result.pct_4_plus)} tone="green" />
@@ -481,8 +481,8 @@ function ResultsPanel({
       </div>
 
       <div className="command-card p-6">
-        <h2 className="font-display text-2xl font-semibold text-text-primary">What this means</h2>
-        <p className="mt-3 text-sm leading-6 text-text-secondary">{result.interpretation}</p>
+        <h2 className="font-display text-heading-xl text-text-primary">What this means</h2>
+        <p className="mt-3 text-body-sm text-text-secondary">{result.interpretation}</p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -493,13 +493,13 @@ function ResultsPanel({
       <div className="command-card p-6">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 className="font-display text-2xl font-semibold text-text-primary">Customer reactions</h2>
-            <p className="mt-2 text-sm text-text-secondary">A sample of predicted reviews from your personas.</p>
+            <h2 className="font-display text-heading-xl text-text-primary">Customer reactions</h2>
+            <p className="mt-2 text-body-sm text-text-secondary">A sample of predicted reviews from your personas.</p>
           </div>
           <a
             href={downloadHref}
             download="irecommend-launch-simulation.json"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-primary underline-offset-4 hover:underline"
+            className="inline-flex items-center gap-2 text-body-sm font-medium text-primary underline-offset-4 hover:underline"
           >
             <Download className="h-4 w-4" />
             Download results
@@ -518,14 +518,14 @@ function ResultsPanel({
 function MetricChip({ label, value, tone }: { label: string; value: string; tone: "green" | "amber" | "red" }) {
   const color =
     tone === "green"
-      ? "bg-success/15 text-white"
+      ? "border-success bg-success-light text-success-text"
       : tone === "amber"
-        ? "bg-warning/20 text-white"
-        : "bg-error/20 text-white";
+        ? "border-warning bg-warning-light text-warning-text"
+        : "border-error bg-error-light text-error-text";
   return (
-    <div className={`rounded-2xl border border-white/15 p-3 ${color}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/70">{label}</p>
-      <p className="mt-2 text-lg font-semibold">{value}</p>
+    <div className={`rounded-lg border p-3 ${color}`}>
+      <p className="text-label-sm">{label}</p>
+      <p className="metric-number mt-2 font-display text-metric-md">{value}</p>
     </div>
   );
 }
@@ -535,10 +535,10 @@ function InsightBox({ title, items, icon }: { title: string; items: string[]; ic
   const color = icon === "check" ? "text-success" : "text-error";
   return (
     <div className="command-card p-5">
-      <h3 className="font-display text-xl font-semibold text-text-primary">{title}</h3>
+      <h3 className="font-display text-heading-lg text-text-primary">{title}</h3>
       <ul className="mt-4 space-y-3">
         {(items.length ? items : ["No signal detected"]).slice(0, 3).map((item) => (
-          <li key={item} className="flex items-start gap-3 text-sm leading-6 text-text-secondary">
+          <li key={item} className="flex items-start gap-3 text-body-sm text-text-secondary">
             <Icon className={`mt-1 h-4 w-4 shrink-0 ${color}`} />
             <span>{item}</span>
           </li>
@@ -553,29 +553,29 @@ function ReactionCard({ simulation }: { simulation: MerchantBulkSimulationResult
   const text = simulation.simulated_review_text || "";
   const shouldClamp = text.length > 180;
   return (
-    <article className="rounded-2xl border border-border bg-surface p-5">
+    <article className="rounded-lg border border-border bg-surface-1 p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-mono text-xs font-semibold uppercase tracking-[0.12em] text-primary">
+          <p className="font-mono text-mono-sm uppercase text-primary">
             {simulation.customer_id.slice(0, 8)}
           </p>
-          <h3 className="mt-2 font-semibold text-text-primary">{simulation.simulated_review_title}</h3>
+          <h3 className="mt-2 text-body-md font-semibold text-text-primary">{simulation.simulated_review_title}</h3>
         </div>
         <div className="text-right">
           <Stars rating={simulation.final_predicted_rating} />
-          <p className="mt-1 text-xs font-semibold text-text-secondary">
+          <p className="mt-1 text-body-xs font-semibold text-text-secondary">
             Confidence {Math.round((simulation.confidence || 0) * 100)}%
           </p>
         </div>
       </div>
-      <p className="mt-4 text-sm italic leading-6 text-text-secondary">
+      <p className="mt-4 text-body-sm italic text-text-secondary">
         &quot;{expanded || !shouldClamp ? text : `${text.slice(0, 180)}...`}&quot;
       </p>
       {shouldClamp ? (
         <button
           type="button"
           onClick={() => setExpanded((current) => !current)}
-          className="mt-3 text-sm font-semibold text-primary underline-offset-4 hover:underline"
+          className="mt-3 text-body-sm font-medium text-primary underline-offset-4 hover:underline"
         >
           {expanded ? "Show less" : "Expand review"}
         </button>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Lock,
@@ -55,6 +55,7 @@ export function DashboardSidebar({
   userEmail = "merchant@example.com",
 }: DashboardSidebarProps) {
   const router = useRouter();
+  const pathname = usePathname();
 
   async function handleLogout() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -69,19 +70,25 @@ export function DashboardSidebar({
   }
 
   return (
-    <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-border bg-soft-surface">
-      <div className="flex h-16 items-center border-b border-border px-5">
+    <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-border bg-surface-1">
+      <div className="flex h-16 items-center border-b border-border px-6">
         <Logo />
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-5">
+      <nav className="flex-1 px-4 py-4">
         {navItems.map((item) => {
           const Icon = item.icon;
+          const isActive =
+            item.href === "/dashboard"
+              ? pathname === item.href
+              : pathname === item.href || pathname.startsWith(`${item.href}/`);
           const className = cn(
-            "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+            "mb-0.5 flex h-9 w-full items-center gap-2.5 rounded-md px-3 text-body-sm font-medium transition-colors duration-150",
             item.locked
-              ? "cursor-not-allowed text-text-muted"
-              : "text-text-secondary hover:bg-primary-light hover:text-primary hover:shadow-[0_10px_24px_rgba(91,33,182,0.08)]",
+              ? "cursor-not-allowed text-text-disabled"
+              : isActive
+                ? "bg-primary-light text-primary"
+                : "text-text-secondary hover:bg-surface-0 hover:text-text-primary",
           );
 
           if (item.locked) {
@@ -94,7 +101,7 @@ export function DashboardSidebar({
               >
                 <Icon className="h-4 w-4" />
                 <span className="flex-1 truncate">{item.label}</span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-text-muted">
+                <span className="inline-flex h-5 items-center gap-1 rounded-full border border-border px-2 text-label-sm text-text-disabled">
                   <Lock className="h-3 w-3" />
                 </span>
               </div>
@@ -112,13 +119,13 @@ export function DashboardSidebar({
 
       <div className="border-t border-border p-4">
         <div className="mb-3 min-w-0">
-          <p className="truncate text-sm font-semibold text-text-primary">{orgName}</p>
-          <p className="truncate text-xs text-text-secondary">{userEmail}</p>
+          <p className="truncate text-body-sm font-semibold text-text-primary">{orgName}</p>
+          <p className="truncate text-body-xs text-text-muted">{userEmail}</p>
         </div>
         <button
           type="button"
           onClick={handleLogout}
-          className="violet-focus-ring flex w-full items-center justify-center gap-2 rounded-lg border bg-surface px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:border-primary-light hover:bg-primary-light hover:text-primary"
+          className="btn-press flex h-9 w-full items-center justify-center gap-2 rounded-md border border-border bg-surface-1 px-3 text-body-sm font-medium text-text-secondary transition-colors hover:bg-surface-0 hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           <LogOut className="h-4 w-4" />
           Log out

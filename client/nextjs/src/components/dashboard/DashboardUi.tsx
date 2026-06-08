@@ -20,12 +20,12 @@ export function StrictnessBadge({ value }: { value?: string | null }) {
   const normalized = (value || "moderate").toLowerCase();
   const className =
     normalized === "strict"
-      ? "border-error/30 bg-error/10 text-error"
+      ? "border-error bg-error-light text-error-text"
       : normalized === "generous"
-        ? "border-success/30 bg-success/10 text-success"
-        : "border-warning/30 bg-warning/10 text-warning";
+        ? "border-success bg-success-light text-success-text"
+        : "border-warning bg-warning-light text-warning-text";
   return (
-    <span className={cn("inline-flex rounded-full border px-2 py-1 text-xs font-semibold capitalize", className)}>
+    <span className={cn("inline-flex h-5 items-center rounded-full border px-2 text-label-sm capitalize", className)}>
       {normalized}
     </span>
   );
@@ -40,7 +40,7 @@ export function InsightBars({
 }) {
   const max = Math.max(...items.map((item) => item.count), 1);
   if (!items.length) {
-    return <p className="text-sm text-text-secondary">Not enough persona evidence yet.</p>;
+    return <p className="text-body-sm text-text-secondary">Not enough persona evidence yet.</p>;
   }
   return (
     <div className="space-y-4">
@@ -48,17 +48,15 @@ export function InsightBars({
         const percent = Math.max(8, Math.round((item.count / max) * 100));
         return (
           <div key={item.label}>
-            <div className="flex items-center justify-between gap-4 text-sm">
+            <div className="flex items-center justify-between gap-4 text-body-sm">
               <span className="font-medium text-text-primary">{item.label}</span>
-              <span className="text-text-muted">{item.count}</span>
+              <span className="font-mono text-mono-sm text-text-muted">{item.count}</span>
             </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-soft-surface">
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-0">
               <div
                 className={cn(
                   "h-full rounded-full",
-                  tone === "red"
-                    ? "bg-gradient-to-r from-error to-red-400"
-                    : "bg-gradient-to-r from-primary to-violet-500",
+                  tone === "red" ? "bg-error" : "bg-primary",
                 )}
                 style={{ width: `${percent}%` }}
               />
@@ -72,7 +70,7 @@ export function InsightBars({
 
 export function TruncatedCustomerId({ customerId }: { customerId: string }) {
   return (
-    <span className="group inline-flex items-center gap-2 font-mono text-sm text-text-primary">
+    <span className="group inline-flex items-center gap-2 font-mono text-mono-md text-text-primary">
       {customerId.length > 10 ? `${customerId.slice(0, 10)}...` : customerId}
       <button
         type="button"

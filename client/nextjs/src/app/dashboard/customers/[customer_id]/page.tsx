@@ -79,14 +79,14 @@ export default function CustomerProfilePage() {
   }, [customerId, orgId]);
 
   if (loading) {
-    return <div className="h-96 animate-pulse rounded-2xl bg-soft-surface" />;
+    return <div className="skeleton-shimmer h-96 rounded-lg" />;
   }
 
   if (error || !profile) {
     return (
       <section className="command-card p-8">
-        <h1 className="font-display text-3xl font-semibold text-text-primary">Profile unavailable</h1>
-        <p className="mt-3 text-sm text-error">{error || "Customer profile not found."}</p>
+        <h1 className="font-display text-display-sm text-text-primary">Profile unavailable</h1>
+        <p className="mt-3 text-body-sm text-error-text">{error || "Customer profile not found."}</p>
       </section>
     );
   }
@@ -105,28 +105,28 @@ function CustomerBriefing({ profile, orgId }: { profile: DashboardCustomerProfil
 
   return (
     <div className="mx-auto max-w-7xl space-y-8">
-      <Link href="/dashboard/customers" className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
+      <Link href="/dashboard/customers" className="inline-flex items-center gap-2 text-body-sm font-medium text-primary">
         <ArrowLeft className="h-4 w-4" />
         Back to customers
       </Link>
 
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Analyst briefing</p>
-        <h1 className="mt-2 font-display text-4xl font-semibold text-text-primary">
+        <p className="text-label-lg text-primary">Analyst briefing</p>
+        <h1 className="mt-2 font-display text-display-md text-text-primary">
           Customer <TruncatedCustomerId customerId={profile.customer_id} />
         </h1>
-        <p className="mt-2 text-text-secondary">{profile.review_count} reviews inform this persona.</p>
+        <p className="mt-2 text-body-md text-text-secondary">{profile.review_count} reviews inform this persona.</p>
       </header>
 
-      <section className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(360px,1.4fr)]">
-        <div className="space-y-6">
+      <section className="grid gap-6 lg:grid-cols-5">
+        <div className="space-y-6 lg:col-span-3">
           <BriefingCard title="Rating behaviour" subtitle="How this customer scores products.">
             <div className="flex flex-wrap items-center gap-4">
               <Stars rating={avgRating} />
-              <span className="font-display text-3xl font-semibold text-text-primary">{avgRating.toFixed(1)}</span>
+              <span className="metric-number font-display text-metric-lg text-text-primary">{avgRating.toFixed(1)}</span>
               <StrictnessBadge value={String(rating.strictness || "moderate")} />
             </div>
-            <p className="mt-4 text-sm leading-6 text-text-secondary">
+            <p className="mt-4 text-body-sm text-text-secondary">
               {textValue(rating.rating_patterns, "No detailed rating pattern yet.")}
             </p>
           </BriefingCard>
@@ -151,7 +151,7 @@ function CustomerBriefing({ profile, orgId }: { profile: DashboardCustomerProfil
           </BriefingCard>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-6 lg:col-span-2">
           <BriefingCard title="What they value" subtitle="Signals to preserve in products and messaging.">
             <IconList items={stringList(preferences.what_they_value)} icon="check" />
           </BriefingCard>
@@ -169,7 +169,7 @@ function CustomerBriefing({ profile, orgId }: { profile: DashboardCustomerProfil
 
       <BriefingCard title="Evidence from reviews" subtitle="Examples that support this persona.">
         <details>
-          <summary className="cursor-pointer text-sm font-semibold text-primary">Show review evidence</summary>
+          <summary className="cursor-pointer text-body-sm font-medium text-primary">Show review evidence</summary>
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <QuoteList title="Positive examples" items={stringList(evidence.positive_examples)} />
             <QuoteList title="Negative examples" items={stringList(evidence.negative_examples)} />
@@ -181,8 +181,8 @@ function CustomerBriefing({ profile, orgId }: { profile: DashboardCustomerProfil
 
       <BriefingCard title="Raw persona JSON" subtitle="Developer view for debugging and handoff.">
         <details>
-          <summary className="cursor-pointer text-sm font-semibold text-primary">View full JSON</summary>
-          <pre className="mt-4 max-h-96 overflow-auto rounded-xl bg-soft-surface p-4 text-xs text-text-secondary">
+          <summary className="cursor-pointer text-body-sm font-medium text-primary">View full JSON</summary>
+          <pre className="mt-4 max-h-96 overflow-auto rounded-lg bg-surface-0 p-4 text-mono-sm text-text-secondary">
             {JSON.stringify(persona, null, 2)}
           </pre>
         </details>
@@ -202,8 +202,8 @@ function BriefingCard({
 }) {
   return (
     <section className="command-card p-6">
-      <h2 className="font-display text-2xl font-semibold text-text-primary">{title}</h2>
-      <p className="mt-2 text-sm leading-6 text-text-secondary">{subtitle}</p>
+      <h2 className="font-display text-heading-xl text-text-primary">{title}</h2>
+      <p className="mt-2 text-body-sm text-text-secondary">{subtitle}</p>
       <div className="mt-5">{children}</div>
     </section>
   );
@@ -211,9 +211,9 @@ function BriefingCard({
 
 function LabeledValue({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border bg-soft-surface p-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">{label}</p>
-      <p className="mt-2 text-sm font-semibold capitalize text-text-primary">{value}</p>
+    <div className="rounded-lg border border-border bg-surface-0 p-3">
+      <p className="text-label-sm text-text-muted">{label}</p>
+      <p className="mt-2 text-body-sm font-semibold capitalize text-text-primary">{value}</p>
     </div>
   );
 }
@@ -221,16 +221,16 @@ function LabeledValue({ label, value }: { label: string; value: string }) {
 function ChipGroup({ label, items, tone = "violet" }: { label: string; items: string[]; tone?: "violet" | "green" | "red" }) {
   const color =
     tone === "green"
-      ? "border-success/30 bg-success/10 text-success"
+      ? "border-success bg-success-light text-success-text"
       : tone === "red"
-        ? "border-error/30 bg-error/10 text-error"
-        : "border-primary/30 bg-primary-light text-primary";
+        ? "border-error bg-error-light text-error-text"
+        : "border-border bg-surface-0 text-text-secondary";
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">{label}</p>
+      <p className="text-label-sm text-text-muted">{label}</p>
       <div className="mt-2 flex flex-wrap gap-2">
         {(items.length ? items : ["No signal yet"]).map((item) => (
-          <span key={item} className={`rounded-full border px-3 py-1 text-xs font-semibold ${color}`}>
+          <span key={item} className={`inline-flex h-5 items-center rounded-full border px-2 text-label-sm ${color}`}>
             {item}
           </span>
         ))}
@@ -246,7 +246,7 @@ function IconList({ items, icon }: { items: string[]; icon: "check" | "x" }) {
   return (
     <ul className="space-y-3">
       {safeItems.map((item) => (
-        <li key={item} className="flex items-start gap-3 text-sm leading-6 text-text-secondary">
+        <li key={item} className="flex items-start gap-3 text-body-sm text-text-secondary">
           <Icon className={`mt-1 h-4 w-4 shrink-0 ${color}`} />
           <span>{item}</span>
         </li>
@@ -258,10 +258,10 @@ function IconList({ items, icon }: { items: string[]; icon: "check" | "x" }) {
 function QuoteList({ title, items }: { title: string; items: string[] }) {
   return (
     <div>
-      <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
+      <h3 className="text-body-sm font-semibold text-text-primary">{title}</h3>
       <div className="mt-3 space-y-3">
         {(items.length ? items : ["No review evidence captured yet."]).map((item) => (
-          <blockquote key={item} className="rounded-xl border border-border bg-soft-surface p-4 text-sm italic leading-6 text-text-secondary">
+          <blockquote key={item} className="rounded-lg border border-border bg-surface-0 p-4 text-body-sm italic text-text-secondary">
             &quot;{item}&quot;
           </blockquote>
         ))}
@@ -319,35 +319,35 @@ function QuickSimulation({ orgId, customerId }: { orgId: string; customerId: str
   }
 
   return (
-    <section className="violet-glow-card rounded-2xl p-6">
-      <h2 className="font-display text-2xl font-semibold text-text-primary">How would this customer react to a product?</h2>
-      <p className="mt-2 text-sm text-text-secondary">
+    <section className="command-card p-6">
+      <h2 className="font-display text-heading-xl text-text-primary">How would this customer react to a product?</h2>
+      <p className="mt-2 text-body-sm text-text-secondary">
         Test customer reactions before investing in inventory.
       </p>
       <form onSubmit={(event) => void handleSubmit(event)} className="mt-6 grid gap-4 lg:grid-cols-2">
-        <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Product title" className="violet-focus-ring" />
-        <Input value={category} onChange={(event) => setCategory(event.target.value)} placeholder="Category" className="violet-focus-ring" />
-        <Input value={price} onChange={(event) => setPrice(event.target.value)} placeholder="Price" type="number" step="0.01" className="violet-focus-ring" />
-        <Textarea value={features} onChange={(event) => setFeatures(event.target.value)} placeholder={"Features, one per line"} className="violet-focus-ring min-h-24" />
-        <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Description" className="violet-focus-ring min-h-24 lg:col-span-2" />
-        <Button disabled={loading} className="violet-focus-ring bg-primary text-white hover:bg-primary-hover lg:col-span-2">
+        <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Product title" />
+        <Input value={category} onChange={(event) => setCategory(event.target.value)} placeholder="Category" />
+        <Input value={price} onChange={(event) => setPrice(event.target.value)} placeholder="Price" type="number" step="0.01" />
+        <Textarea value={features} onChange={(event) => setFeatures(event.target.value)} placeholder={"Features, one per line"} className="min-h-24" />
+        <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Description" className="min-h-24 lg:col-span-2" />
+        <Button disabled={loading} className="lg:col-span-2">
           {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           Simulate
         </Button>
       </form>
-      {error ? <p className="mt-4 text-sm text-error">{error}</p> : null}
+      {error ? <p className="mt-4 text-body-sm text-error-text">{error}</p> : null}
       {result ? (
-        <div className="mt-6 rounded-2xl border border-border bg-surface p-5">
+        <div className="mt-6 rounded-lg border border-border bg-surface-1 p-5">
           <div className="flex flex-wrap items-center gap-3">
             <Stars rating={result.final_predicted_rating} />
             <span className="font-display text-2xl font-semibold text-text-primary">
               {result.final_predicted_rating.toFixed(1)} / 5
             </span>
           </div>
-          <h3 className="mt-4 font-semibold text-text-primary">{result.simulated_review_title}</h3>
-          <p className="mt-2 text-sm italic leading-6 text-text-secondary">&quot;{result.simulated_review_text}&quot;</p>
+          <h3 className="mt-4 text-body-md font-semibold text-text-primary">{result.simulated_review_title}</h3>
+          <p className="mt-2 text-body-sm italic text-text-secondary">&quot;{result.simulated_review_text}&quot;</p>
           {result.reasoning_summary ? (
-            <p className="mt-4 rounded-xl bg-soft-surface p-4 text-sm leading-6 text-text-secondary">
+            <p className="mt-4 rounded-lg bg-surface-0 p-4 text-body-sm text-text-secondary">
               {result.reasoning_summary}
             </p>
           ) : null}

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Star } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { Stars } from "@/components/dashboard/DashboardUi";
 
 type PersonaPreviewProps = {
   persona: Record<string, unknown> | string;
@@ -82,14 +83,6 @@ function getTopComplaints(persona: Record<string, unknown> | string) {
   );
 }
 
-function starsForRating(value: number | null) {
-  if (value === null) {
-    return "n/a";
-  }
-  const rounded = Math.max(1, Math.min(5, Math.round(value)));
-  return "★".repeat(rounded) + "☆".repeat(5 - rounded);
-}
-
 export function PersonaPreview({
   persona,
   averageRating,
@@ -105,12 +98,12 @@ export function PersonaPreview({
     <div className="command-card overflow-hidden">
       <button
         type="button"
-        className="violet-focus-ring flex w-full items-center justify-between border-0 bg-surface px-4 py-3 text-left"
+        className="flex w-full items-center justify-between border-0 bg-surface-1 px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         onClick={() => setOpen((value) => !value)}
       >
         <div>
-          <p className="text-sm font-semibold text-text-primary">Persona preview</p>
-          <p className="text-xs text-text-secondary">What this customer values and notices</p>
+          <p className="text-body-sm font-semibold text-text-primary">Persona preview</p>
+          <p className="text-body-xs text-text-secondary">What this customer values and notices</p>
         </div>
         {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
       </button>
@@ -119,32 +112,31 @@ export function PersonaPreview({
         <div className="space-y-4 border-t border-border px-4 py-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+              <p className="text-label-sm text-text-muted">
                 Tone
               </p>
-              <p className="mt-1 text-sm font-medium text-text-primary">{String(getTone(persona))}</p>
+              <p className="mt-1 text-body-sm font-medium text-text-primary">{String(getTone(persona))}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+              <p className="text-label-sm text-text-muted">
                 Avg rating
               </p>
-              <p className="mt-1 flex items-center gap-2 text-sm font-medium text-warning">
-                <Star className="h-4 w-4 fill-current" />
-                {starsForRating(rating)}
-                {rating !== null && <span className="text-text-secondary">{rating.toFixed(1)}</span>}
+              <p className="mt-1 flex items-center gap-2 text-body-sm font-medium text-warning">
+                {rating === null ? "n/a" : <Stars rating={rating} />}
+                {rating !== null && <span className="font-mono text-mono-sm text-text-secondary">{rating.toFixed(1)}</span>}
               </p>
             </div>
           </div>
 
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+            <p className="text-label-sm text-text-muted">
               Top values
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {(values.length ? values : ["not available"]).map((item) => (
                 <span
                   key={item}
-                  className="rounded-full border border-primary/20 bg-primary-light px-2.5 py-1 text-xs font-medium text-primary"
+                  className="inline-flex h-5 items-center rounded-full border border-border bg-surface-0 px-2 text-label-sm text-text-secondary"
                 >
                   {item}
                 </span>
@@ -153,14 +145,14 @@ export function PersonaPreview({
           </div>
 
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+            <p className="text-label-sm text-text-muted">
               Top complaints
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {(complaints.length ? complaints : ["not available"]).map((item) => (
                 <span
                   key={item}
-                  className="rounded-full border border-border bg-soft-surface px-2.5 py-1 text-xs font-medium text-text-secondary"
+                  className="inline-flex h-5 items-center rounded-full border border-border bg-surface-0 px-2 text-label-sm text-text-secondary"
                 >
                   {item}
                 </span>
@@ -171,7 +163,7 @@ export function PersonaPreview({
           <button
             type="button"
             className={cn(
-              "text-xs font-semibold text-primary underline-offset-4 hover:underline",
+              "text-body-xs font-semibold text-primary underline-offset-4 hover:underline",
               showJson && "text-primary-hover",
             )}
             onClick={() => setShowJson((value) => !value)}
@@ -180,7 +172,7 @@ export function PersonaPreview({
           </button>
 
           {showJson && (
-            <pre className="max-h-72 overflow-auto rounded-lg bg-soft-surface p-3 text-xs leading-5 text-text-secondary">
+            <pre className="max-h-72 overflow-auto rounded-lg bg-surface-0 p-3 text-mono-sm text-text-secondary">
               {typeof persona === "string" ? persona : JSON.stringify(persona, null, 2)}
             </pre>
           )}

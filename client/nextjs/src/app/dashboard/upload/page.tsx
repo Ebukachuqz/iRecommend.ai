@@ -16,24 +16,24 @@ export default function DashboardUploadPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-8">
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Upload data</p>
-        <h1 className="mt-2 font-display text-4xl font-semibold text-text-primary">Upload customer reviews</h1>
-        <p className="mt-2 max-w-2xl text-text-secondary">
+        <p className="text-label-lg text-primary">Upload data</p>
+        <h1 className="mt-2 font-display text-display-md text-text-primary">Upload customer reviews</h1>
+        <p className="mt-2 max-w-2xl text-body-md text-text-secondary">
           Map your CSV columns and build behavioural personas for {orgName}. Product catalog upload is available inside the launch simulator.
         </p>
       </header>
 
       {completeStatus ? (
-        <section className="aurora-panel p-8">
-          <CheckCircle2 className="h-9 w-9 text-white" />
-          <h2 className="mt-5 font-display text-3xl font-semibold text-white">Customer intelligence updated</h2>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-white/80">
+        <section className="rounded-lg border border-success bg-success-light p-8">
+          <CheckCircle2 className="h-9 w-9 text-success" />
+          <h2 className="mt-5 font-display text-display-sm text-text-primary">Customer intelligence updated</h2>
+          <p className="mt-3 max-w-xl text-body-sm text-text-secondary">
             {completeStatus.personas_generated} personas were generated from{" "}
             {completeStatus.processed_rows} processed rows. Your overview is ready to refresh.
           </p>
           <Button
             render={<Link href="/dashboard" />}
-            className="violet-focus-ring mt-8 bg-white text-primary hover:bg-primary-light"
+            className="mt-8"
           >
             View dashboard
           </Button>
