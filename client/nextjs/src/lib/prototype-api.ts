@@ -30,11 +30,12 @@ export type UserSummary = {
 };
 
 export type PersonaSelection = {
-  mode: "demo" | "custom";
+  mode: "demo" | "custom" | "cold_start";
   userId?: string;
   category: DemoCategory;
-  persona: Record<string, unknown> | string;
+  persona?: Record<string, unknown> | string;
   personaRow?: PersonaRow;
+  onboardingAnswers?: Record<string, unknown>;
 };
 
 export type ProductInput = {
@@ -78,6 +79,16 @@ export type RecommendationItem = {
   confidence?: number | null;
   evidence?: string[];
   score_breakdown?: Record<string, unknown>;
+  images?: unknown;
+  image_url?: string | null;
+  category?: string | null;
+  main_category?: string | null;
+  price?: number | null;
+  average_rating?: number | null;
+  rating_number?: number | null;
+  store?: string | null;
+  product?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 };
 
 export type RecommendationResult = {
@@ -158,6 +169,15 @@ export async function listDemoUsers(limit = 30): Promise<UserSummary[]> {
   return batches.flat();
 }
 
+export async function listDemoUsersForCategory(
+  category: DemoCategory,
+  limit = 20,
+): Promise<UserSummary[]> {
+  return requestJson<UserSummary[]>(
+    `/users?category=${encodeURIComponent(category)}&limit=${limit}`,
+  );
+}
+
 export async function getPersona(userId: string, category: string): Promise<PersonaRow> {
   return requestJson<PersonaRow>(
     `/users/${encodeURIComponent(userId)}/persona?category=${encodeURIComponent(category)}`,
@@ -200,7 +220,7 @@ export async function simulateReview(selection: PersonaSelection, product: Produ
       user_id: selection.mode === "demo" ? selection.userId : undefined,
       category: product.category,
       parent_asin: product.parent_asin || "playground_custom_product",
-      persona: selection.persona,
+      persona: selection.persona || {},
       product: {
         parent_asin: product.parent_asin || "playground_custom_product",
         title: product.title,
@@ -223,17 +243,19 @@ export async function getRecommendations(
   selection: PersonaSelection,
   requestText: string,
   sessionId?: string | null,
+  limit = 5,
 ) {
   return requestJson<RecommendationResult>("/recommendations/generate", {
     method: "POST",
     body: JSON.stringify({
       user_id: selection.mode === "demo" ? selection.userId : undefined,
       category: selection.category,
-      persona: selection.persona,
+      persona: selection.mode === "cold_start" ? undefined : selection.persona,
+      onboarding_answers: selection.mode === "cold_start" ? selection.onboardingAnswers : undefined,
       request: requestText || null,
-      limit: 5,
+      limit,
       session_id: sessionId || undefined,
-      cold_start: selection.mode === "custom",
+      cold_start: selection.mode === "cold_start",
       context: { source: "nextjs_playground" },
     }),
   });
@@ -243,6 +265,7 @@ export async function refineRecommendations(
   sessionId: string,
   selection: PersonaSelection,
   message: string,
+  limit = 5,
 ) {
   const payload =
     selection.mode === "demo"
@@ -250,15 +273,16 @@ export async function refineRecommendations(
           user_id: selection.userId,
           category: selection.category,
           message,
-          limit: 5,
+          limit,
         }
       : {
-          persona: selection.persona,
+          persona: selection.mode === "cold_start" ? undefined : selection.persona,
+          onboarding_answers: selection.mode === "cold_start" ? selection.onboardingAnswers : undefined,
           category: selection.category,
           request: message,
-          limit: 5,
+          limit,
           session_id: sessionId,
-          cold_start: true,
+          cold_start: selection.mode === "cold_start",
           context: { source: "nextjs_playground", refinement: true },
         };
 

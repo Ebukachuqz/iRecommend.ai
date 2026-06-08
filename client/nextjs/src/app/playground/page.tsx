@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   FileText,
+  ImageIcon,
   Loader2,
   RefreshCcw,
   Send,
@@ -27,6 +28,7 @@ import {
   type PersonaSelection,
   type ProductInput,
   type ProductSummary,
+  type RecommendationItem,
   type RecommendationResult,
   type SimulationResult,
 } from "@/lib/prototype-api";
@@ -91,6 +93,61 @@ function productSummaryToInput(product: ProductSummary, category: DemoCategory):
     features: [],
     description: "",
   };
+}
+
+function stringFromUnknown(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function imageUrlFromImageObject(value: unknown): string | null {
+  if (!value) {
+    return null;
+  }
+  if (typeof value === "string") {
+    return stringFromUnknown(value);
+  }
+  if (typeof value !== "object") {
+    return null;
+  }
+
+  const image = value as Record<string, unknown>;
+  return (
+    stringFromUnknown(image.large) ||
+    stringFromUnknown(image.hi_res) ||
+    stringFromUnknown(image.thumb) ||
+    stringFromUnknown(image.url) ||
+    stringFromUnknown(image.src)
+  );
+}
+
+function recommendationImageUrl(item: RecommendationItem) {
+  if (item.image_url) {
+    return item.image_url;
+  }
+
+  const direct = item.images;
+  if (Array.isArray(direct) && direct.length > 0) {
+    const main = direct.find(
+      (image) =>
+        typeof image === "object" &&
+        image !== null &&
+        (image as Record<string, unknown>).variant === "MAIN",
+    );
+    return imageUrlFromImageObject(main || direct[0]);
+  }
+
+  const nestedImages = item.product?.images || item.metadata?.images;
+  if (Array.isArray(nestedImages) && nestedImages.length > 0) {
+    const main = nestedImages.find(
+      (image) =>
+        typeof image === "object" &&
+        image !== null &&
+        (image as Record<string, unknown>).variant === "MAIN",
+    );
+    return imageUrlFromImageObject(main || nestedImages[0]);
+  }
+
+  return imageUrlFromImageObject(direct);
 }
 
 function EmptyState({ title, description }: { title: string; description: string }) {
@@ -249,11 +306,30 @@ function RecommendationResults({
       <div className="space-y-4">
         {result.recommendations.map((item, index) => {
           const evidence = evidenceList(item.evidence);
+          const imageUrl = recommendationImageUrl(item);
+          const category =
+            item.category ||
+            item.main_category ||
+            (typeof item.product?.category === "string" ? item.product.category : null) ||
+            result.category;
           return (
             <article key={`${item.parent_asin}-${index}`} className="rounded-lg border border-border bg-surface-1 p-5">
-              <div className="flex gap-4">
+              <div className="flex flex-col gap-4 sm:flex-row">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-body-sm font-medium text-text-inverse">
                   {item.rank || index + 1}
+                </div>
+                <div className="flex h-28 w-full shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-0 sm:w-28">
+                  {imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={imageUrl}
+                      alt={item.title || item.parent_asin}
+                      className="h-full w-full object-contain p-2"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <ImageIcon className="h-8 w-8 text-text-muted" />
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -261,9 +337,10 @@ function RecommendationResults({
                       {item.title || item.parent_asin}
                     </h3>
                     <span className="inline-flex h-5 items-center rounded-full border border-border bg-surface-0 px-2 text-label-sm text-text-secondary">
-                      {categoryLabelByValue[result.category as DemoCategory] || result.category}
+                      {categoryLabelByValue[category as DemoCategory] || category}
                     </span>
                   </div>
+                  <p className="mt-1 font-mono text-mono-sm text-text-muted">{item.parent_asin}</p>
 
                   <div className="mt-4">
                     <p className="text-label-sm text-text-muted">
@@ -348,6 +425,7 @@ export default function PlaygroundPage() {
   const [product, setProduct] = useState<ProductInput>(defaultProduct);
   const [demoProducts, setDemoProducts] = useState<ProductSummary[]>([]);
   const [selectedProductKey, setSelectedProductKey] = useState("");
+  const [maxProductsToLoad, setMaxProductsToLoad] = useState(20);
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsError, setProductsError] = useState<string | null>(null);
   const [featuresText, setFeaturesText] = useState("");
@@ -356,6 +434,7 @@ export default function PlaygroundPage() {
   const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
 
   const [requestText, setRequestText] = useState("");
+  const [recommendationLimit, setRecommendationLimit] = useState(5);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
   const [recommendationResult, setRecommendationResult] = useState<RecommendationResult | null>(null);
@@ -371,8 +450,6 @@ export default function PlaygroundPage() {
   }, []);
 
   useEffect(() => {
-    let mounted = true;
-
     if (!personaSelection) {
       setDemoProducts([]);
       setSelectedProductKey("");
@@ -397,7 +474,7 @@ export default function PlaygroundPage() {
     setDemoProducts([]);
     setSelectedProductKey("");
     setProductsError(null);
-    setProductsLoading(true);
+    setProductsLoading(false);
     setProduct((current) => ({
       ...current,
       title: "",
@@ -405,33 +482,13 @@ export default function PlaygroundPage() {
       parent_asin: undefined,
       main_category: undefined,
     }));
-
-    listUnseenProducts(personaSelection.userId)
-      .then((products) => {
-        if (!mounted) {
-          return;
-        }
-        setDemoProducts(products);
-        if (!products.length) {
-          setProductsError("No demo products were returned for this customer.");
-        }
-      })
-      .catch((error) => {
-        if (!mounted) {
-          return;
-        }
-        setProductsError(friendlyError(error));
-      })
-      .finally(() => {
-        if (mounted) {
-          setProductsLoading(false);
-        }
-      });
-
-    return () => {
-      mounted = false;
-    };
   }, [personaSelection]);
+
+  useEffect(() => {
+    if (activeTab === "simulation" && personaSelection?.mode === "cold_start") {
+      setPersonaSelection(null);
+    }
+  }, [activeTab, personaSelection?.mode]);
 
   const productForSubmit = useMemo<ProductInput>(
     () => ({
@@ -444,9 +501,40 @@ export default function PlaygroundPage() {
     [featuresText, product],
   );
 
-  const canSimulate = Boolean(personaSelection && productForSubmit.title.trim());
+  const canSimulate = Boolean(
+    personaSelection && personaSelection.mode !== "cold_start" && productForSubmit.title.trim(),
+  );
   const canRecommend = Boolean(personaSelection);
-  const usesDemoProductDropdown = personaSelection?.mode !== "custom";
+  const usesDemoProductDropdown = !personaSelection || personaSelection.mode === "demo";
+
+  async function handleLoadUnseenProducts() {
+    if (personaSelection?.mode !== "demo" || !personaSelection.userId) {
+      setProductsError("Please select a demo customer first.");
+      return;
+    }
+    setProductsLoading(true);
+    setProductsError(null);
+    setDemoProducts([]);
+    setSelectedProductKey("");
+    setProduct((current) => ({
+      ...current,
+      title: "",
+      parent_asin: undefined,
+      main_category: undefined,
+    }));
+
+    try {
+      const products = await listUnseenProducts(personaSelection.userId, maxProductsToLoad);
+      setDemoProducts(products);
+      if (!products.length) {
+        setProductsError("No demo products were returned for this customer.");
+      }
+    } catch (error) {
+      setProductsError(friendlyError(error));
+    } finally {
+      setProductsLoading(false);
+    }
+  }
 
   function handleDemoProductSelection(nextKey: string) {
     setSelectedProductKey(nextKey);
@@ -490,7 +578,7 @@ export default function PlaygroundPage() {
     setRecommendationLoading(true);
     setRecommendationError(null);
     try {
-      const result = await getRecommendations(personaSelection, requestText, sessionId);
+      const result = await getRecommendations(personaSelection, requestText, sessionId, recommendationLimit);
       setRecommendationResult({ ...result, session_id: result.session_id || sessionId });
       setConversation([
         {
@@ -517,7 +605,12 @@ export default function PlaygroundPage() {
     setRefining(true);
     setRecommendationError(null);
     try {
-      const result = await refineRecommendations(recommendationResult.session_id, personaSelection, message);
+      const result = await refineRecommendations(
+        recommendationResult.session_id,
+        personaSelection,
+        message,
+        recommendationLimit,
+      );
       setRecommendationResult({ ...result, session_id: result.session_id || recommendationResult.session_id });
       setConversation((current) => [
         ...current,
@@ -580,7 +673,11 @@ export default function PlaygroundPage() {
         </div>
 
         <div className="mt-6 grid gap-6 xl:grid-cols-2">
-          <PersonaSelector value={personaSelection} onChange={setPersonaSelection} />
+          <PersonaSelector
+            value={personaSelection}
+            onChange={setPersonaSelection}
+            allowColdStart={activeTab === "recommendations"}
+          />
 
           {activeTab === "simulation" ? (
             <div className="command-card space-y-4 p-5">
@@ -601,6 +698,43 @@ export default function PlaygroundPage() {
 
               {usesDemoProductDropdown ? (
                 <div className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                    <label className="block">
+                      <span className="text-label-sm text-text-muted">
+                        Max products to load
+                      </span>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={100}
+                        step={1}
+                        value={maxProductsToLoad}
+                        onChange={(event) =>
+                          setMaxProductsToLoad(
+                            Math.max(1, Math.min(100, Number(event.target.value) || 1)),
+                          )
+                        }
+                        className="mt-2"
+                      />
+                    </label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!personaSelection || productsLoading}
+                      onClick={() => void handleLoadUnseenProducts()}
+                      className="h-10"
+                    >
+                      {productsLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Loading...
+                        </>
+                      ) : (
+                        "Load unseen products"
+                      )}
+                    </Button>
+                  </div>
+
                   <label className="block">
                     <span className="text-label-sm text-text-muted">
                       Product from demo database*
@@ -625,6 +759,12 @@ export default function PlaygroundPage() {
                       ))}
                     </select>
                   </label>
+
+                  {!demoProducts.length && !productsError && !productsLoading && (
+                    <p className="rounded-lg bg-surface-0 px-3 py-2 text-body-xs text-text-secondary">
+                      Click Load unseen products to populate the product list.
+                    </p>
+                  )}
 
                   {productsError && <p className="text-body-sm text-error-text">{productsError}</p>}
 
@@ -760,6 +900,23 @@ export default function PlaygroundPage() {
                 placeholder={"What are you looking for? (optional)\nLeave empty - your persona is enough."}
                 className="resize-none"
               />
+
+              <label className="block">
+                <span className="text-label-sm text-text-muted">
+                  Max recommendations
+                </span>
+                <select
+                  value={recommendationLimit}
+                  onChange={(event) => setRecommendationLimit(Number(event.target.value))}
+                  className="mt-2 h-10 w-full rounded-md border border-border bg-surface-1 px-3 text-body-md text-text-primary outline-none transition-colors hover:border-border-strong focus:border-primary focus:shadow-[0_0_0_3px_var(--color-primary-light)]"
+                >
+                  {Array.from({ length: 10 }, (_, index) => index + 1).map((limit) => (
+                    <option key={limit} value={limit}>
+                      {limit}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <p className="text-body-xs text-text-muted">A request is not required.</p>
 
               <Button
