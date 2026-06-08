@@ -1,5 +1,7 @@
-export const SAAS_API_URL =
-  process.env.NEXT_PUBLIC_SAAS_API_URL?.replace(/\/$/, "") || "http://localhost:8001";
+export const BACKEND_API_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || "http://localhost:8000";
+
+const OFFLINE_MESSAGE = "Backend API is offline. Start it with: uvicorn app.api.main:app --reload --port 8000.";
 
 export type Organisation = {
   id: string;
@@ -146,7 +148,7 @@ export class SaasApiError extends Error {
 async function requestSaas<T>(path: string, accessToken: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${SAAS_API_URL}${path}`, {
+    response = await fetch(`${BACKEND_API_URL}${path}`, {
       ...init,
       headers: {
         "Content-Type": "application/json",
@@ -158,7 +160,7 @@ async function requestSaas<T>(path: string, accessToken: string, init?: RequestI
     if (error instanceof DOMException && error.name === "AbortError") {
       throw new SaasApiError("This request took too long. Try again with a smaller sample, or load the sample result.");
     }
-    throw new SaasApiError("SaaS API is offline. Start it with: uvicorn app.saas.main:app --reload --port 8001.");
+    throw new SaasApiError(OFFLINE_MESSAGE);
   }
 
   let payload: unknown = null;
@@ -187,7 +189,7 @@ async function requestSaas<T>(path: string, accessToken: string, init?: RequestI
 async function requestSaasForm<T>(path: string, accessToken: string, body: FormData): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${SAAS_API_URL}${path}`, {
+    response = await fetch(`${BACKEND_API_URL}${path}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -195,7 +197,7 @@ async function requestSaasForm<T>(path: string, accessToken: string, body: FormD
       body,
     });
   } catch {
-    throw new SaasApiError("SaaS API is offline. Start it with: uvicorn app.saas.main:app --reload --port 8001.");
+    throw new SaasApiError(OFFLINE_MESSAGE);
   }
 
   let payload: unknown = null;

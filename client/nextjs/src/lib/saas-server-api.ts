@@ -1,11 +1,11 @@
-import { SAAS_API_URL, type Organisation } from "@/lib/saas-api";
+import { BACKEND_API_URL, type Organisation } from "@/lib/saas-api";
 
 type MyOrganisationResponse = {
   organisation: Organisation | null;
 };
 
 export async function getMyOrganisationServer(accessToken: string): Promise<MyOrganisationResponse> {
-  const response = await fetch(`${SAAS_API_URL}/saas/me/organisation`, {
+  const response = await fetch(`${BACKEND_API_URL}/saas/me/organisation`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },

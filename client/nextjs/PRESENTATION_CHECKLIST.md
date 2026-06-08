@@ -2,10 +2,8 @@
 
 ## Start Services
 
-- From project root, start the prototype API on port 8000:
+- From project root, start the unified backend on port 8000:
   `uvicorn app.api.main:app --reload --port 8000`
-- From project root, start the SaaS API on port 8001:
-  `uvicorn app.saas.main:app --reload --port 8001`
 - Start the Next.js app:
   `cd client/nextjs`
   `npm run dev`

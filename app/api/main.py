@@ -4,6 +4,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routers import health, personas, recommend, sessions, simulate
+from app.saas.routes import dashboard as saas_dashboard
+from app.saas.routes import organisations as saas_organisations
+from app.saas.routes import uploads as saas_uploads
 
 
 app = FastAPI(
@@ -26,3 +29,6 @@ app.include_router(personas.router)
 app.include_router(simulate.router)
 app.include_router(recommend.router)
 app.include_router(sessions.router)
+app.include_router(saas_organisations.router)
+app.include_router(saas_uploads.router)
+app.include_router(saas_dashboard.router)

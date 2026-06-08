@@ -189,23 +189,17 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for Docker and Render deployment in
 
 ## iRecommend Next.js SaaS App
 
-The SaaS app lives in `client/nextjs` and runs alongside the existing prototype API.
+The SaaS app lives in `client/nextjs`. Prototype and SaaS API routes are served by one FastAPI backend on port `8000`; prototype routes stay at their existing paths and SaaS routes stay under `/saas/*`.
 
 ### Running locally
 
-Terminal 1 - Prototype API from project root:
+Terminal 1 - Unified backend from project root:
 
 ```powershell
 uvicorn app.api.main:app --reload --port 8000
 ```
 
-Terminal 2 - SaaS API from project root:
-
-```powershell
-uvicorn app.saas.main:app --reload --port 8001
-```
-
-Terminal 3 - Next.js app:
+Terminal 2 - Next.js app:
 
 ```powershell
 cd client/nextjs
@@ -220,7 +214,6 @@ Copy `client/nextjs/.env.local.example` to `client/nextjs/.env.local` and fill i
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-NEXT_PUBLIC_SAAS_API_URL=http://localhost:8001
 ```
 
 ### Database setup
