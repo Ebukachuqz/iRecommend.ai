@@ -1,7 +1,21 @@
 customer_id,product_name,category,rating,review_text,review_date,order_value
-CUST-001,Everyday Hydration Serum,Skincare,5,"Absorbs quickly and keeps my skin calm all day. I would buy this again.",2026-01-12,34.00
-CUST-002,Everyday Hydration Serum,Skincare,3,"Good texture, but the scent is stronger than I expected for sensitive skin.",2026-01-14,34.00
-CUST-003,Compact Desk Lamp,Home Office,4,"The lamp feels sturdy and the warm light makes evening work easier.",2026-01-16,49.99
-CUST-004,Compact Desk Lamp,Home Office,2,"Looks nice, but the switch feels cheap and I worry it will not last.",2026-01-18,49.99
-CUST-005,Travel Cable Organizer,Accessories,5,"Simple, durable, and saves me time when packing. Exactly what I needed.",2026-01-19,18.50
-CUST-006,Travel Cable Organizer,Accessories,4,"Useful little case. I wish it had one more elastic loop for larger chargers.",2026-01-21,18.50
+CUST-001,Everyday Hydration Serum,Skincare,5,"Absorbs quickly and keeps my skin calm all day. I like that it feels lightweight and does not leave a sticky finish.",2026-01-12,34.00
+CUST-001,Gentle Barrier Cream,Skincare,4,"Very soothing after cleansing. The jar is smaller than I expected, but the formula works well for dry patches.",2026-01-19,28.50
+CUST-001,Fragrance-Free Face Wash,Skincare,5,"Exactly what I wanted for sensitive skin. No tight feeling after rinsing and no strong scent.",2026-02-02,19.99
+CUST-001,Overnight Repair Mask,Skincare,3,"It moisturizes, but it feels heavier than I prefer. I would use it only in colder weather.",2026-02-17,31.00
+CUST-002,Compact Desk Lamp,Home Office,4,"The lamp feels sturdy and the warm light makes evening work easier. Setup was simple.",2026-01-16,49.99
+CUST-002,Wireless Ergonomic Mouse,Electronics,5,"Comfortable for long work sessions and the battery lasts longer than expected. The buttons feel solid.",2026-01-26,42.00
+CUST-002,Laptop Stand,Home Office,4,"Good height and stable enough for my laptop. I wish the finish resisted fingerprints better.",2026-02-04,38.75
+CUST-002,USB-C Charging Hub,Electronics,2,"Ports worked at first, but the connection became unreliable after a week. Not durable enough.",2026-02-21,44.99
+CUST-003,Travel Cable Organizer,Accessories,5,"Simple, durable, and saves me time when packing. Exactly what I needed.",2026-01-19,18.50
+CUST-003,Carry-On Toiletry Pouch,Travel,4,"Fits more than it looks like it should. The zipper is smooth, though the fabric could be thicker.",2026-01-28,24.00
+CUST-003,Portable Power Bank,Electronics,5,"Reliable for flights and weekend trips. It charges my phone twice and still has power left.",2026-02-09,39.99
+CUST-003,Noise Reducing Earbuds,Electronics,3,"Sound is decent for the price, but the fit gets uncomfortable after an hour.",2026-02-25,55.00
+CUST-004,Kitchen Storage Set,Home & Kitchen,4,"The containers stack neatly and make the pantry easier to manage. Labels would have made it perfect.",2026-01-22,29.99
+CUST-004,Silicone Cooking Utensils,Home & Kitchen,5,"Strong handles, easy to wash, and they do not scratch my pans. Great value.",2026-02-01,22.50
+CUST-004,Reusable Grocery Bags,Household,4,"Holds heavy items without tearing. I like the size, but folding them back is a little annoying.",2026-02-12,16.00
+CUST-004,Countertop Spice Rack,Home & Kitchen,2,"Looks good, but it wobbles and the bottles do not sit evenly. Feels cheaper than the photos.",2026-02-28,27.25
+CUST-005,Daily Multivitamin Gummies,Health,4,"Easy to take and no unpleasant aftertaste. I appreciate the simple ingredients list.",2026-01-24,21.00
+CUST-005,Digital Body Scale,Health,3,"The screen is clear, but the readings vary more than I expected if I step on it twice.",2026-02-03,32.99
+CUST-005,Foam Massage Roller,Fitness,5,"Firm enough for sore legs after workouts and it has held its shape so far.",2026-02-14,26.50
+CUST-005,Insulated Water Bottle,Fitness,4,"Keeps water cold all day and does not leak. The lid is slightly hard to clean.",2026-03-01,30.00
