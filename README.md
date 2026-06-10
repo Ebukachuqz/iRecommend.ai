@@ -9,6 +9,12 @@ iRecommend is a behaviour-aware LLM agent system that does two things:
 
 The core insight is that structured user personas, extracted from Amazon review history via LLM, can drive both tasks. The system learns how a user writes, what they value, how strictly they rate, and what they avoid, then uses that understanding to simulate behaviour or generate recommendations.
 
+## Live Deployments
+
+- **Next.js SaaS app:** [https://i-recommend-ai.vercel.app/](https://i-recommend-ai.vercel.app/)
+- **Unified FastAPI backend:** [https://irecommend-ai.onrender.com/](https://irecommend-ai.onrender.com/)
+- **Streamlit prototype client:** [https://irecommend-ai-client.onrender.com/](https://irecommend-ai-client.onrender.com/)
+
 **Key design principles:**
 
 - Persona-grounded: every decision traces back to the user's persona.
@@ -21,6 +27,7 @@ The core insight is that structured user personas, extracted from Amazon review 
 
 ## Contents
 
+- [Live Deployments](#live-deployments)
 - [Architecture](#architecture)
 - [Quick Setup](#quick-setup)
 - [Environment Variables](#environment-variables)
