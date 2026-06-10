@@ -1,0 +1,5 @@
+product_id,product_name,category,price,description,features
+PROD-001,Everyday Hydration Serum,Skincare,34.00,"A lightweight serum for customers who want hydration without heaviness.","hydrating; lightweight; sensitive-skin friendly"
+PROD-002,Compact Desk Lamp,Home Office,49.99,"A small adjustable desk lamp for home office customers who value comfort and focus.","warm light; adjustable; metal body"
+PROD-003,Travel Cable Organizer,Accessories,18.50,"A compact pouch for keeping cables, chargers, and adapters easy to find.","durable; compact; travel-ready"
+PROD-004,Wireless Ergonomic Mouse,Electronics,49.99,"An ergonomic mouse designed for customers who spend long sessions at a desk.","wireless; ergonomic; rechargeable"
